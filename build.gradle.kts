@@ -17,6 +17,7 @@
 import com.adarshr.gradle.testlogger.theme.ThemeType
 import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import java.util.Locale
 import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import ru.vyarus.gradle.plugin.python.task.PythonTask
@@ -171,7 +172,7 @@ tasks.register<Test>("accuracyReport") {
             languages.forEach { language ->
                 includeTestsMatching(
                     "$linguaGroupId.$linguaArtifactId.report" +
-                        ".${detector.toLowerCase()}.${language}DetectionAccuracyReport"
+                        ".${detector.toLowerCase(Locale.ROOT)}.${language}DetectionAccuracyReport"
                 )
             }
         }
@@ -204,7 +205,7 @@ tasks.register("writeAggregatedAccuracyReport") {
             csvFile.appendText(language)
 
             for (detector in detectors) {
-                val languageReportFileName = "$accuracyReportsDirectoryName/${detector.toLowerCase()}/$language.txt"
+                val languageReportFileName = "$accuracyReportsDirectoryName/${detector.toLowerCase(Locale.ROOT)}/$language.txt"
                 val languageReportFile = file(languageReportFileName)
 
                 if (languageReportFile.exists()) {
