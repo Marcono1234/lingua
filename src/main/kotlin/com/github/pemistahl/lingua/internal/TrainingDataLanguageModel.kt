@@ -18,15 +18,18 @@ package com.github.pemistahl.lingua.internal
 
 import com.github.pemistahl.lingua.api.Language
 import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
+import com.squareup.moshi.JsonReader
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import okio.buffer
+import okio.source
+import java.io.InputStream
+import java.lang.IllegalArgumentException
 import java.util.*
 
-@Serializable
+
 internal data class JsonLanguageModel(val language: Language, val ngrams: Map<Fraction, String>)
 
 internal data class TrainingDataLanguageModel(
@@ -46,10 +49,12 @@ internal data class TrainingDataLanguageModel(
 
         val jsonLanguageModel = JsonLanguageModel(language, ngrams.mapValues { it.value.joinToString(separator = " ") })
 
-        return Json.encodeToString(jsonLanguageModel)
+        TODO()
     }
 
     companion object {
+        private val jsonModelNameOptions = JsonReader.Options.of("language", "ngrams")
+
         fun fromText(
             text: Sequence<String>,
             language: Language,
@@ -82,22 +87,40 @@ internal data class TrainingDataLanguageModel(
             )
         }
 
-        fun fromJson(json: String): TrainingDataLanguageModel {
-            val jsonLanguageModel = Json.decodeFromString<JsonLanguageModel>(json)
-            val jsonRelativeFrequencies = Object2DoubleOpenHashMap<Ngram>()
+        fun fromJson(json: InputStream): TrainingDataLanguageModel {
+            val jsonReader = JsonReader.of(json.source().buffer())
+            jsonReader.beginObject()
 
-            for ((fraction, ngrams) in jsonLanguageModel.ngrams) {
-                val fractionAsDouble = fraction.toDouble()
-                for (ngram in ngrams.split(' ')) {
-                    jsonRelativeFrequencies[Ngram(ngram)] = fractionAsDouble
+            var language: Language? = null
+            var jsonRelativeFrequencies: Object2DoubleOpenHashMap<Ngram>? = null
+
+            while (jsonReader.hasNext()) {
+                when (jsonReader.selectName(jsonModelNameOptions)) {
+                    -1 -> throw IllegalArgumentException("Unknown name '${jsonReader.nextName()}' at ${jsonReader.path}")
+                    0 -> if (language == null) {
+                        language = Language.valueOf(jsonReader.nextString())
+                    } else throw IllegalArgumentException("Duplicate language at ${jsonReader.path}")
+                    1 -> if (jsonRelativeFrequencies == null) {
+                        jsonRelativeFrequencies = Object2DoubleOpenHashMap()
+                        jsonReader.beginObject()
+                        while (jsonReader.hasNext()) {
+                            val (numerator, denominator) = jsonReader.nextName().split('/').map(String::toInt)
+                            val frequency = numerator / denominator.toDouble()
+                            jsonReader.nextString().split(' ')
+                                .map(::Ngram)
+                                .forEach { jsonRelativeFrequencies[it] = frequency }
+                        }
+                        jsonReader.endObject()
+                    } else throw IllegalArgumentException("Duplicate ngrams at ${jsonReader.path}")
                 }
             }
+            jsonReader.endObject()
 
             return TrainingDataLanguageModel(
-                language = jsonLanguageModel.language,
+                language = language ?: throw IllegalArgumentException("Language is missing"),
                 absoluteFrequencies = emptyMap(),
                 relativeFrequencies = emptyMap(),
-                jsonRelativeFrequencies = jsonRelativeFrequencies
+                jsonRelativeFrequencies = jsonRelativeFrequencies ?: throw IllegalArgumentException("Ngrams are missing")
             )
         }
 

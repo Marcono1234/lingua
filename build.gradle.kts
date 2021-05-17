@@ -53,7 +53,6 @@ description = linguaDescription
 plugins {
     kotlin("jvm") version "1.4.32"
     kotlin("plugin.serialization") version "1.4.32"
-    id("org.jlleitschuh.gradle.ktlint") version "10.0.0"
     id("com.adarshr.test-logger") version "3.0.0"
     id("com.asarkar.gradle.build-time-tracker") version "2.0.4"
     id("org.jetbrains.dokka") version "1.4.32"
@@ -295,7 +294,7 @@ tasks.register<JavaExec>("runLinguaOnConsole") {
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.4.32")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.1.0")
+    implementation("com.squareup.moshi:moshi-kotlin:1.12.0")
     implementation("it.unimi.dsi:fastutil:8.5.4")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.7.1")

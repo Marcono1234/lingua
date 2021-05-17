@@ -16,14 +16,8 @@
 
 package com.github.pemistahl.lingua.internal
 
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
+import com.squareup.moshi.FromJson
 
-@Serializable(with = FractionSerializer::class)
 internal data class Fraction(
     var numerator: Int,
     var denominator: Int
@@ -33,6 +27,14 @@ internal data class Fraction(
         val (num, den) = reduceToLowestTerms(numerator, denominator)
         this.numerator = num
         this.denominator = den
+    }
+
+    companion object Adapter {
+        @FromJson
+        fun fromJson(string: String): Fraction {
+            val (numerator, denominator) = string.split('/')
+            return Fraction(numerator.toInt(), denominator.toInt())
+        }
     }
 
     override fun compareTo(other: Fraction): Int {
@@ -174,18 +176,5 @@ internal data class Fraction(
     private fun abs(x: Int): Int {
         val i = x.ushr(31)
         return (x xor i.inv() + 1) + i
-    }
-}
-
-internal object FractionSerializer : KSerializer<Fraction> {
-    override val descriptor = PrimitiveSerialDescriptor("Fraction", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: Fraction) {
-        encoder.encodeString(value.toString())
-    }
-
-    override fun deserialize(decoder: Decoder): Fraction {
-        val (numerator, denominator) = decoder.decodeString().split('/')
-        return Fraction(numerator.toInt(), denominator.toInt())
     }
 }
