@@ -19,21 +19,17 @@ package com.github.pemistahl.lingua.internal
 import com.github.pemistahl.lingua.api.Language
 import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
 import com.squareup.moshi.JsonReader
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-import it.unimi.dsi.fastutil.bytes.Byte2FloatAVLTreeMap
-import it.unimi.dsi.fastutil.bytes.Byte2FloatArrayMap
-import it.unimi.dsi.fastutil.bytes.Byte2FloatMap
 import it.unimi.dsi.fastutil.bytes.Byte2FloatOpenHashMap
+import it.unimi.dsi.fastutil.chars.Char2FloatOpenHashMap
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
-import it.unimi.dsi.fastutil.objects.Object2DoubleMap
-import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
+import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
+import it.unimi.dsi.fastutil.shorts.Short2FloatOpenHashMap
 import okio.buffer
 import okio.source
 import java.io.InputStream
-import java.lang.IllegalArgumentException
 import java.util.*
+import kotlin.IllegalArgumentException
 
 
 internal data class JsonLanguageModel(val language: Language, val ngrams: Map<Fraction, String>)
@@ -42,9 +38,9 @@ internal data class TrainingDataLanguageModel(
     val language: Language,
     val absoluteFrequencies: Map<Ngram, Int>,
     val relativeFrequencies: Map<Ngram, Fraction>,
-    val jsonRelativeFrequencies: Object2FloatOpenHashMap<Ngram>
+    val jsonRelativeFrequencies: RelativeFrequencyLookup
 ) {
-    fun getRelativeFrequency(ngram: Ngram): Double = jsonRelativeFrequencies.getFloat(ngram).toDouble()
+    fun getRelativeFrequency(ngram: Ngram): Double = jsonRelativeFrequencies.getFrequency(ngram).toDouble()
 
     fun toJson(): String {
         val ngrams = mutableMapOf<Fraction, MutableList<Ngram>>()
@@ -58,13 +54,161 @@ internal data class TrainingDataLanguageModel(
         TODO()
     }
 
-    class RelativeFrequencyLookup {
-        val loadFactory = 0.9f
-        val unigrams = Int2FloatOpenHashMap(10, loadFactory)
+    internal class RelativeFrequencyLookup {
+        private val loadFactor = 0.9f
+        private val initialCapacity = 16
 
+        private val unigramsAsByte = Byte2FloatOpenHashMap(initialCapacity, loadFactor)
+        private val unigramsAsChar = Char2FloatOpenHashMap(initialCapacity, loadFactor)
+
+        private val bigramsAsShort = Short2FloatOpenHashMap(initialCapacity, loadFactor)
+        private val bigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
+
+        private val trigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
+        private val trigramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
+
+        private val quadrigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
+        private val quadrigramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
+
+        private val fivegramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
+        private val fivegramsAsObject = Object2FloatOpenHashMap<Ngram>(initialCapacity, loadFactor)
+
+        private fun String.bigramToShort(): Short {
+            return (
+                (this[1].toInt() shl 8)
+                or this[0].toInt()
+            ).toShort()
+        }
+
+        private fun String.bigramToInt(): Int {
+            return (
+                (this[1].toInt() shl 16)
+                or this[0].toInt()
+            )
+        }
+
+        private val triAsIntBits = Int.SIZE_BITS / 3
+        private val triAsIntMaxChar = (2 shl (triAsIntBits - 1)) - 1
+        private fun String.trigramToInt(): Int {
+            return (
+                (this[2].toInt() shl (triAsIntBits * 2))
+                or (this[1].toInt() shl triAsIntBits)
+                or this[0].toInt()
+            )
+        }
+
+        private val triAsLongBits = Long.SIZE_BITS / 3
+        private fun String.trigramToLong(): Long {
+            return (
+                (this[2].toLong() shl (triAsLongBits * 2))
+                or (this[1].toLong() shl triAsLongBits)
+                or this[0].toLong()
+            )
+        }
+
+        private fun String.quadrigramToInt(): Int {
+            return (
+                (this[3].toInt() shl 24)
+                or (this[2].toInt() shl 16)
+                or (this[1].toInt() shl 8)
+                or this[0].toInt()
+            )
+        }
+
+        private fun String.quadrigramToLong(): Long {
+            return (
+                (this[1].toLong() shl 48)
+                or (this[1].toLong() shl 32)
+                or (this[1].toLong() shl 16)
+                or this[0].toLong()
+            )
+        }
+
+        private val fiveAsLongBits = Long.SIZE_BITS / 5
+        private val fiveAsLongMaxChar = (2 shl (fiveAsLongBits - 1)) - 1
+        private fun String.fivegramToLong(): Long {
+            return (
+                (this[4].toLong() shl (fiveAsLongBits * 4))
+                or (this[3].toLong() shl (fiveAsLongBits * 3))
+                or (this[2].toLong() shl (fiveAsLongBits * 2))
+                or (this[1].toLong() shl fiveAsLongBits)
+                or this[0].toLong()
+            )
+        }
+
+        fun putFrequency(ngram: String, frequency: Float) {
+            val highestChar = ngram.chars().max().asInt
+
+            when (ngram.length) {
+                1 -> when {
+                    highestChar <= 255 -> unigramsAsByte[highestChar.toByte()] = frequency
+                    else -> unigramsAsChar[highestChar.toChar()] = frequency
+                }
+                2 -> when {
+                    highestChar <= 255 -> bigramsAsShort[ngram.bigramToShort()] = frequency
+                    else -> bigramsAsInt[ngram.bigramToInt()] = frequency
+                }
+                3 -> when {
+                    highestChar <= triAsIntMaxChar -> trigramsAsInt[ngram.trigramToInt()] = frequency
+                    else -> trigramsAsLong[ngram.trigramToLong()] = frequency
+                }
+                4 -> when {
+                    highestChar <= 255 -> quadrigramsAsInt[ngram.quadrigramToInt()] = frequency
+                    else -> quadrigramsAsLong[ngram.quadrigramToLong()] = frequency
+                }
+                5 -> when {
+                    highestChar <= fiveAsLongMaxChar -> fivegramsAsLong[ngram.fivegramToLong()] = frequency
+                    // Fall back to storing Ngram object
+                    else -> fivegramsAsObject[Ngram(ngram)] = frequency
+                }
+                else -> throw IllegalArgumentException("Invalid Ngram length")
+            }
+        }
 
         fun finishCreation() {
-            unigrams.trim()
+            unigramsAsByte.trim()
+            unigramsAsChar.trim()
+
+            bigramsAsShort.trim()
+            bigramsAsInt.trim()
+
+            trigramsAsInt.trim()
+            trigramsAsLong.trim()
+
+            quadrigramsAsInt.trim()
+            quadrigramsAsLong.trim()
+
+            fivegramsAsLong.trim()
+            fivegramsAsObject.trim()
+        }
+
+        fun getFrequency(ngram: Ngram): Float {
+            val ngramStr = ngram.value
+            val highestChar = ngramStr.chars().max().asInt
+
+            return when (ngramStr.length) {
+                1 -> when {
+                    highestChar <= 255 -> unigramsAsByte[highestChar.toByte()]
+                    else -> unigramsAsChar[highestChar.toChar()]
+                }
+                2 -> when {
+                    highestChar <= 255 -> bigramsAsShort[ngramStr.bigramToShort()]
+                    else -> bigramsAsInt[ngramStr.bigramToInt()]
+                }
+                3 -> when {
+                    highestChar <= triAsIntMaxChar -> trigramsAsInt[ngramStr.trigramToInt()]
+                    else -> trigramsAsLong[ngramStr.trigramToLong()]
+                }
+                4 -> when {
+                    highestChar <= 255 -> quadrigramsAsInt[ngramStr.quadrigramToInt()]
+                    else -> quadrigramsAsLong[ngramStr.quadrigramToLong()]
+                }
+                5 -> when {
+                    highestChar <= fiveAsLongMaxChar -> fivegramsAsLong[ngramStr.fivegramToLong()]
+                    else -> fivegramsAsObject.getFloat(ngram)
+                }
+                else -> throw IllegalArgumentException("Invalid Ngram length")
+            }
         }
     }
 
@@ -99,7 +243,7 @@ internal data class TrainingDataLanguageModel(
                 language,
                 absoluteFrequencies,
                 relativeFrequencies,
-                Object2FloatOpenHashMap()
+                RelativeFrequencyLookup()
             )
         }
 
@@ -108,7 +252,7 @@ internal data class TrainingDataLanguageModel(
             jsonReader.beginObject()
 
             var language: Language? = null
-            var jsonRelativeFrequencies: Object2FloatOpenHashMap<Ngram>? = null
+            var jsonRelativeFrequencies: RelativeFrequencyLookup? = null
 
             while (jsonReader.hasNext()) {
                 when (jsonReader.selectName(jsonModelNameOptions)) {
@@ -117,14 +261,13 @@ internal data class TrainingDataLanguageModel(
                         language = Language.valueOf(jsonReader.nextString())
                     } else throw IllegalArgumentException("Duplicate language at ${jsonReader.path}")
                     1 -> if (jsonRelativeFrequencies == null) {
-                        jsonRelativeFrequencies = Object2FloatOpenHashMap(1000, 0.99f)
+                        jsonRelativeFrequencies = RelativeFrequencyLookup()
                         jsonReader.beginObject()
                         while (jsonReader.hasNext()) {
                             val (numerator, denominator) = jsonReader.nextName().split('/').map(String::toInt)
                             val frequency = numerator / denominator.toFloat()
                             jsonReader.nextString().split(' ')
-                                .map(::Ngram)
-                                .forEach { jsonRelativeFrequencies[it] = frequency }
+                                .forEach { jsonRelativeFrequencies.putFrequency(it, frequency) }
                         }
                         jsonReader.endObject()
                     } else throw IllegalArgumentException("Duplicate ngrams at ${jsonReader.path}")
@@ -132,16 +275,20 @@ internal data class TrainingDataLanguageModel(
             }
             jsonReader.endObject()
 
-            jsonRelativeFrequencies!!.trim()
-            println(jsonRelativeFrequencies!!.keys.map(Ngram::value).filter{it.codePoints().allMatch { it < 4096 }}.groupBy({it.length}).forEach({println("${it.key}: " + it.value.size)}))
+            //jsonRelativeFrequencies!!.trim()
+            //println("$language: " + jsonRelativeFrequencies!!.keys.map(Ngram::value).filter{it.length == 5 && it.codePoints().allMatch { it < 4096 }}.count())
+            //println("$language: " + jsonRelativeFrequencies!!.keys.map(Ngram::value).filter{it.codePoints().allMatch { it < 256 }}.groupBy { it.length }.map { "${it.key}: ${it.value.size}" }.joinToString(", "))
+            //jsonRelativeFrequencies!!.keys.map(Ngram::value).filter{it.codePoints().allMatch { it < 4096 }}.groupBy({it.length}).forEach({println("${it.key}: " + it.value.size)})
             //println(jsonRelativeFrequencies!!.keys.stream().map(Ngram::value).flatMapToInt(String::codePoints).filter{it < 7000 && it !in intArrayOf(65357, 64258, 64257, 64257, 64256) }.max()!!)
             //println(jsonRelativeFrequencies!!.keys.stream().map(Ngram::value).filter{it.codePoints().anyMatch{it > 60000}}.forEach(::println))
+
+            jsonRelativeFrequencies?.finishCreation() ?: throw IllegalArgumentException("Model data is missing ngrams")
 
             return TrainingDataLanguageModel(
                 language = language ?: throw IllegalArgumentException("Language is missing"),
                 absoluteFrequencies = emptyMap(),
                 relativeFrequencies = emptyMap(),
-                jsonRelativeFrequencies = jsonRelativeFrequencies ?: throw IllegalArgumentException("Ngrams are missing")
+                jsonRelativeFrequencies = jsonRelativeFrequencies
             )
         }
 
