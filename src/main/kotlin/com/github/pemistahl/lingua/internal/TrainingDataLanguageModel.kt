@@ -21,6 +21,11 @@ import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
 import com.squareup.moshi.JsonReader
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import it.unimi.dsi.fastutil.bytes.Byte2FloatAVLTreeMap
+import it.unimi.dsi.fastutil.bytes.Byte2FloatArrayMap
+import it.unimi.dsi.fastutil.bytes.Byte2FloatMap
+import it.unimi.dsi.fastutil.bytes.Byte2FloatOpenHashMap
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
 import okio.buffer
@@ -50,6 +55,16 @@ internal data class TrainingDataLanguageModel(
         val jsonLanguageModel = JsonLanguageModel(language, ngrams.mapValues { it.value.joinToString(separator = " ") })
 
         TODO()
+    }
+
+    class RelativeFrequencyLookup {
+        val loadFactory = 0.9f
+        val unigrams = Int2FloatOpenHashMap(10, loadFactory)
+
+
+        fun finishCreation() {
+            unigrams.trim()
+        }
     }
 
     companion object {
@@ -101,7 +116,7 @@ internal data class TrainingDataLanguageModel(
                         language = Language.valueOf(jsonReader.nextString())
                     } else throw IllegalArgumentException("Duplicate language at ${jsonReader.path}")
                     1 -> if (jsonRelativeFrequencies == null) {
-                        jsonRelativeFrequencies = Object2DoubleOpenHashMap()
+                        jsonRelativeFrequencies = Object2DoubleOpenHashMap(1000, 0.99f)
                         jsonReader.beginObject()
                         while (jsonReader.hasNext()) {
                             val (numerator, denominator) = jsonReader.nextName().split('/').map(String::toInt)
@@ -115,6 +130,11 @@ internal data class TrainingDataLanguageModel(
                 }
             }
             jsonReader.endObject()
+
+            jsonRelativeFrequencies!!.trim()
+            println(jsonRelativeFrequencies!!.keys.map(Ngram::value).filter{it.codePoints().allMatch { it < 4096 }}.groupBy({it.length}).forEach({println("${it.key}: " + it.value.size)}))
+            //println(jsonRelativeFrequencies!!.keys.stream().map(Ngram::value).flatMapToInt(String::codePoints).filter{it < 7000 && it !in intArrayOf(65357, 64258, 64257, 64257, 64256) }.max()!!)
+            //println(jsonRelativeFrequencies!!.keys.stream().map(Ngram::value).filter{it.codePoints().anyMatch{it > 60000}}.forEach(::println))
 
             return TrainingDataLanguageModel(
                 language = language ?: throw IllegalArgumentException("Language is missing"),
