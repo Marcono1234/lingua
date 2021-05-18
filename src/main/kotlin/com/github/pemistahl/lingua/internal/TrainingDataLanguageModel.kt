@@ -34,6 +34,29 @@ import kotlin.IllegalArgumentException
 
 internal data class JsonLanguageModel(val language: Language, val ngrams: Map<Fraction, String>)
 
+internal typealias ModelEncodingType = Int
+const val UNIGRAM_AS_BYTE = 0
+const val UNIGRAM_AS_CHAR = 1
+const val BIGRAM_AS_SHORT = 2
+const val BIGRAM_AS_INT = 3
+const val TRIGRAM_AS_INT = 4
+const val TRIGRAM_AS_LONG = 5
+
+const val TRIGRAM_AS_INT_BITS_PER_CHAR = Int.SIZE_BITS / 3
+/**
+ * Maximum code point value (inclusive) a char of a trigram may have to
+ * allow encoding the trigram as int.
+ */
+private const val TRIGRAM_AS_INT_MAX_CHAR = (2 shl (TRIGRAM_AS_INT_BITS_PER_CHAR - 1)) - 1
+private const val TRIGRAM_AS_LONG_BITS_PER_CHAR = Long.SIZE_BITS / 3
+
+private const val FIVEGRAM_AS_LONG_BITS_PER_CHAR = Long.SIZE_BITS / 5
+/**
+ * Maximum code point value (inclusive) a char of a fivegram may have to
+ * allow encoding the fivegram as long.
+ */
+private const val FIVEGRAM_AS_LONG_MAX_CHAR = (2 shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR - 1)) - 1
+
 internal data class TrainingDataLanguageModel(
     val language: Language,
     val absoluteFrequencies: Map<Ngram, Int>,
@@ -41,6 +64,7 @@ internal data class TrainingDataLanguageModel(
     val jsonRelativeFrequencies: RelativeFrequencyLookup
 ) {
     fun getRelativeFrequency(ngram: Ngram): Double = jsonRelativeFrequencies.getFrequency(ngram).toDouble()
+    fun getRelativeFrequency(ngram: PrimitiveNgram): Double = jsonRelativeFrequencies.getFrequency(ngram).toDouble()
 
     fun toJson(): String {
         val ngrams = mutableMapOf<Fraction, MutableList<Ngram>>()
@@ -75,64 +99,59 @@ internal data class TrainingDataLanguageModel(
 
         private fun String.bigramToShort(): Short {
             return (
-                (this[1].toInt() shl 8)
-                or this[0].toInt()
+                (this[1].code shl 8)
+                or this[0].code
             ).toShort()
         }
 
         private fun String.bigramToInt(): Int {
             return (
-                (this[1].toInt() shl 16)
-                or this[0].toInt()
+                (this[1].code shl 16)
+                or this[0].code
             )
         }
 
-        private val triAsIntBits = Int.SIZE_BITS / 3
-        private val triAsIntMaxChar = (2 shl (triAsIntBits - 1)) - 1
         private fun String.trigramToInt(): Int {
             return (
-                (this[2].toInt() shl (triAsIntBits * 2))
-                or (this[1].toInt() shl triAsIntBits)
-                or this[0].toInt()
+                (this[2].code shl (TRIGRAM_AS_INT_BITS_PER_CHAR * 2))
+                or (this[1].code shl TRIGRAM_AS_INT_BITS_PER_CHAR)
+                or this[0].code
             )
         }
 
-        private val triAsLongBits = Long.SIZE_BITS / 3
         private fun String.trigramToLong(): Long {
             return (
-                (this[2].toLong() shl (triAsLongBits * 2))
-                or (this[1].toLong() shl triAsLongBits)
-                or this[0].toLong()
+                (this[2].code.toLong() shl (TRIGRAM_AS_LONG_BITS_PER_CHAR * 2))
+                or (this[1].code.toLong() shl TRIGRAM_AS_LONG_BITS_PER_CHAR)
+                or this[0].code.toLong()
             )
         }
 
         private fun String.quadrigramToInt(): Int {
             return (
-                (this[3].toInt() shl 24)
-                or (this[2].toInt() shl 16)
-                or (this[1].toInt() shl 8)
-                or this[0].toInt()
+                (this[3].code shl 24)
+                or (this[2].code shl 16)
+                or (this[1].code shl 8)
+                or this[0].code
             )
         }
 
         private fun String.quadrigramToLong(): Long {
             return (
-                (this[1].toLong() shl 48)
-                or (this[1].toLong() shl 32)
-                or (this[1].toLong() shl 16)
-                or this[0].toLong()
+                (this[1].code.toLong() shl 48)
+                or (this[1].code.toLong() shl 32)
+                or (this[1].code.toLong() shl 16)
+                or this[0].code.toLong()
             )
         }
 
-        private val fiveAsLongBits = Long.SIZE_BITS / 5
-        private val fiveAsLongMaxChar = (2 shl (fiveAsLongBits - 1)) - 1
         private fun String.fivegramToLong(): Long {
             return (
-                (this[4].toLong() shl (fiveAsLongBits * 4))
-                or (this[3].toLong() shl (fiveAsLongBits * 3))
-                or (this[2].toLong() shl (fiveAsLongBits * 2))
-                or (this[1].toLong() shl fiveAsLongBits)
-                or this[0].toLong()
+                (this[4].code.toLong() shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR * 4))
+                or (this[3].code.toLong() shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR * 3))
+                or (this[2].code.toLong() shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR * 2))
+                or (this[1].code.toLong() shl FIVEGRAM_AS_LONG_BITS_PER_CHAR)
+                or this[0].code.toLong()
             )
         }
 
@@ -149,7 +168,7 @@ internal data class TrainingDataLanguageModel(
                     else -> bigramsAsInt[ngram.bigramToInt()] = frequency
                 }
                 3 -> when {
-                    highestChar <= triAsIntMaxChar -> trigramsAsInt[ngram.trigramToInt()] = frequency
+                    highestChar <= TRIGRAM_AS_INT_MAX_CHAR -> trigramsAsInt[ngram.trigramToInt()] = frequency
                     else -> trigramsAsLong[ngram.trigramToLong()] = frequency
                 }
                 4 -> when {
@@ -157,7 +176,7 @@ internal data class TrainingDataLanguageModel(
                     else -> quadrigramsAsLong[ngram.quadrigramToLong()] = frequency
                 }
                 5 -> when {
-                    highestChar <= fiveAsLongMaxChar -> fivegramsAsLong[ngram.fivegramToLong()] = frequency
+                    highestChar <= FIVEGRAM_AS_LONG_MAX_CHAR -> fivegramsAsLong[ngram.fivegramToLong()] = frequency
                     // Fall back to storing Ngram object
                     else -> fivegramsAsObject[ngram] = frequency
                 }
@@ -196,7 +215,7 @@ internal data class TrainingDataLanguageModel(
                     else -> bigramsAsInt[ngramStr.bigramToInt()]
                 }
                 3 -> when {
-                    highestChar <= triAsIntMaxChar -> trigramsAsInt[ngramStr.trigramToInt()]
+                    highestChar <= TRIGRAM_AS_INT_MAX_CHAR -> trigramsAsInt[ngramStr.trigramToInt()]
                     else -> trigramsAsLong[ngramStr.trigramToLong()]
                 }
                 4 -> when {
@@ -204,10 +223,22 @@ internal data class TrainingDataLanguageModel(
                     else -> quadrigramsAsLong[ngramStr.quadrigramToLong()]
                 }
                 5 -> when {
-                    highestChar <= fiveAsLongMaxChar -> fivegramsAsLong[ngramStr.fivegramToLong()]
+                    highestChar <= FIVEGRAM_AS_LONG_MAX_CHAR -> fivegramsAsLong[ngramStr.fivegramToLong()]
                     else -> fivegramsAsObject.getFloat(ngramStr)
                 }
                 else -> throw IllegalArgumentException("Invalid Ngram length")
+            }
+        }
+
+        fun getFrequency(ngram: PrimitiveNgram): Float {
+            return when (ngram.getEncodingType()) {
+                UNIGRAM_AS_BYTE -> unigramsAsByte[ngram.unigramToByte()]
+                UNIGRAM_AS_CHAR -> unigramsAsChar[ngram.unigramToChar()]
+                BIGRAM_AS_SHORT -> bigramsAsShort[ngram.bigramToShort()]
+                BIGRAM_AS_INT -> bigramsAsInt[ngram.bigramToInt()]
+                TRIGRAM_AS_INT -> trigramsAsInt[ngram.trigramToInt()]
+                TRIGRAM_AS_LONG -> trigramsAsLong[ngram.trigramToLong()]
+                else -> throw AssertionError("Unknown encoding type")
             }
         }
     }

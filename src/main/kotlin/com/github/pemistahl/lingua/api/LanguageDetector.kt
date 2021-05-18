@@ -27,11 +27,14 @@ import com.github.pemistahl.lingua.internal.Constant.NO_LETTER
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
 import com.github.pemistahl.lingua.internal.Ngram
+import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.TrainingDataLanguageModel
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList
+import it.unimi.dsi.fastutil.longs.LongSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -39,6 +42,7 @@ import kotlinx.coroutines.runBlocking
 import java.util.Locale
 import java.util.SortedMap
 import java.util.TreeMap
+import java.util.stream.StreamSupport
 import kotlin.math.ln
 
 /**
@@ -169,6 +173,7 @@ class LanguageDetector internal constructor(
     }
 
     internal fun splitTextIntoWords(text: String): List<String> {
+        // TODO Change to streaming
         val normalizedTextBuilder = StringBuilder()
         for (chr in text) {
             normalizedTextBuilder.append(chr)
@@ -177,6 +182,7 @@ class LanguageDetector internal constructor(
             }
         }
         val normalizedText = normalizedTextBuilder.toString()
+        // TODO Change to streaming
         return if (normalizedText.contains(' ')) {
             normalizedText.split(' ').filter { it.isNotBlank() }
         } else {
@@ -223,7 +229,7 @@ class LanguageDetector internal constructor(
         for (word in words) {
             val wordLanguageCounts = mutableMapOf<Language, Int>()
 
-            for (character in word.map { it.toString() }) {
+            for (character in word) {
                 var isMatch = false
                 for ((alphabet, language) in alphabetsSupportingExactlyOneLanguage) {
                     if (alphabet.matches(character)) {
@@ -234,7 +240,7 @@ class LanguageDetector internal constructor(
                 if (!isMatch) {
                     when {
                         Alphabet.HAN.matches(character) -> wordLanguageCounts.incrementCounter(CHINESE)
-                        JAPANESE_CHARACTER_SET.matches(character) -> wordLanguageCounts.incrementCounter(JAPANESE)
+                        JAPANESE_CHARACTER_SET.matches(character.toString()) -> wordLanguageCounts.incrementCounter(JAPANESE)
                         Alphabet.LATIN.matches(character) ||
                             Alphabet.CYRILLIC.matches(character) ||
                             Alphabet.DEVANAGARI.matches(character) ->
@@ -346,16 +352,17 @@ class LanguageDetector internal constructor(
     ): Map<Language, Double> {
         val probabilities = hashMapOf<Language, Double>()
         for (language in filteredLanguages) {
-            probabilities[language] = computeSumOfNgramProbabilities(language, testDataModel.ngrams)
+            probabilities[language] = computeSumOfNgramProbabilities(language, testDataModel.ngrams, testDataModel.primitiveNgrams)
         }
         return probabilities.filter { it.value < 0.0 }
     }
 
     internal fun computeSumOfNgramProbabilities(
         language: Language,
-        ngrams: Set<Ngram>
+        ngrams: Set<Ngram>,
+        primitiveNgrams: LongSet
     ): Double {
-        val probabilities = mutableListOf<Double>()
+        val probabilities = DoubleArrayList()
 
         for (ngram in ngrams) {
             for (elem in ngram.rangeOfLowerOrderNgrams()) {
@@ -366,7 +373,23 @@ class LanguageDetector internal constructor(
                 }
             }
         }
-        return probabilities.sumByDouble { ln(it) }
+        primitiveNgrams.forEach{
+            var current = PrimitiveNgram(it)
+            while (true) {
+                val probability = lookUpNgramProbability(language, current)
+                if (probability > 0) {
+                    probabilities.add(probability)
+                    break
+                }
+
+                current = current.getLowerOrderNgram()
+                if (current.value == PrimitiveNgram.NONE.value) {
+                    break
+                }
+            }
+        }
+
+        return probabilities.doubleStream().map(::ln).sum()
     }
 
     internal fun lookUpNgramProbability(
@@ -381,6 +404,23 @@ class LanguageDetector internal constructor(
             1 -> unigramLanguageModels
             0 -> throw IllegalArgumentException("Zerogram detected")
             else -> throw IllegalArgumentException("unsupported ngram length detected: ${ngram.value.length}")
+        }
+
+        return languageModels.getValue(language).value.getRelativeFrequency(ngram)
+    }
+
+    internal fun lookUpNgramProbability(
+        language: Language,
+        ngram: PrimitiveNgram
+    ): Double {
+        val languageModels = when (ngram.getLength()) {
+            5 -> fivegramLanguageModels
+            4 -> quadrigramLanguageModels
+            3 -> trigramLanguageModels
+            2 -> bigramLanguageModels
+            1 -> unigramLanguageModels
+            0 -> throw IllegalArgumentException("Zerogram detected")
+            else -> throw IllegalArgumentException("unsupported ngram length detected: ${ngram.getLength()}")
         }
 
         return languageModels.getValue(language).value.getRelativeFrequency(ngram)

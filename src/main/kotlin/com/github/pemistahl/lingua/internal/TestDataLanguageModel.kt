@@ -16,24 +16,34 @@
 
 package com.github.pemistahl.lingua.internal
 
-internal data class TestDataLanguageModel(val ngrams: Set<Ngram>) {
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet
+import it.unimi.dsi.fastutil.longs.LongSet
+
+internal data class TestDataLanguageModel(val ngrams: Set<Ngram>, val primitiveNgrams: LongSet) {
 
     companion object {
-        private val LETTER_REGEX = Regex("\\p{L}+")
-
         fun fromText(text: String, ngramLength: Int): TestDataLanguageModel {
             require(ngramLength in 1..5) {
                 "ngram length $ngramLength is not in range 1..5"
             }
+
             val ngrams = hashSetOf<Ngram>()
-            for (i in 0..text.length - ngramLength) {
-                val textSlice = text.slice(i until i + ngramLength)
-                if (textSlice.codePoints().allMatch(Character::isLetter)) {
-                    val ngram = Ngram(textSlice)
-                    ngrams.add(ngram)
+            val primitiveNgrams = LongOpenHashSet()
+
+            sliceLoop@ for (i in 0..text.length - ngramLength) {
+                for (sliceIndex in i until i + ngramLength) {
+                    if (!Character.isLetter(text[i])) {
+                        continue@sliceLoop
+                    }
+                }
+
+                val primitiveNgram = PrimitiveNgram.of(text, i, ngramLength)
+                when (primitiveNgram.value) {
+                    PrimitiveNgram.NONE.value -> ngrams.add(Ngram(text.slice(i until i + ngramLength)))
+                    else -> primitiveNgrams.add(primitiveNgram.value)
                 }
             }
-            return TestDataLanguageModel(ngrams)
+            return TestDataLanguageModel(ngrams, primitiveNgrams)
         }
     }
 }

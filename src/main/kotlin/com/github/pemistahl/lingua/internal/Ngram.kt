@@ -16,6 +16,111 @@
 
 package com.github.pemistahl.lingua.internal
 
+@JvmInline
+internal value class PrimitiveNgram(val value: Long) {
+    fun getLength(): Int {
+        return (value and 0xFF).toInt()
+    }
+
+    fun getEncodingType(): ModelEncodingType {
+        when (getLength()) {
+            1 -> {
+                val char0 = (value shr 8) and 0xFFFF
+                return if (char0 <= 255) UNIGRAM_AS_BYTE else UNIGRAM_AS_CHAR
+            }
+            2 -> {
+                val char0 = (value shr 8) and 0xFFFF
+                val char1 = (value shr 24) and 0xFFFF
+                return if (char0 <= 255 && char1 <= 255) BIGRAM_AS_SHORT else BIGRAM_AS_INT
+            }
+            3 -> {
+                val char0 = (value shr 8) and 0xFFFF
+                val char1 = (value shr 24) and 0xFFFF
+                val char2 = (value shr 40) and 0xFFFF
+                return if (
+                    char0 <= TRIGRAM_AS_INT_BITS_PER_CHAR
+                    && char1 <= TRIGRAM_AS_INT_BITS_PER_CHAR
+                    && char2 <= TRIGRAM_AS_INT_BITS_PER_CHAR
+                ) TRIGRAM_AS_INT else TRIGRAM_AS_LONG
+            }
+            // Larger ngrams are not supported yet
+            else -> throw AssertionError("Invalid length")
+        }
+    }
+
+    fun unigramToByte(): Byte {
+        return (value shr 8).toByte()
+    }
+
+    fun unigramToChar(): Char {
+        return (value shr 8).toInt().toChar()
+    }
+
+    fun bigramToShort(): Short {
+        return (
+            ((value shr 8) and 0xFF)
+            or ((value shr 24) shl 8)
+        ).toShort()
+    }
+
+    fun bigramToInt(): Int {
+        return (
+            ((value shr 8) and 0xFFFF)
+            or ((value shr 24) shl 16)
+        ).toInt()
+    }
+
+    fun trigramToInt(): Int {
+        return (
+            ((value shr 8) and 0xFF)
+            or (((value shr 24) and 0xFF) shl 8)
+            or ((value shr 40) shl 16)
+        ).toInt()
+    }
+
+    fun trigramToLong(): Long {
+        return (
+            ((value shr 8) and 0xFFFF)
+            or (((value shr 24) and 0xFFFF) shl 16)
+            or ((value shr 40) shl 32)
+        )
+    }
+
+    fun getLowerOrderNgram(): PrimitiveNgram {
+        return when(getLength()) {
+            1 -> NONE
+            // Overwrite length and copy over only chars
+            2 -> PrimitiveNgram(1L or (value and 0xFFFF_00))
+            3 -> PrimitiveNgram(2L or (value and 0xFFFF_FFFF_00))
+            else -> throw IllegalStateException("No lower order ngram exists")
+        }
+    }
+
+    companion object {
+        val NONE = PrimitiveNgram(0)
+
+        fun of(string: String, startIndex: Int, length: Int): PrimitiveNgram {
+            return when (length) {
+                1 -> PrimitiveNgram(1L
+                    or (string[startIndex + 0].code.toLong() shl 8)
+                )
+                2 -> PrimitiveNgram(2L
+                    or (string[startIndex + 0].code.toLong() shl 8)
+                    or (string[startIndex + 1].code.toLong() shl 24)
+                )
+                3 -> PrimitiveNgram(3L
+                    or (string[startIndex + 0].code.toLong() shl 8)
+                    or (string[startIndex + 1].code.toLong() shl 24)
+                    or (string[startIndex + 2].code.toLong() shl 40)
+                )
+                // For now don't support larger ngrams, otherwise would complicate
+                // encoding since there would not be 16bits per char
+                else -> NONE
+            }
+        }
+    }
+}
+
 internal data class Ngram(val value: String) : Comparable<Ngram> {
     init {
         require(value.length in 0..5) {
