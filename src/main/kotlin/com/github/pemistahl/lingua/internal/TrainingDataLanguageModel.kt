@@ -28,6 +28,7 @@ import it.unimi.dsi.fastutil.bytes.Byte2FloatOpenHashMap
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
 import okio.buffer
 import okio.source
 import java.io.InputStream
@@ -41,9 +42,9 @@ internal data class TrainingDataLanguageModel(
     val language: Language,
     val absoluteFrequencies: Map<Ngram, Int>,
     val relativeFrequencies: Map<Ngram, Fraction>,
-    val jsonRelativeFrequencies: Object2DoubleMap<Ngram>
+    val jsonRelativeFrequencies: Object2FloatOpenHashMap<Ngram>
 ) {
-    fun getRelativeFrequency(ngram: Ngram): Double = jsonRelativeFrequencies.getDouble(ngram)
+    fun getRelativeFrequency(ngram: Ngram): Double = jsonRelativeFrequencies.getFloat(ngram).toDouble()
 
     fun toJson(): String {
         val ngrams = mutableMapOf<Fraction, MutableList<Ngram>>()
@@ -98,7 +99,7 @@ internal data class TrainingDataLanguageModel(
                 language,
                 absoluteFrequencies,
                 relativeFrequencies,
-                Object2DoubleOpenHashMap()
+                Object2FloatOpenHashMap()
             )
         }
 
@@ -107,7 +108,7 @@ internal data class TrainingDataLanguageModel(
             jsonReader.beginObject()
 
             var language: Language? = null
-            var jsonRelativeFrequencies: Object2DoubleOpenHashMap<Ngram>? = null
+            var jsonRelativeFrequencies: Object2FloatOpenHashMap<Ngram>? = null
 
             while (jsonReader.hasNext()) {
                 when (jsonReader.selectName(jsonModelNameOptions)) {
@@ -116,11 +117,11 @@ internal data class TrainingDataLanguageModel(
                         language = Language.valueOf(jsonReader.nextString())
                     } else throw IllegalArgumentException("Duplicate language at ${jsonReader.path}")
                     1 -> if (jsonRelativeFrequencies == null) {
-                        jsonRelativeFrequencies = Object2DoubleOpenHashMap(1000, 0.99f)
+                        jsonRelativeFrequencies = Object2FloatOpenHashMap(1000, 0.99f)
                         jsonReader.beginObject()
                         while (jsonReader.hasNext()) {
                             val (numerator, denominator) = jsonReader.nextName().split('/').map(String::toInt)
-                            val frequency = numerator / denominator.toDouble()
+                            val frequency = numerator / denominator.toFloat()
                             jsonReader.nextString().split(' ')
                                 .map(::Ngram)
                                 .forEach { jsonRelativeFrequencies[it] = frequency }
