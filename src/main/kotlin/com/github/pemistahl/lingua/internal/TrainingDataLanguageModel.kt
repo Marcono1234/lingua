@@ -71,7 +71,7 @@ internal data class TrainingDataLanguageModel(
         private val quadrigramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
 
         private val fivegramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
-        private val fivegramsAsObject = Object2FloatOpenHashMap<Ngram>(initialCapacity, loadFactor)
+        private val fivegramsAsObject = Object2FloatOpenHashMap<String>(initialCapacity, loadFactor)
 
         private fun String.bigramToShort(): Short {
             return (
@@ -159,7 +159,7 @@ internal data class TrainingDataLanguageModel(
                 5 -> when {
                     highestChar <= fiveAsLongMaxChar -> fivegramsAsLong[ngram.fivegramToLong()] = frequency
                     // Fall back to storing Ngram object
-                    else -> fivegramsAsObject[Ngram(ngram)] = frequency
+                    else -> fivegramsAsObject[ngram] = frequency
                 }
                 else -> throw IllegalArgumentException("Invalid Ngram length")
             }
@@ -205,7 +205,7 @@ internal data class TrainingDataLanguageModel(
                 }
                 5 -> when {
                     highestChar <= fiveAsLongMaxChar -> fivegramsAsLong[ngramStr.fivegramToLong()]
-                    else -> fivegramsAsObject.getFloat(ngram)
+                    else -> fivegramsAsObject.getFloat(ngramStr)
                 }
                 else -> throw IllegalArgumentException("Invalid Ngram length")
             }
