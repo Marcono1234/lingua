@@ -24,6 +24,8 @@ import it.unimi.dsi.fastutil.chars.Char2FloatOpenHashMap
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
 import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2IntMap
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import it.unimi.dsi.fastutil.shorts.Short2FloatOpenHashMap
 import okio.buffer
 import okio.source
@@ -35,14 +37,14 @@ import kotlin.IllegalArgumentException
 internal data class JsonLanguageModel(val language: Language, val ngrams: Map<Fraction, String>)
 
 internal typealias ModelEncodingType = Int
-const val UNIGRAM_AS_BYTE = 0
-const val UNIGRAM_AS_CHAR = 1
-const val BIGRAM_AS_SHORT = 2
-const val BIGRAM_AS_INT = 3
-const val TRIGRAM_AS_INT = 4
-const val TRIGRAM_AS_LONG = 5
+internal const val UNIGRAM_AS_BYTE = 0
+internal const val UNIGRAM_AS_CHAR = 1
+internal const val BIGRAM_AS_SHORT = 2
+internal const val BIGRAM_AS_INT = 3
+internal const val TRIGRAM_AS_INT = 4
+internal const val TRIGRAM_AS_LONG = 5
 
-const val TRIGRAM_AS_INT_BITS_PER_CHAR = Int.SIZE_BITS / 3
+internal const val TRIGRAM_AS_INT_BITS_PER_CHAR = Int.SIZE_BITS / 3
 /**
  * Maximum code point value (inclusive) a char of a trigram may have to
  * allow encoding the trigram as int.
@@ -97,6 +99,10 @@ internal data class TrainingDataLanguageModel(
         private val fivegramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
         private val fivegramsAsObject = Object2FloatOpenHashMap<String>(initialCapacity, loadFactor)
 
+        private fun String.bigramFitsShort(): Boolean {
+            return this[0].code <= 255 && this[1].code <= 255
+        }
+
         private fun String.bigramToShort(): Short {
             return (
                 (this[1].code shl 8)
@@ -109,6 +115,12 @@ internal data class TrainingDataLanguageModel(
                 (this[1].code shl 16)
                 or this[0].code
             )
+        }
+
+        private fun String.trigramFitsInt(): Boolean {
+            return this[0].code <= TRIGRAM_AS_INT_MAX_CHAR
+                && this[1].code <= TRIGRAM_AS_INT_MAX_CHAR
+                && this[2].code <= TRIGRAM_AS_INT_MAX_CHAR
         }
 
         private fun String.trigramToInt(): Int {
@@ -125,6 +137,13 @@ internal data class TrainingDataLanguageModel(
                 or (this[1].code.toLong() shl TRIGRAM_AS_LONG_BITS_PER_CHAR)
                 or this[0].code.toLong()
             )
+        }
+
+        private fun String.quadrigramFitsInt(): Boolean {
+            return this[0].code <= 255
+                && this[1].code <= 255
+                && this[2].code <= 255
+                && this[3].code <= 255
         }
 
         private fun String.quadrigramToInt(): Int {
@@ -145,6 +164,14 @@ internal data class TrainingDataLanguageModel(
             )
         }
 
+        private fun String.fivegramFitsLong(): Boolean {
+            return this[0].code <= FIVEGRAM_AS_LONG_MAX_CHAR
+                && this[1].code <= FIVEGRAM_AS_LONG_MAX_CHAR
+                && this[2].code <= FIVEGRAM_AS_LONG_MAX_CHAR
+                && this[3].code <= FIVEGRAM_AS_LONG_MAX_CHAR
+                && this[4].code <= FIVEGRAM_AS_LONG_MAX_CHAR
+        }
+
         private fun String.fivegramToLong(): Long {
             return (
                 (this[4].code.toLong() shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR * 4))
@@ -156,27 +183,28 @@ internal data class TrainingDataLanguageModel(
         }
 
         fun putFrequency(ngram: String, frequency: Float) {
-            val highestChar = ngram.chars().max().asInt
-
             when (ngram.length) {
-                1 -> when {
-                    highestChar <= 255 -> unigramsAsByte[highestChar.toByte()] = frequency
-                    else -> unigramsAsChar[highestChar.toChar()] = frequency
+                1 -> {
+                    val char0 = ngram[0].code
+                    when {
+                        char0 <= 255 -> unigramsAsByte[char0.toByte()] = frequency
+                        else -> unigramsAsChar[char0.toChar()] = frequency
+                    }
                 }
                 2 -> when {
-                    highestChar <= 255 -> bigramsAsShort[ngram.bigramToShort()] = frequency
+                    ngram.bigramFitsShort() -> bigramsAsShort[ngram.bigramToShort()] = frequency
                     else -> bigramsAsInt[ngram.bigramToInt()] = frequency
                 }
                 3 -> when {
-                    highestChar <= TRIGRAM_AS_INT_MAX_CHAR -> trigramsAsInt[ngram.trigramToInt()] = frequency
+                    ngram.trigramFitsInt() -> trigramsAsInt[ngram.trigramToInt()] = frequency
                     else -> trigramsAsLong[ngram.trigramToLong()] = frequency
                 }
                 4 -> when {
-                    highestChar <= 255 -> quadrigramsAsInt[ngram.quadrigramToInt()] = frequency
+                    ngram.quadrigramFitsInt() -> quadrigramsAsInt[ngram.quadrigramToInt()] = frequency
                     else -> quadrigramsAsLong[ngram.quadrigramToLong()] = frequency
                 }
                 5 -> when {
-                    highestChar <= FIVEGRAM_AS_LONG_MAX_CHAR -> fivegramsAsLong[ngram.fivegramToLong()] = frequency
+                    ngram.fivegramFitsLong() -> fivegramsAsLong[ngram.fivegramToLong()] = frequency
                     // Fall back to storing Ngram object
                     else -> fivegramsAsObject[ngram] = frequency
                 }
@@ -203,27 +231,29 @@ internal data class TrainingDataLanguageModel(
 
         fun getFrequency(ngram: Ngram): Float {
             val ngramStr = ngram.value
-            val highestChar = ngramStr.chars().max().asInt
 
             return when (ngramStr.length) {
-                1 -> when {
-                    highestChar <= 255 -> unigramsAsByte[highestChar.toByte()]
-                    else -> unigramsAsChar[highestChar.toChar()]
+                1 -> {
+                    val char0 = ngramStr[0].code
+                    when {
+                        char0 <= 255 -> unigramsAsByte[char0.toByte()]
+                        else -> unigramsAsChar[char0.toChar()]
+                    }
                 }
                 2 -> when {
-                    highestChar <= 255 -> bigramsAsShort[ngramStr.bigramToShort()]
+                    ngramStr.bigramFitsShort() -> bigramsAsShort[ngramStr.bigramToShort()]
                     else -> bigramsAsInt[ngramStr.bigramToInt()]
                 }
                 3 -> when {
-                    highestChar <= TRIGRAM_AS_INT_MAX_CHAR -> trigramsAsInt[ngramStr.trigramToInt()]
+                    ngramStr.trigramFitsInt() -> trigramsAsInt[ngramStr.trigramToInt()]
                     else -> trigramsAsLong[ngramStr.trigramToLong()]
                 }
                 4 -> when {
-                    highestChar <= 255 -> quadrigramsAsInt[ngramStr.quadrigramToInt()]
+                    ngramStr.quadrigramFitsInt() -> quadrigramsAsInt[ngramStr.quadrigramToInt()]
                     else -> quadrigramsAsLong[ngramStr.quadrigramToLong()]
                 }
                 5 -> when {
-                    highestChar <= FIVEGRAM_AS_LONG_MAX_CHAR -> fivegramsAsLong[ngramStr.fivegramToLong()]
+                    ngramStr.fivegramFitsLong() -> fivegramsAsLong[ngramStr.fivegramToLong()]
                     else -> fivegramsAsObject.getFloat(ngramStr)
                 }
                 else -> throw IllegalArgumentException("Invalid Ngram length")
@@ -327,15 +357,15 @@ internal data class TrainingDataLanguageModel(
             text: Sequence<String>,
             ngramLength: Int,
             charClass: String
-        ): Map<Ngram, Int> {
+        ): Object2IntMap<Ngram> {
 
-            val absoluteFrequencies = hashMapOf<Ngram, Int>()
+            val absoluteFrequencies = Object2IntOpenHashMap<Ngram>()
             val regex = Regex("[$charClass]+")
 
             for (line in text) {
                 val lowerCasedLine = line.toLowerCase(Locale.ROOT)
                 for (i in 0..lowerCasedLine.length - ngramLength) {
-                    val textSlice = lowerCasedLine.slice(i until i + ngramLength)
+                    val textSlice = lowerCasedLine.substring(i, i + ngramLength)
                     if (regex.matches(textSlice)) {
                         val ngram = Ngram(textSlice)
                         absoluteFrequencies.incrementCounter(ngram)
@@ -359,7 +389,7 @@ internal data class TrainingDataLanguageModel(
                 val denominator = if (ngramLength == 1 || lowerNgramAbsoluteFrequencies.isEmpty()) {
                     totalNgramFrequency
                 } else {
-                    lowerNgramAbsoluteFrequencies.getValue(Ngram(ngram.value.slice(0..ngramLength - 2)))
+                    lowerNgramAbsoluteFrequencies.getValue(Ngram(ngram.value.substring(0, ngramLength - 1)))
                 }
                 ngramProbabilities[ngram] = Fraction(frequency, denominator)
             }

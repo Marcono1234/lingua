@@ -16,6 +16,8 @@
 
 package com.github.pemistahl.lingua.internal.util.extension
 
-internal fun <T> MutableMap<T, Int>.incrementCounter(key: T) {
-    this[key] = this.getOrDefault(key, 0) + 1
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
+
+internal fun <T> Object2IntOpenHashMap<T>.incrementCounter(key: T) {
+    this.addTo(key, 1)
 }

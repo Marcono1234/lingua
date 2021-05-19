@@ -39,7 +39,7 @@ internal data class TestDataLanguageModel(val ngrams: Set<Ngram>, val primitiveN
 
                 val primitiveNgram = PrimitiveNgram.of(text, i, ngramLength)
                 when (primitiveNgram.value) {
-                    PrimitiveNgram.NONE.value -> ngrams.add(Ngram(text.slice(i until i + ngramLength)))
+                    PrimitiveNgram.NONE.value -> ngrams.add(Ngram(text.substring(i, i + ngramLength)))
                     else -> primitiveNgrams.add(primitiveNgram.value)
                 }
             }

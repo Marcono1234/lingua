@@ -23,7 +23,6 @@ import com.github.pemistahl.lingua.internal.Alphabet
 import com.github.pemistahl.lingua.internal.Constant.CHARS_TO_LANGUAGES_MAPPING
 import com.github.pemistahl.lingua.internal.Constant.JAPANESE_CHARACTER_SET
 import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
-import com.github.pemistahl.lingua.internal.Constant.NO_LETTER
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
 import com.github.pemistahl.lingua.internal.Ngram
@@ -33,16 +32,18 @@ import com.github.pemistahl.lingua.internal.TrainingDataLanguageModel
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList
 import it.unimi.dsi.fastutil.longs.LongSet
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap
+import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2IntMap
+import it.unimi.dsi.fastutil.objects.Object2IntMaps
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
-import java.util.Locale
-import java.util.SortedMap
-import java.util.TreeMap
-import java.util.stream.StreamSupport
+import java.util.*
+import java.util.function.LongConsumer
 import kotlin.math.ln
 
 /**
@@ -113,7 +114,7 @@ class LanguageDetector internal constructor(
         val values = TreeMap<Language, Double>()
         val cleanedUpText = cleanUpInputText(text)
 
-        if (cleanedUpText.isEmpty() || NO_LETTER.matches(cleanedUpText)) return values
+        if (cleanedUpText.isEmpty() || !cleanedUpText.codePoints().anyMatch(Character::isLetter)) return values
 
         val words = splitTextIntoWords(cleanedUpText)
         val languageDetectedByRules = detectLanguageWithRules(words)
@@ -155,7 +156,7 @@ class LanguageDetector internal constructor(
         }
 
         val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
-        val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: emptyMap()
+        val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: Object2IntMaps.emptyMap()
         val summedUpProbabilities = sumUpProbabilities(allProbabilities, unigramCounts, filteredLanguages)
         val highestProbability = summedUpProbabilities.maxByOrNull { it.value }?.value ?: return sortedMapOf()
         val confidenceValues = summedUpProbabilities.mapValues { highestProbability / it.value }
@@ -173,7 +174,6 @@ class LanguageDetector internal constructor(
     }
 
     internal fun splitTextIntoWords(text: String): List<String> {
-        // TODO Change to streaming
         val normalizedTextBuilder = StringBuilder()
         for (chr in text) {
             normalizedTextBuilder.append(chr)
@@ -182,7 +182,6 @@ class LanguageDetector internal constructor(
             }
         }
         val normalizedText = normalizedTextBuilder.toString()
-        // TODO Change to streaming
         return if (normalizedText.contains(' ')) {
             normalizedText.split(' ').filter { it.isNotBlank() }
         } else {
@@ -193,41 +192,65 @@ class LanguageDetector internal constructor(
     internal fun countUnigramsOfInputText(
         unigramLanguageModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>
-    ): Map<Language, Int> {
-        val unigramCounts = mutableMapOf<Language, Int>()
+    ): Object2IntMap<Language> {
+        val unigramCounts = Object2IntOpenHashMap<Language>()
         for (language in filteredLanguages) {
-            for (unigram in unigramLanguageModel.ngrams) {
-                val probability = lookUpNgramProbability(language, unigram)
+            // Only have to check primitiveNgrams since unigrams are always encoded as primitive
+            unigramLanguageModel.primitiveNgrams.forEach(LongConsumer {
+                val probability = lookUpNgramProbability(language, PrimitiveNgram(it))
                 if (probability > 0) {
                     unigramCounts.incrementCounter(language)
                 }
-            }
+            })
         }
         return unigramCounts
     }
 
     internal fun sumUpProbabilities(
-        probabilities: List<Map<Language, Double>>,
-        unigramCountsOfInputText: Map<Language, Int>,
+        probabilities: List<Object2DoubleMap<Language>>,
+        unigramCountsOfInputText: Object2IntMap<Language>,
         filteredLanguages: Set<Language>
     ): Map<Language, Double> {
         val summedUpProbabilities = hashMapOf<Language, Double>()
         for (language in filteredLanguages) {
-            summedUpProbabilities[language] = probabilities.sumByDouble { it[language] ?: 0.0 }
+            summedUpProbabilities[language] = probabilities.sumOf { it.getOrDefault(language as Any, 0.0) }
 
             if (unigramCountsOfInputText.containsKey(language)) {
                 summedUpProbabilities[language] = summedUpProbabilities.getValue(language) /
-                    unigramCountsOfInputText.getValue(language)
+                    unigramCountsOfInputText.getInt(language)
             }
         }
         return summedUpProbabilities.filter { it.value != 0.0 }
     }
 
+    private class SingleCharSequence : CharSequence {
+        var char = '0'
+
+        override val length: Int
+            get() = 1
+
+        override fun get(index: Int): Char {
+            return if (index == 0) char else throw IndexOutOfBoundsException("Invalid index $index")
+        }
+
+        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
+            return if (startIndex in 0..1 && endIndex == startIndex) ""
+            else if (startIndex == 0 && endIndex == 1) this
+            else throw IndexOutOfBoundsException()
+        }
+
+        override fun toString(): String {
+            return char.toString()
+        }
+    }
+
     internal fun detectLanguageWithRules(words: List<String>): Language {
-        val totalLanguageCounts = mutableMapOf<Language, Int>()
+        val totalLanguageCounts = Object2IntOpenHashMap<Language>()
+        val singleCharSequence = SingleCharSequence()
+        val japaneseMatcher = JAPANESE_CHARACTER_SET.matcher("")
 
         for (word in words) {
-            val wordLanguageCounts = mutableMapOf<Language, Int>()
+            val wordLanguageCounts = Object2IntOpenHashMap<Language>()
 
             for (character in word) {
                 var isMatch = false
@@ -238,17 +261,24 @@ class LanguageDetector internal constructor(
                     }
                 }
                 if (!isMatch) {
-                    when {
-                        Alphabet.HAN.matches(character) -> wordLanguageCounts.incrementCounter(CHINESE)
-                        JAPANESE_CHARACTER_SET.matches(character.toString()) -> wordLanguageCounts.incrementCounter(JAPANESE)
-                        Alphabet.LATIN.matches(character) ||
-                            Alphabet.CYRILLIC.matches(character) ||
-                            Alphabet.DEVANAGARI.matches(character) ->
-                            languagesWithUniqueCharacters.filter {
-                                it.uniqueCharacters?.contains(character) ?: false
-                            }.forEach {
-                                wordLanguageCounts.incrementCounter(it)
-                            }
+                    if (Alphabet.HAN.matches(character)) {
+                        wordLanguageCounts.incrementCounter(CHINESE)
+                    } else {
+                        // For performance reasons reuse a single CharSequence and a single Matcher
+                        singleCharSequence.char = character
+                        japaneseMatcher.reset(singleCharSequence)
+
+                        when {
+                            japaneseMatcher.matches() -> wordLanguageCounts.incrementCounter(JAPANESE)
+                            Alphabet.LATIN.matches(character) ||
+                                Alphabet.CYRILLIC.matches(character) ||
+                                Alphabet.DEVANAGARI.matches(character) ->
+                                languagesWithUniqueCharacters.filter {
+                                    it.uniqueCharacters?.contains(character) ?: false
+                                }.forEach {
+                                    wordLanguageCounts.incrementCounter(it)
+                                }
+                        }
                     }
                 }
             }
@@ -277,7 +307,7 @@ class LanguageDetector internal constructor(
             }
         }
 
-        val unknownLanguageCount = totalLanguageCounts[UNKNOWN] ?: 0
+        val unknownLanguageCount = totalLanguageCounts.getOrDefault(UNKNOWN as Any, 0)
         val filteredLanguageCounts = if (unknownLanguageCount >= (0.5 * words.size)) {
             totalLanguageCounts
         } else {
@@ -307,7 +337,7 @@ class LanguageDetector internal constructor(
     }
 
     internal fun filterLanguagesByRules(words: List<String>): Set<Language> {
-        val detectedAlphabets = mutableMapOf<Alphabet, Int>()
+        val detectedAlphabets = Object2IntOpenHashMap<Alphabet>()
 
         for (word in words) {
             for (alphabet in Alphabet.values()) {
@@ -324,7 +354,7 @@ class LanguageDetector internal constructor(
 
         val mostFrequentAlphabet = detectedAlphabets.entries.maxByOrNull { it.value }!!.key
         val filteredLanguages = languages.filter { it.alphabets.contains(mostFrequentAlphabet) }
-        val languageCounts = mutableMapOf<Language, Int>()
+        val languageCounts = Object2IntOpenHashMap<Language>()
 
         for (word in words) {
             for ((characters, languages) in CHARS_TO_LANGUAGES_MAPPING) {
@@ -349,12 +379,16 @@ class LanguageDetector internal constructor(
     internal fun computeLanguageProbabilities(
         testDataModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>
-    ): Map<Language, Double> {
-        val probabilities = hashMapOf<Language, Double>()
+    ): Object2DoubleMap<Language> {
+        val probabilities = Object2DoubleOpenHashMap<Language>()
         for (language in filteredLanguages) {
-            probabilities[language] = computeSumOfNgramProbabilities(language, testDataModel.ngrams, testDataModel.primitiveNgrams)
+            val probability = computeSumOfNgramProbabilities(language, testDataModel.ngrams, testDataModel.primitiveNgrams)
+            if (probability < 0.0) {
+                // Note: Don't convert to assignment, would choose wrong overload then (?)
+                probabilities.put(language, probability)
+            }
         }
-        return probabilities.filter { it.value < 0.0 }
+        return probabilities
     }
 
     internal fun computeSumOfNgramProbabilities(
@@ -362,23 +396,33 @@ class LanguageDetector internal constructor(
         ngrams: Set<Ngram>,
         primitiveNgrams: LongSet
     ): Double {
-        val probabilities = DoubleArrayList()
+        var probabilitySum = 0.0
 
         for (ngram in ngrams) {
-            for (elem in ngram.rangeOfLowerOrderNgrams()) {
-                val probability = lookUpNgramProbability(language, elem)
+            var current = ngram
+            while (true) {
+                val probability = lookUpNgramProbability(language, current)
                 if (probability > 0) {
-                    probabilities.add(probability)
+                    probabilitySum += ln(probability)
                     break
+                }
+
+                val newCurrent = current.getLowerOrderNgram()
+                if (newCurrent == null) {
+                    break
+                } else {
+                    current = newCurrent
                 }
             }
         }
-        primitiveNgrams.forEach{
+
+        // Must explicitly specify LongConsumer type, otherwise Kotlin picks the wrong overload
+        primitiveNgrams.forEach(LongConsumer {
             var current = PrimitiveNgram(it)
             while (true) {
                 val probability = lookUpNgramProbability(language, current)
                 if (probability > 0) {
-                    probabilities.add(probability)
+                    probabilitySum += ln(probability)
                     break
                 }
 
@@ -387,9 +431,9 @@ class LanguageDetector internal constructor(
                     break
                 }
             }
-        }
+        })
 
-        return probabilities.doubleStream().map(::ln).sum()
+        return probabilitySum
     }
 
     internal fun lookUpNgramProbability(

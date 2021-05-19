@@ -123,10 +123,9 @@ internal object Constant {
         Regex("^[\\p{Hiragana}\\p{Katakana}\\p{Han}]+$")
     } catch (e: PatternSyntaxException) {
         Regex("^[\\p{IsHiragana}\\p{IsKatakana}\\p{IsHan}]+$")
-    }
+    }.toPattern()
     val LANGUAGES_SUPPORTING_LOGOGRAMS = setOf(CHINESE, JAPANESE, KOREAN)
     val MULTIPLE_WHITESPACE = Regex("\\s+")
-    val NO_LETTER = Regex("^[^\\p{L}]+$")
     val NUMBERS = Regex("\\p{N}")
     val PUNCTUATION = Regex("\\p{P}")
 }

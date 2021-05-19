@@ -136,14 +136,9 @@ internal data class Ngram(val value: String) : Comparable<Ngram> {
         else -> 0
     }
 
-    fun rangeOfLowerOrderNgrams() = NgramRange(this, Ngram(this.value[0].toString()))
-
-    operator fun dec(): Ngram = when {
-        this.value.length > 1 -> Ngram(this.value.slice(0..this.value.length - 2))
-        this.value.length == 1 -> Ngram("")
-        else -> throw IllegalStateException(
-            "Zerogram is ngram type of lowest order and can not be decremented"
-        )
+    fun getLowerOrderNgram(): Ngram? {
+        return if (value.length == 1) null
+        else Ngram(value.substring(0, value.length - 1))
     }
 
     companion object {
@@ -155,31 +150,5 @@ internal data class Ngram(val value: String) : Comparable<Ngram> {
             5 -> "fivegram"
             else -> throw IllegalArgumentException("ngram length $ngramLength is not in range 1..5")
         }
-    }
-}
-
-internal data class NgramRange(
-    override val start: Ngram,
-    override val endInclusive: Ngram
-) : ClosedRange<Ngram>, Iterable<Ngram> {
-    init {
-        require(start >= endInclusive) {
-            "'$start' must be of higher order than '$endInclusive'"
-        }
-    }
-
-    override fun contains(value: Ngram): Boolean = value in endInclusive..start
-
-    override fun iterator(): Iterator<Ngram> = NgramIterator(start)
-}
-
-internal data class NgramIterator(private val start: Ngram) : Iterator<Ngram> {
-    private var current = start
-
-    override fun hasNext(): Boolean = current.value.isNotEmpty()
-
-    override fun next(): Ngram {
-        if (!hasNext()) throw NoSuchElementException()
-        return current--
     }
 }

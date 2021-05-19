@@ -18,13 +18,14 @@ package com.github.pemistahl.lingua.internal.util.extension
 
 import com.github.pemistahl.lingua.internal.Constant.LANGUAGES_SUPPORTING_LOGOGRAMS
 
+// Cache list of alphabets here to avoid evaluating it every time
+// for isLogogram()
+private val alphabetsWithLogograms = LANGUAGES_SUPPORTING_LOGOGRAMS.flatMap { it.alphabets }
+
 fun Char.isLogogram(): Boolean {
     return if (this.isWhitespace()) {
         false
     } else {
-        LANGUAGES_SUPPORTING_LOGOGRAMS
-            .asSequence()
-            .flatMap { it.alphabets }
-            .any { it.matches(this) }
+        alphabetsWithLogograms.any { it.matches(this) }
     }
 }
