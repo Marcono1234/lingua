@@ -25,10 +25,10 @@ import com.github.pemistahl.lingua.internal.Constant.JAPANESE_CHARACTER_SET
 import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
-import com.github.pemistahl.lingua.internal.ObjectNgram
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
-import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup
+import com.github.pemistahl.lingua.internal.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
+import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
@@ -43,6 +43,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import java.util.*
 import java.util.function.LongConsumer
+import java.util.stream.Collectors
 import kotlin.math.ln
 
 /**
@@ -194,9 +195,11 @@ class LanguageDetector internal constructor(
     ): Object2IntMap<Language> {
         val unigramCounts = Object2IntOpenHashMap<Language>()
         for (language in filteredLanguages) {
+            val lookup = languageModels[language]!!.value.uniBiTrigramsLookup
+
             // Only have to check primitiveNgrams since unigrams are always encoded as primitive
             unigramLanguageModel.primitiveNgrams.forEach(LongConsumer {
-                val probability = lookUpNgramProbability(language, PrimitiveNgram(it))
+                val probability = lookup.getFrequency(PrimitiveNgram(it))
                 if (probability > 0) {
                     unigramCounts.incrementCounter(language)
                 }
@@ -382,7 +385,19 @@ class LanguageDetector internal constructor(
     ): Object2DoubleMap<Language> {
         val probabilities = Object2DoubleOpenHashMap<Language>()
         for (language in filteredLanguages) {
-            val probability = computeSumOfNgramProbabilities(language, testDataModel)
+            val modelHolder = languageModels[language]!!.value
+            val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
+            val quadriFivegramLookup = when {
+                // When model only contains primitives don't have to load quadriFivegramLookup
+                testDataModel.hasOnlyPrimitives() -> QuadriFivegramRelativeFrequencyLookup.empty
+                else -> modelHolder.quadriFivegramLookup.value
+            }
+
+            val probability = computeSumOfNgramProbabilities(
+                uniBiTrigramsLookup,
+                quadriFivegramLookup,
+                testDataModel
+            )
             if (probability < 0.0) {
                 // Note: Don't convert to assignment, would choose wrong overload then (?)
                 probabilities.put(language, probability)
@@ -392,7 +407,8 @@ class LanguageDetector internal constructor(
     }
 
     internal fun computeSumOfNgramProbabilities(
-        language: Language,
+        uniBiTrigramsLookup: UniBiTrigramRelativeFrequencyLookup,
+        quadriFivegramLookup: QuadriFivegramRelativeFrequencyLookup,
         testDataModel: TestDataLanguageModel
     ): Double {
         var probabilitySum = 0.0
@@ -401,7 +417,7 @@ class LanguageDetector internal constructor(
             var current = ngram
             var currentPrimitive: PrimitiveNgram
             while (true) {
-                val probability = lookUpNgramProbability(language, current)
+                val probability = quadriFivegramLookup.getFrequency(current)
                 if (probability > 0) {
                     probabilitySum += ln(probability)
                     continue@ngramLoop
@@ -417,7 +433,7 @@ class LanguageDetector internal constructor(
             }
 
             do {
-                val probability = lookUpNgramProbability(language, currentPrimitive)
+                val probability = uniBiTrigramsLookup.getFrequency(currentPrimitive)
                 if (probability > 0) {
                     probabilitySum += ln(probability)
                     break
@@ -431,7 +447,7 @@ class LanguageDetector internal constructor(
         testDataModel.primitiveNgrams.forEach(LongConsumer {
             var current = PrimitiveNgram(it)
             do {
-                val probability = lookUpNgramProbability(language, current)
+                val probability = uniBiTrigramsLookup.getFrequency(current)
                 if (probability > 0) {
                     probabilitySum += ln(probability)
                     break
@@ -444,45 +460,15 @@ class LanguageDetector internal constructor(
         return probabilitySum
     }
 
-    internal fun lookUpNgramProbability(
-        language: Language,
-        ngram: ObjectNgram
-    ): Double {
-        val languageModels = when (ngram.value.length) {
-            5 -> fivegramLanguageModels
-            4 -> quadrigramLanguageModels
-            3 -> trigramLanguageModels
-            2 -> bigramLanguageModels
-            1 -> unigramLanguageModels
-            0 -> throw IllegalArgumentException("Zerogram detected")
-            else -> throw IllegalArgumentException("unsupported ngram length detected: ${ngram.value.length}")
-        }
-
-        return languageModels.getValue(language).value.getFrequency(ngram).toDouble()
-    }
-
-    internal fun lookUpNgramProbability(
-        language: Language,
-        ngram: PrimitiveNgram
-    ): Double {
-        val languageModels = when (ngram.getLength()) {
-            5 -> fivegramLanguageModels
-            4 -> quadrigramLanguageModels
-            3 -> trigramLanguageModels
-            2 -> bigramLanguageModels
-            1 -> unigramLanguageModels
-            0 -> throw IllegalArgumentException("Zerogram detected")
-            else -> throw IllegalArgumentException("unsupported ngram length detected: ${ngram.getLength()}")
-        }
-
-        return languageModels.getValue(language).value.getFrequency(ngram).toDouble()
-    }
-
     private fun preloadLanguageModels() {
         runBlocking {
-            languageModels.map { models ->
-                async(Dispatchers.IO) { languages.forEach { language -> models[language]?.value } }
-            }
+            languageModels.map {
+                async(Dispatchers.IO) {
+                    // Initialize values of Lazy objects
+                    val modelHolder = it.value.value
+                    modelHolder.quadriFivegramLookup.value
+                }
+            }.awaitAll()
         }
     }
 
@@ -496,35 +482,21 @@ class LanguageDetector internal constructor(
 
     override fun hashCode() = 31 * languages.hashCode() + minimumRelativeDistance.hashCode()
 
+    internal data class LanguageModelHolder(
+        val uniBiTrigramsLookup: UniBiTrigramRelativeFrequencyLookup,
+        val quadriFivegramLookup: Lazy<QuadriFivegramRelativeFrequencyLookup>
+    )
+
     internal companion object {
-        internal var unigramLanguageModels = loadLanguageModels(ngramLength = 1)
-        internal var bigramLanguageModels = loadLanguageModels(ngramLength = 2)
-        internal var trigramLanguageModels = loadLanguageModels(ngramLength = 3)
-        internal var quadrigramLanguageModels = loadLanguageModels(ngramLength = 4)
-        internal var fivegramLanguageModels = loadLanguageModels(ngramLength = 5)
-
-        internal val languageModels = listOf(
-            unigramLanguageModels,
-            bigramLanguageModels,
-            trigramLanguageModels,
-            quadrigramLanguageModels,
-            fivegramLanguageModels
-        )
-
-        private fun loadLanguageModels(ngramLength: Int): Map<Language, Lazy<RelativeFrequencyLookup>> {
-            val languageModels = hashMapOf<Language, Lazy<RelativeFrequencyLookup>>()
-            for (language in Language.all()) {
-                languageModels[language] = lazy { loadLanguageModel(language, ngramLength) }
-            }
-            return languageModels
-        }
-
-        private fun loadLanguageModel(language: Language, ngramLength: Int): RelativeFrequencyLookup {
-            val fileName = "${ObjectNgram.getNgramNameByLength(ngramLength)}s.json"
-            val filePath = "/language-models/${language.isoCode639_1}/$fileName"
-            return Language::class.java.getResourceAsStream(filePath).use {
-                RelativeFrequencyLookup.fromJson(it!!)
-            }
-        }
+        internal var languageModels = Language.all().stream()
+            .collect(Collectors.toMap(
+                { language -> language },
+                { language -> lazy {
+                    LanguageModelHolder(
+                        UniBiTrigramRelativeFrequencyLookup.fromJson(language),
+                        lazy { QuadriFivegramRelativeFrequencyLookup.fromJson(language) }
+                    )
+                }}
+            ))
     }
 }

@@ -20,6 +20,9 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import it.unimi.dsi.fastutil.longs.LongSet
 
 internal data class TestDataLanguageModel(val objectNgrams: Set<ObjectNgram>, val primitiveNgrams: LongSet) {
+    fun hasOnlyPrimitives(): Boolean {
+        return objectNgrams.isEmpty()
+    }
 
     companion object {
         fun fromText(text: String, ngramLength: Int): TestDataLanguageModel {

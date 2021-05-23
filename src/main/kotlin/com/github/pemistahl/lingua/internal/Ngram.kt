@@ -16,13 +16,13 @@
 
 package com.github.pemistahl.lingua.internal
 
-import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.BIGRAM_AS_INT
-import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.BIGRAM_AS_SHORT
-import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.TRIGRAM_AS_INT
-import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.TRIGRAM_AS_INT_BITS_PER_CHAR
-import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.TRIGRAM_AS_LONG
-import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.UNIGRAM_AS_BYTE
-import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.UNIGRAM_AS_CHAR
+import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.BIGRAM_AS_INT
+import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.BIGRAM_AS_SHORT
+import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.TRIGRAM_AS_INT
+import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.TRIGRAM_AS_INT_BITS_PER_CHAR
+import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.TRIGRAM_AS_LONG
+import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.UNIGRAM_AS_BYTE
+import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.UNIGRAM_AS_CHAR
 
 /**
  * Ngram encoded as primitive [Long]. Ngrams which cannot be encoded as
@@ -34,7 +34,7 @@ import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.UN
  */
 @JvmInline
 internal value class PrimitiveNgram(val value: Long) {
-    fun getLength(): Int {
+    private fun getLength(): Int {
         return (value and 0xFF).toInt()
     }
 
@@ -174,16 +174,5 @@ internal data class ObjectNgram(val value: String) {
      */
     fun getLowerOrderPrimitiveNgram(): PrimitiveNgram {
         return PrimitiveNgram.of(value, 0, value.length - 1)
-    }
-
-    companion object {
-        fun getNgramNameByLength(ngramLength: Int) = when (ngramLength) {
-            1 -> "unigram"
-            2 -> "bigram"
-            3 -> "trigram"
-            4 -> "quadrigram"
-            5 -> "fivegram"
-            else -> throw IllegalArgumentException("ngram length $ngramLength is not in range 1..5")
-        }
     }
 }

@@ -14,7 +14,80 @@ import java.io.InputStream
 
 internal typealias ModelEncodingType = Int
 
-internal class RelativeFrequencyLookup {
+/**
+ * Helper interface which allows creating lookups from model files.
+ * The lookup types implement this interface for simplicity, however none
+ * of the functions of this interface should be called from outside of this
+ * file.
+ */
+internal interface FrequencyLookupBuilder {
+    companion object {
+        private val jsonModelNameOptions = JsonReader.Options.of("language", "ngrams")
+
+        private fun fromJson(builder: FrequencyLookupBuilder, language: Language, jsonStream: InputStream) {
+            val jsonReader = JsonReader.of(jsonStream.source().buffer())
+            jsonReader.beginObject()
+
+            var isLanguageMissing = true
+            var areNgramsMissing = true
+
+            while (jsonReader.hasNext()) {
+                when (jsonReader.selectName(jsonModelNameOptions)) {
+                    -1 -> throw IllegalArgumentException("Unknown name '${jsonReader.nextName()}' at ${jsonReader.path}")
+                    0 -> if (isLanguageMissing) {
+                        isLanguageMissing = false
+                        if (Language.valueOf(jsonReader.nextString()) != language) {
+                            throw IllegalArgumentException("JSON file is for wrong language")
+                        }
+                    } else throw IllegalArgumentException("Duplicate language at ${jsonReader.path}")
+                    1 -> if (areNgramsMissing) {
+                        areNgramsMissing = false
+                        jsonReader.beginObject()
+                        while (jsonReader.hasNext()) {
+                            val (numerator, denominator) = jsonReader.nextName().split('/')
+                                .map(String::toInt)
+                            val frequency = numerator / denominator.toFloat()
+                            jsonReader.nextString().split(' ')
+                                .forEach { builder.putFrequency(it, frequency) }
+                        }
+                        jsonReader.endObject()
+                    } else throw IllegalArgumentException("Duplicate ngrams at ${jsonReader.path}")
+                }
+            }
+            jsonReader.endObject()
+
+            if (isLanguageMissing) throw IllegalArgumentException("Model data is missing language")
+            if (areNgramsMissing) throw IllegalArgumentException("Model data is missing ngrams")
+            builder.finishCreation()
+        }
+
+        fun fromJson(builder: FrequencyLookupBuilder, language: Language, jsonNames: List<String>) {
+            jsonNames.forEach { jsonName ->
+                val filePath = "/language-models/${language.isoCode639_1}/$jsonName"
+                Language::class.java.getResourceAsStream(filePath)!!.use {
+                   fromJson(builder, language, it)
+                }
+            }
+        }
+    }
+
+    fun putFrequency(ngram: String, frequency: Float)
+    fun finishCreation()
+}
+
+/*
+ * Implementation note:
+ * Declares two types of lookups (uni-, bi- and trigrams, and quadri- and fivegrams)
+ * since that is how LanguageDetector currently uses the lookups; for short texts
+ * it creates ngrams of all lengths (1 - 5), for long texts it only creates trigrams
+ * and then lower order ngrams. Therefore these two lookup types allow lazily loading
+ * the required models into memory.
+ */
+
+/**
+ * Frequency lookup for uni-, bi- and trigrams.
+ */
+internal class UniBiTrigramRelativeFrequencyLookup: FrequencyLookupBuilder {
     companion object {
         private const val loadFactor = 0.9f
         private const val initialCapacity = 16
@@ -32,12 +105,6 @@ internal class RelativeFrequencyLookup {
          * allow encoding the trigram as int.
          */
         private const val TRIGRAM_AS_INT_MAX_CHAR = (1 shl (TRIGRAM_AS_INT_BITS_PER_CHAR - 1)) - 1
-
-        /**
-         * Number of bits per fivegram char used to encode the signed offset compared to
-         * the first char (at index 0).
-         */
-        private const val FIVEGRAM_OFFSET_BITS_PER_CHAR = (Long.SIZE_BITS - Char.SIZE_BITS) / 4
 
         private fun String.bigramFitsShort(): Boolean {
             return this[0].code <= 255 && this[1].code <= 255
@@ -78,6 +145,83 @@ internal class RelativeFrequencyLookup {
                 or (this[2].code.toLong() shl 32)
             )
         }
+
+        fun fromJson(language: Language): UniBiTrigramRelativeFrequencyLookup {
+            val lookup = UniBiTrigramRelativeFrequencyLookup()
+            FrequencyLookupBuilder.fromJson(lookup, language, listOf("unigrams.json", "bigrams.json", "trigrams.json"))
+            return lookup
+        }
+    }
+
+    private val unigramsAsByte = Byte2FloatOpenHashMap(initialCapacity, loadFactor)
+    private val unigramsAsChar = Char2FloatOpenHashMap(initialCapacity, loadFactor)
+
+    private val bigramsAsShort = Short2FloatOpenHashMap(initialCapacity, loadFactor)
+    private val bigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
+
+    private val trigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
+    private val trigramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
+
+    override fun putFrequency(ngram: String, frequency: Float) {
+        when (ngram.length) {
+            1 -> {
+                val char0 = ngram[0].code
+                when {
+                    char0 <= 255 -> unigramsAsByte[char0.toByte()] = frequency
+                    else -> unigramsAsChar[char0.toChar()] = frequency
+                }
+            }
+            2 -> when {
+                ngram.bigramFitsShort() -> bigramsAsShort[ngram.bigramToShort()] = frequency
+                else -> bigramsAsInt[ngram.bigramToInt()] = frequency
+            }
+            3 -> when {
+                ngram.trigramFitsInt() -> trigramsAsInt[ngram.trigramToInt()] = frequency
+                else -> trigramsAsLong[ngram.trigramToLong()] = frequency
+            }
+            else -> throw IllegalArgumentException("Invalid Ngram length")
+        }
+    }
+
+    override fun finishCreation() {
+        unigramsAsByte.trim()
+        unigramsAsChar.trim()
+
+        bigramsAsShort.trim()
+        bigramsAsInt.trim()
+
+        trigramsAsInt.trim()
+        trigramsAsLong.trim()
+    }
+
+    fun getFrequency(ngram: PrimitiveNgram): Double {
+        return when (ngram.getEncodingType()) {
+            UNIGRAM_AS_BYTE -> unigramsAsByte[ngram.unigramToByte()]
+            UNIGRAM_AS_CHAR -> unigramsAsChar[ngram.unigramToChar()]
+            BIGRAM_AS_SHORT -> bigramsAsShort[ngram.bigramToShort()]
+            BIGRAM_AS_INT -> bigramsAsInt[ngram.bigramToInt()]
+            TRIGRAM_AS_INT -> trigramsAsInt[ngram.trigramToInt()]
+            TRIGRAM_AS_LONG -> trigramsAsLong[ngram.trigramToLong()]
+            else -> throw AssertionError("Unknown encoding type")
+        }.toDouble()
+    }
+}
+
+/**
+ * Frequency lookup for quadri- and fivegrams.
+ */
+internal class QuadriFivegramRelativeFrequencyLookup : FrequencyLookupBuilder {
+    companion object {
+        val empty = QuadriFivegramRelativeFrequencyLookup()
+
+        private const val loadFactor = 0.9f
+        private const val initialCapacity = 16
+
+        /**
+         * Number of bits per fivegram char used to encode the signed offset compared to
+         * the first char (at index 0).
+         */
+        private const val FIVEGRAM_OFFSET_BITS_PER_CHAR = (Long.SIZE_BITS - Char.SIZE_BITS) / 4
 
         private fun String.quadrigramFitsInt(): Boolean {
             return this[0].code <= 255
@@ -143,50 +287,12 @@ internal class RelativeFrequencyLookup {
             )
         }
 
-        private val jsonModelNameOptions = JsonReader.Options.of("language", "ngrams")
-
-        fun fromJson(json: InputStream): RelativeFrequencyLookup {
-            val jsonReader = JsonReader.of(json.source().buffer())
-            jsonReader.beginObject()
-
-            var language: Language? = null
-            var jsonRelativeFrequencies: RelativeFrequencyLookup? = null
-
-            while (jsonReader.hasNext()) {
-                when (jsonReader.selectName(jsonModelNameOptions)) {
-                    -1 -> throw IllegalArgumentException("Unknown name '${jsonReader.nextName()}' at ${jsonReader.path}")
-                    0 -> if (language == null) {
-                        language = Language.valueOf(jsonReader.nextString())
-                    } else throw IllegalArgumentException("Duplicate language at ${jsonReader.path}")
-                    1 -> if (jsonRelativeFrequencies == null) {
-                        jsonRelativeFrequencies = RelativeFrequencyLookup()
-                        jsonReader.beginObject()
-                        while (jsonReader.hasNext()) {
-                            val (numerator, denominator) = jsonReader.nextName().split('/').map(String::toInt)
-                            val frequency = numerator / denominator.toFloat()
-                            jsonReader.nextString().split(' ')
-                                .forEach { jsonRelativeFrequencies.putFrequency(it, frequency) }
-                        }
-                        jsonReader.endObject()
-                    } else throw IllegalArgumentException("Duplicate ngrams at ${jsonReader.path}")
-                }
-            }
-            jsonReader.endObject()
-
-            language ?: throw IllegalArgumentException("Language is missing")
-            jsonRelativeFrequencies?.finishCreation() ?: throw IllegalArgumentException("Model data is missing ngrams")
-            return jsonRelativeFrequencies
+        fun fromJson(language: Language): QuadriFivegramRelativeFrequencyLookup {
+            val lookup = QuadriFivegramRelativeFrequencyLookup()
+            FrequencyLookupBuilder.fromJson(lookup, language, listOf("quadrigrams.json", "fivegrams.json"))
+            return lookup
         }
     }
-
-    private val unigramsAsByte = Byte2FloatOpenHashMap(initialCapacity, loadFactor)
-    private val unigramsAsChar = Char2FloatOpenHashMap(initialCapacity, loadFactor)
-
-    private val bigramsAsShort = Short2FloatOpenHashMap(initialCapacity, loadFactor)
-    private val bigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
-
-    private val trigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
-    private val trigramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
 
     private val quadrigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
     private val quadrigramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
@@ -194,23 +300,8 @@ internal class RelativeFrequencyLookup {
     private val fivegramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
     private val fivegramsAsObject = Object2FloatOpenHashMap<String>(initialCapacity, loadFactor)
 
-    private fun putFrequency(ngram: String, frequency: Float) {
+    override fun putFrequency(ngram: String, frequency: Float) {
         when (ngram.length) {
-            1 -> {
-                val char0 = ngram[0].code
-                when {
-                    char0 <= 255 -> unigramsAsByte[char0.toByte()] = frequency
-                    else -> unigramsAsChar[char0.toChar()] = frequency
-                }
-            }
-            2 -> when {
-                ngram.bigramFitsShort() -> bigramsAsShort[ngram.bigramToShort()] = frequency
-                else -> bigramsAsInt[ngram.bigramToInt()] = frequency
-            }
-            3 -> when {
-                ngram.trigramFitsInt() -> trigramsAsInt[ngram.trigramToInt()] = frequency
-                else -> trigramsAsLong[ngram.trigramToLong()] = frequency
-            }
             4 -> when {
                 ngram.quadrigramFitsInt() -> quadrigramsAsInt[ngram.quadrigramToInt()] = frequency
                 else -> quadrigramsAsLong[ngram.quadrigramToLong()] = frequency
@@ -224,16 +315,7 @@ internal class RelativeFrequencyLookup {
         }
     }
 
-    private fun finishCreation() {
-        unigramsAsByte.trim()
-        unigramsAsChar.trim()
-
-        bigramsAsShort.trim()
-        bigramsAsInt.trim()
-
-        trigramsAsInt.trim()
-        trigramsAsLong.trim()
-
+    override fun finishCreation() {
         quadrigramsAsInt.trim()
         quadrigramsAsLong.trim()
 
@@ -241,25 +323,10 @@ internal class RelativeFrequencyLookup {
         fivegramsAsObject.trim()
     }
 
-    fun getFrequency(ngram: ObjectNgram): Float {
+    fun getFrequency(ngram: ObjectNgram): Double {
         val ngramStr = ngram.value
 
         return when (ngramStr.length) {
-            1 -> {
-                val char0 = ngramStr[0].code
-                when {
-                    char0 <= 255 -> unigramsAsByte[char0.toByte()]
-                    else -> unigramsAsChar[char0.toChar()]
-                }
-            }
-            2 -> when {
-                ngramStr.bigramFitsShort() -> bigramsAsShort[ngramStr.bigramToShort()]
-                else -> bigramsAsInt[ngramStr.bigramToInt()]
-            }
-            3 -> when {
-                ngramStr.trigramFitsInt() -> trigramsAsInt[ngramStr.trigramToInt()]
-                else -> trigramsAsLong[ngramStr.trigramToLong()]
-            }
             4 -> when {
                 ngramStr.quadrigramFitsInt() -> quadrigramsAsInt[ngramStr.quadrigramToInt()]
                 else -> quadrigramsAsLong[ngramStr.quadrigramToLong()]
@@ -269,18 +336,6 @@ internal class RelativeFrequencyLookup {
                 else -> fivegramsAsObject.getFloat(ngramStr)
             }
             else -> throw IllegalArgumentException("Invalid Ngram length")
-        }
-    }
-
-    fun getFrequency(ngram: PrimitiveNgram): Float {
-        return when (ngram.getEncodingType()) {
-            UNIGRAM_AS_BYTE -> unigramsAsByte[ngram.unigramToByte()]
-            UNIGRAM_AS_CHAR -> unigramsAsChar[ngram.unigramToChar()]
-            BIGRAM_AS_SHORT -> bigramsAsShort[ngram.bigramToShort()]
-            BIGRAM_AS_INT -> bigramsAsInt[ngram.bigramToInt()]
-            TRIGRAM_AS_INT -> trigramsAsInt[ngram.trigramToInt()]
-            TRIGRAM_AS_LONG -> trigramsAsLong[ngram.trigramToLong()]
-            else -> throw AssertionError("Unknown encoding type")
-        }
+        }.toDouble()
     }
 }
