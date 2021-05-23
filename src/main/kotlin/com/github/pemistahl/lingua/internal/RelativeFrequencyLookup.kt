@@ -33,12 +33,11 @@ internal class RelativeFrequencyLookup {
          */
         private const val TRIGRAM_AS_INT_MAX_CHAR = (1 shl (TRIGRAM_AS_INT_BITS_PER_CHAR - 1)) - 1
 
-        private const val FIVEGRAM_AS_LONG_BITS_PER_CHAR = Long.SIZE_BITS / 5
         /**
-         * Maximum code point value (inclusive) a char of a fivegram may have to
-         * allow encoding the fivegram as long.
+         * Number of bits per fivegram char used to encode the signed offset compared to
+         * the first char (at index 0).
          */
-        private const val FIVEGRAM_AS_LONG_MAX_CHAR = (1 shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR - 1)) - 1
+        private const val FIVEGRAM_OFFSET_BITS_PER_CHAR = (Long.SIZE_BITS - Char.SIZE_BITS) / 4
 
         private fun String.bigramFitsShort(): Boolean {
             return this[0].code <= 255 && this[1].code <= 255
@@ -106,20 +105,41 @@ internal class RelativeFrequencyLookup {
         }
 
         private fun String.fivegramFitsLong(): Boolean {
-            return this[0].code <= FIVEGRAM_AS_LONG_MAX_CHAR
-                && this[1].code <= FIVEGRAM_AS_LONG_MAX_CHAR
-                && this[2].code <= FIVEGRAM_AS_LONG_MAX_CHAR
-                && this[3].code <= FIVEGRAM_AS_LONG_MAX_CHAR
-                && this[4].code <= FIVEGRAM_AS_LONG_MAX_CHAR
+            /*
+             * Fivegram is encoded by writing absolute char value of first char (index 0)
+             * using 16 bits followed by the signed offsets of the other chars compared
+             * to the first char.
+             *
+             * This allows encoding fivegrams where some or all chars would not fit
+             * within Long.SIZE_BITS / 5, but all of the char values are close together.
+             */
+
+            val char0 = this[0].code
+            // (2^x) - 1
+            val maxOffset = (1 shl (FIVEGRAM_OFFSET_BITS_PER_CHAR - 1)) - 1
+            // -2^x
+            val minOffset = -maxOffset - 1
+
+            val diff1 = this[1].code - char0
+            val diff2 = this[2].code - char0
+            val diff3 = this[3].code - char0
+            val diff4 = this[4].code - char0
+
+            return (diff1 in minOffset..maxOffset)
+                && (diff2 in minOffset..maxOffset)
+                && (diff3 in minOffset..maxOffset)
+                && (diff4 in minOffset..maxOffset)
         }
 
         private fun String.fivegramToLong(): Long {
+            val char0 = this[0].code.toLong()
+
             return (
-                this[0].code.toLong()
-                or (this[1].code.toLong() shl FIVEGRAM_AS_LONG_BITS_PER_CHAR)
-                or (this[2].code.toLong() shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR * 2))
-                or (this[3].code.toLong() shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR * 3))
-                or (this[4].code.toLong() shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR * 4))
+                char0
+                or ((this[1].code.toLong() - char0) shl FIVEGRAM_OFFSET_BITS_PER_CHAR)
+                or ((this[2].code.toLong() - char0) shl (FIVEGRAM_OFFSET_BITS_PER_CHAR * 2))
+                or ((this[3].code.toLong() - char0) shl (FIVEGRAM_OFFSET_BITS_PER_CHAR * 3))
+                or ((this[4].code.toLong() - char0) shl (FIVEGRAM_OFFSET_BITS_PER_CHAR * 4))
             )
         }
 
@@ -152,13 +172,6 @@ internal class RelativeFrequencyLookup {
                 }
             }
             jsonReader.endObject()
-
-            //jsonRelativeFrequencies!!.trim()
-            //println("$language: " + jsonRelativeFrequencies!!.keys.map(Ngram::value).filter{it.length == 5 && it.codePoints().allMatch { it < 4096 }}.count())
-            //println("$language: " + jsonRelativeFrequencies!!.keys.map(Ngram::value).filter{it.codePoints().allMatch { it < 256 }}.groupBy { it.length }.map { "${it.key}: ${it.value.size}" }.joinToString(", "))
-            //jsonRelativeFrequencies!!.keys.map(Ngram::value).filter{it.codePoints().allMatch { it < 4096 }}.groupBy({it.length}).forEach({println("${it.key}: " + it.value.size)})
-            //println(jsonRelativeFrequencies!!.keys.stream().map(Ngram::value).flatMapToInt(String::codePoints).filter{it < 7000 && it !in intArrayOf(65357, 64258, 64257, 64257, 64256) }.max()!!)
-            //println(jsonRelativeFrequencies!!.keys.stream().map(Ngram::value).filter{it.codePoints().anyMatch{it > 60000}}.forEach(::println))
 
             language ?: throw IllegalArgumentException("Language is missing")
             jsonRelativeFrequencies?.finishCreation() ?: throw IllegalArgumentException("Model data is missing ngrams")
