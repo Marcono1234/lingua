@@ -30,9 +30,9 @@ class TrainingDataLanguageModelTest {
         By the way, they consist of 23 words in total.
         """.toLowerCase(Locale.ROOT).trimIndent()
 
-    private val keyMapper = { entry: Map.Entry<String, Any> -> Ngram(entry.key) }
+    private val keyMapper = { entry: Map.Entry<String, Any> -> ObjectNgram(entry.key) }
 
-    private val valueMapper = { entry: Map.Entry<Ngram, String> ->
+    private val valueMapper = { entry: Map.Entry<ObjectNgram, String> ->
         val (numerator, denominator) = entry.value.split('/').map { it.toInt() }
         Fraction(numerator, denominator)
     }

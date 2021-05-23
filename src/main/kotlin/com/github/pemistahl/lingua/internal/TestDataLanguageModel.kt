@@ -19,7 +19,7 @@ package com.github.pemistahl.lingua.internal
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import it.unimi.dsi.fastutil.longs.LongSet
 
-internal data class TestDataLanguageModel(val ngrams: Set<Ngram>, val primitiveNgrams: LongSet) {
+internal data class TestDataLanguageModel(val objectNgrams: Set<ObjectNgram>, val primitiveNgrams: LongSet) {
 
     companion object {
         fun fromText(text: String, ngramLength: Int): TestDataLanguageModel {
@@ -27,7 +27,7 @@ internal data class TestDataLanguageModel(val ngrams: Set<Ngram>, val primitiveN
                 "ngram length $ngramLength is not in range 1..5"
             }
 
-            val ngrams = hashSetOf<Ngram>()
+            val ngrams = hashSetOf<ObjectNgram>()
             val primitiveNgrams = LongOpenHashSet()
 
             sliceLoop@ for (i in 0..text.length - ngramLength) {
@@ -39,7 +39,7 @@ internal data class TestDataLanguageModel(val ngrams: Set<Ngram>, val primitiveN
 
                 val primitiveNgram = PrimitiveNgram.of(text, i, ngramLength)
                 when (primitiveNgram.value) {
-                    PrimitiveNgram.NONE.value -> ngrams.add(Ngram(text.substring(i, i + ngramLength)))
+                    PrimitiveNgram.NONE.value -> ngrams.add(ObjectNgram(text.substring(i, i + ngramLength)))
                     else -> primitiveNgrams.add(primitiveNgram.value)
                 }
             }

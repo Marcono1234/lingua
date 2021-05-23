@@ -25,7 +25,7 @@ import com.github.pemistahl.lingua.internal.Constant.JAPANESE_CHARACTER_SET
 import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
-import com.github.pemistahl.lingua.internal.Ngram
+import com.github.pemistahl.lingua.internal.ObjectNgram
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.TrainingDataLanguageModel
@@ -382,7 +382,7 @@ class LanguageDetector internal constructor(
     ): Object2DoubleMap<Language> {
         val probabilities = Object2DoubleOpenHashMap<Language>()
         for (language in filteredLanguages) {
-            val probability = computeSumOfNgramProbabilities(language, testDataModel.ngrams, testDataModel.primitiveNgrams)
+            val probability = computeSumOfNgramProbabilities(language, testDataModel.objectNgrams, testDataModel.primitiveNgrams)
             if (probability < 0.0) {
                 // Note: Don't convert to assignment, would choose wrong overload then (?)
                 probabilities.put(language, probability)
@@ -393,12 +393,12 @@ class LanguageDetector internal constructor(
 
     internal fun computeSumOfNgramProbabilities(
         language: Language,
-        ngrams: Set<Ngram>,
+        objectNgrams: Set<ObjectNgram>,
         primitiveNgrams: LongSet
     ): Double {
         var probabilitySum = 0.0
 
-        for (ngram in ngrams) {
+        for (ngram in objectNgrams) {
             var current = ngram
             while (true) {
                 val probability = lookUpNgramProbability(language, current)
@@ -438,7 +438,7 @@ class LanguageDetector internal constructor(
 
     internal fun lookUpNgramProbability(
         language: Language,
-        ngram: Ngram
+        ngram: ObjectNgram
     ): Double {
         val languageModels = when (ngram.value.length) {
             5 -> fivegramLanguageModels
@@ -512,7 +512,7 @@ class LanguageDetector internal constructor(
         }
 
         private fun loadLanguageModel(language: Language, ngramLength: Int): TrainingDataLanguageModel {
-            val fileName = "${Ngram.getNgramNameByLength(ngramLength)}s.json"
+            val fileName = "${ObjectNgram.getNgramNameByLength(ngramLength)}s.json"
             val filePath = "/language-models/${language.isoCode639_1}/$fileName"
             return Language::class.java.getResourceAsStream(filePath).use {
                 TrainingDataLanguageModel.fromJson(it!!)

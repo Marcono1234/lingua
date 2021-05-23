@@ -61,15 +61,15 @@ private const val FIVEGRAM_AS_LONG_MAX_CHAR = (2 shl (FIVEGRAM_AS_LONG_BITS_PER_
 
 internal data class TrainingDataLanguageModel(
     val language: Language,
-    val absoluteFrequencies: Map<Ngram, Int>,
-    val relativeFrequencies: Map<Ngram, Fraction>,
+    val absoluteFrequencies: Map<ObjectNgram, Int>,
+    val relativeFrequencies: Map<ObjectNgram, Fraction>,
     val jsonRelativeFrequencies: RelativeFrequencyLookup
 ) {
-    fun getRelativeFrequency(ngram: Ngram): Double = jsonRelativeFrequencies.getFrequency(ngram).toDouble()
+    fun getRelativeFrequency(ngram: ObjectNgram): Double = jsonRelativeFrequencies.getFrequency(ngram).toDouble()
     fun getRelativeFrequency(ngram: PrimitiveNgram): Double = jsonRelativeFrequencies.getFrequency(ngram).toDouble()
 
     fun toJson(): String {
-        val ngrams = mutableMapOf<Fraction, MutableList<Ngram>>()
+        val ngrams = mutableMapOf<Fraction, MutableList<ObjectNgram>>()
 
         for ((ngram, fraction) in relativeFrequencies) {
             ngrams.computeIfAbsent(fraction) { mutableListOf() }.add(ngram)
@@ -229,7 +229,7 @@ internal data class TrainingDataLanguageModel(
             fivegramsAsObject.trim()
         }
 
-        fun getFrequency(ngram: Ngram): Float {
+        fun getFrequency(ngram: ObjectNgram): Float {
             val ngramStr = ngram.value
 
             return when (ngramStr.length) {
@@ -281,7 +281,7 @@ internal data class TrainingDataLanguageModel(
             language: Language,
             ngramLength: Int,
             charClass: String,
-            lowerNgramAbsoluteFrequencies: Map<Ngram, Int>
+            lowerNgramAbsoluteFrequencies: Map<ObjectNgram, Int>
         ): TrainingDataLanguageModel {
 
             require(ngramLength in 1..5) {
@@ -357,9 +357,9 @@ internal data class TrainingDataLanguageModel(
             text: Sequence<String>,
             ngramLength: Int,
             charClass: String
-        ): Object2IntMap<Ngram> {
+        ): Object2IntMap<ObjectNgram> {
 
-            val absoluteFrequencies = Object2IntOpenHashMap<Ngram>()
+            val absoluteFrequencies = Object2IntOpenHashMap<ObjectNgram>()
             val regex = Regex("[$charClass]+")
 
             for (line in text) {
@@ -367,7 +367,7 @@ internal data class TrainingDataLanguageModel(
                 for (i in 0..lowerCasedLine.length - ngramLength) {
                     val textSlice = lowerCasedLine.substring(i, i + ngramLength)
                     if (regex.matches(textSlice)) {
-                        val ngram = Ngram(textSlice)
+                        val ngram = ObjectNgram(textSlice)
                         absoluteFrequencies.incrementCounter(ngram)
                     }
                 }
@@ -378,18 +378,18 @@ internal data class TrainingDataLanguageModel(
 
         private fun computeRelativeFrequencies(
             ngramLength: Int,
-            absoluteFrequencies: Map<Ngram, Int>,
-            lowerNgramAbsoluteFrequencies: Map<Ngram, Int>
-        ): Map<Ngram, Fraction> {
+            absoluteFrequencies: Map<ObjectNgram, Int>,
+            lowerNgramAbsoluteFrequencies: Map<ObjectNgram, Int>
+        ): Map<ObjectNgram, Fraction> {
 
-            val ngramProbabilities = hashMapOf<Ngram, Fraction>()
+            val ngramProbabilities = hashMapOf<ObjectNgram, Fraction>()
             val totalNgramFrequency = absoluteFrequencies.values.sum()
 
             for ((ngram, frequency) in absoluteFrequencies) {
                 val denominator = if (ngramLength == 1 || lowerNgramAbsoluteFrequencies.isEmpty()) {
                     totalNgramFrequency
                 } else {
-                    lowerNgramAbsoluteFrequencies.getValue(Ngram(ngram.value.substring(0, ngramLength - 1)))
+                    lowerNgramAbsoluteFrequencies.getValue(ObjectNgram(ngram.value.substring(0, ngramLength - 1)))
                 }
                 ngramProbabilities[ngram] = Fraction(frequency, denominator)
             }

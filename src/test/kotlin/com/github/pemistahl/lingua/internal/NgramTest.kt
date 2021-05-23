@@ -24,12 +24,12 @@ import org.junit.jupiter.api.Test
 
 class NgramTest {
 
-    private val zerogram = Ngram("")
-    private val unigram = Ngram("q")
-    private val bigram = Ngram("qw")
-    private val trigram = Ngram("qwe")
-    private val quadrigram = Ngram("qwer")
-    private val fivegram = Ngram("qwert")
+    private val zerogram = ObjectNgram("")
+    private val unigram = ObjectNgram("q")
+    private val bigram = ObjectNgram("qw")
+    private val trigram = ObjectNgram("qwe")
+    private val quadrigram = ObjectNgram("qwer")
+    private val fivegram = ObjectNgram("qwert")
     private val ngrams = listOf(unigram, bigram, trigram, quadrigram, fivegram)
 
     @Test

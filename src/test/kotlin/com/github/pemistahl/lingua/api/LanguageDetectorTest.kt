@@ -77,7 +77,7 @@ import com.github.pemistahl.lingua.api.Language.WELSH
 import com.github.pemistahl.lingua.api.Language.XHOSA
 import com.github.pemistahl.lingua.api.Language.YORUBA
 import com.github.pemistahl.lingua.api.Language.ZULU
-import com.github.pemistahl.lingua.internal.Ngram
+import com.github.pemistahl.lingua.internal.ObjectNgram
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.TrainingDataLanguageModel
 import io.mockk.every
@@ -223,24 +223,24 @@ class LanguageDetectorTest {
     // ngram probability lookup
 
     private fun ngramProbabilityProvider() = listOf(
-        arguments(ENGLISH, Ngram("a"), 0.01),
-        arguments(ENGLISH, Ngram("lt"), 0.12),
-        arguments(ENGLISH, Ngram("ter"), 0.21),
-        arguments(ENGLISH, Ngram("alte"), 0.25),
-        arguments(ENGLISH, Ngram("alter"), 0.29),
+        arguments(ENGLISH, ObjectNgram("a"), 0.01),
+        arguments(ENGLISH, ObjectNgram("lt"), 0.12),
+        arguments(ENGLISH, ObjectNgram("ter"), 0.21),
+        arguments(ENGLISH, ObjectNgram("alte"), 0.25),
+        arguments(ENGLISH, ObjectNgram("alter"), 0.29),
 
-        arguments(GERMAN, Ngram("t"), 0.08),
-        arguments(GERMAN, Ngram("er"), 0.18),
-        arguments(GERMAN, Ngram("alt"), 0.22),
-        arguments(GERMAN, Ngram("lter"), 0.28),
-        arguments(GERMAN, Ngram("alter"), 0.30)
+        arguments(GERMAN, ObjectNgram("t"), 0.08),
+        arguments(GERMAN, ObjectNgram("er"), 0.18),
+        arguments(GERMAN, ObjectNgram("alt"), 0.22),
+        arguments(GERMAN, ObjectNgram("lter"), 0.28),
+        arguments(GERMAN, ObjectNgram("alter"), 0.30)
     )
 
     @ParameterizedTest
     @MethodSource("ngramProbabilityProvider")
     internal fun `assert that ngram probability lookup works correctly`(
         language: Language,
-        ngram: Ngram,
+        ngram: ObjectNgram,
         expectedProbability: Double
     ) {
         assertThat(
@@ -255,7 +255,7 @@ class LanguageDetectorTest {
     @Test
     fun `assert that ngram probability lookup does not work for Zerogram`() {
         assertThatIllegalArgumentException().isThrownBy {
-            detectorForEnglishAndGerman.lookUpNgramProbability(ENGLISH, Ngram(""))
+            detectorForEnglishAndGerman.lookUpNgramProbability(ENGLISH, ObjectNgram(""))
         }.withMessage(
             "Zerogram detected"
         )
@@ -265,17 +265,17 @@ class LanguageDetectorTest {
 
     private fun ngramProbabilitySumProvider() = listOf(
         arguments(
-            setOf(Ngram("a"), Ngram("l"), Ngram("t"), Ngram("e"), Ngram("r")),
+            setOf(ObjectNgram("a"), ObjectNgram("l"), ObjectNgram("t"), ObjectNgram("e"), ObjectNgram("r")),
             ln(0.01) + ln(0.02) + ln(0.03) + ln(0.04) + ln(0.05)
         ),
         arguments(
             // back off unknown Trigram("tez") to known Bigram("te")
-            setOf(Ngram("alt"), Ngram("lte"), Ngram("tez")),
+            setOf(ObjectNgram("alt"), ObjectNgram("lte"), ObjectNgram("tez")),
             ln(0.19) + ln(0.2) + ln(0.13)
         ),
         arguments(
             // back off unknown Fivegram("aquas") to known Unigram("a")
-            setOf(Ngram("aquas")),
+            setOf(ObjectNgram("aquas")),
             ln(0.01)
         )
     )
@@ -283,7 +283,7 @@ class LanguageDetectorTest {
     @ParameterizedTest
     @MethodSource("ngramProbabilitySumProvider")
     internal fun `assert that sum of ngram probabilities can be computed correctly`(
-        ngrams: Set<Ngram>,
+        ngrams: Set<ObjectNgram>,
         expectedSumOfProbabilities: Double
     ) {
         assertThat(
@@ -828,104 +828,104 @@ class LanguageDetectorTest {
 
     private fun defineBehaviorOfUnigramLanguageModels() {
         with(unigramLanguageModelForEnglish) {
-            every { getRelativeFrequency(Ngram("a")) } returns 0.01
-            every { getRelativeFrequency(Ngram("l")) } returns 0.02
-            every { getRelativeFrequency(Ngram("t")) } returns 0.03
-            every { getRelativeFrequency(Ngram("e")) } returns 0.04
-            every { getRelativeFrequency(Ngram("r")) } returns 0.05
+            every { getRelativeFrequency(ObjectNgram("a")) } returns 0.01
+            every { getRelativeFrequency(ObjectNgram("l")) } returns 0.02
+            every { getRelativeFrequency(ObjectNgram("t")) } returns 0.03
+            every { getRelativeFrequency(ObjectNgram("e")) } returns 0.04
+            every { getRelativeFrequency(ObjectNgram("r")) } returns 0.05
 
             // unknown unigrams in model
-            every { getRelativeFrequency(Ngram("w")) } returns 0.0
+            every { getRelativeFrequency(ObjectNgram("w")) } returns 0.0
         }
 
         with(unigramLanguageModelForGerman) {
-            every { getRelativeFrequency(Ngram("a")) } returns 0.06
-            every { getRelativeFrequency(Ngram("l")) } returns 0.07
-            every { getRelativeFrequency(Ngram("t")) } returns 0.08
-            every { getRelativeFrequency(Ngram("e")) } returns 0.09
-            every { getRelativeFrequency(Ngram("r")) } returns 0.1
+            every { getRelativeFrequency(ObjectNgram("a")) } returns 0.06
+            every { getRelativeFrequency(ObjectNgram("l")) } returns 0.07
+            every { getRelativeFrequency(ObjectNgram("t")) } returns 0.08
+            every { getRelativeFrequency(ObjectNgram("e")) } returns 0.09
+            every { getRelativeFrequency(ObjectNgram("r")) } returns 0.1
 
             // unknown unigrams in model
-            every { getRelativeFrequency(Ngram("w")) } returns 0.0
+            every { getRelativeFrequency(ObjectNgram("w")) } returns 0.0
         }
     }
 
     private fun defineBehaviorOfBigramLanguageModels() {
         with(bigramLanguageModelForEnglish) {
-            every { getRelativeFrequency(Ngram("al")) } returns 0.11
-            every { getRelativeFrequency(Ngram("lt")) } returns 0.12
-            every { getRelativeFrequency(Ngram("te")) } returns 0.13
-            every { getRelativeFrequency(Ngram("er")) } returns 0.14
+            every { getRelativeFrequency(ObjectNgram("al")) } returns 0.11
+            every { getRelativeFrequency(ObjectNgram("lt")) } returns 0.12
+            every { getRelativeFrequency(ObjectNgram("te")) } returns 0.13
+            every { getRelativeFrequency(ObjectNgram("er")) } returns 0.14
 
             // unknown bigrams in model
             for (value in listOf("aq", "wx")) {
-                every { getRelativeFrequency(Ngram(value)) } returns 0.0
+                every { getRelativeFrequency(ObjectNgram(value)) } returns 0.0
             }
         }
 
         with(bigramLanguageModelForGerman) {
-            every { getRelativeFrequency(Ngram("al")) } returns 0.15
-            every { getRelativeFrequency(Ngram("lt")) } returns 0.16
-            every { getRelativeFrequency(Ngram("te")) } returns 0.17
-            every { getRelativeFrequency(Ngram("er")) } returns 0.18
+            every { getRelativeFrequency(ObjectNgram("al")) } returns 0.15
+            every { getRelativeFrequency(ObjectNgram("lt")) } returns 0.16
+            every { getRelativeFrequency(ObjectNgram("te")) } returns 0.17
+            every { getRelativeFrequency(ObjectNgram("er")) } returns 0.18
 
             // unknown bigrams in model
-            every { getRelativeFrequency(Ngram("wx")) } returns 0.0
+            every { getRelativeFrequency(ObjectNgram("wx")) } returns 0.0
         }
     }
 
     private fun defineBehaviorOfTrigramLanguageModels() {
         with(trigramLanguageModelForEnglish) {
-            every { getRelativeFrequency(Ngram("alt")) } returns 0.19
-            every { getRelativeFrequency(Ngram("lte")) } returns 0.2
-            every { getRelativeFrequency(Ngram("ter")) } returns 0.21
+            every { getRelativeFrequency(ObjectNgram("alt")) } returns 0.19
+            every { getRelativeFrequency(ObjectNgram("lte")) } returns 0.2
+            every { getRelativeFrequency(ObjectNgram("ter")) } returns 0.21
 
             // unknown trigrams in model
             for (value in listOf("aqu", "tez", "wxy")) {
-                every { getRelativeFrequency(Ngram(value)) } returns 0.0
+                every { getRelativeFrequency(ObjectNgram(value)) } returns 0.0
             }
         }
 
         with(trigramLanguageModelForGerman) {
-            every { getRelativeFrequency(Ngram("alt")) } returns 0.22
-            every { getRelativeFrequency(Ngram("lte")) } returns 0.23
-            every { getRelativeFrequency(Ngram("ter")) } returns 0.24
+            every { getRelativeFrequency(ObjectNgram("alt")) } returns 0.22
+            every { getRelativeFrequency(ObjectNgram("lte")) } returns 0.23
+            every { getRelativeFrequency(ObjectNgram("ter")) } returns 0.24
 
             // unknown trigrams in model
-            every { getRelativeFrequency(Ngram("wxy")) } returns 0.0
+            every { getRelativeFrequency(ObjectNgram("wxy")) } returns 0.0
         }
     }
 
     private fun defineBehaviorOfQuadrigramLanguageModels() {
         with(quadrigramLanguageModelForEnglish) {
-            every { getRelativeFrequency(Ngram("alte")) } returns 0.25
-            every { getRelativeFrequency(Ngram("lter")) } returns 0.26
+            every { getRelativeFrequency(ObjectNgram("alte")) } returns 0.25
+            every { getRelativeFrequency(ObjectNgram("lter")) } returns 0.26
 
             // unknown quadrigrams in model
             for (value in listOf("aqua", "wxyz")) {
-                every { getRelativeFrequency(Ngram(value)) } returns 0.0
+                every { getRelativeFrequency(ObjectNgram(value)) } returns 0.0
             }
         }
 
         with(quadrigramLanguageModelForGerman) {
-            every { getRelativeFrequency(Ngram("alte")) } returns 0.27
-            every { getRelativeFrequency(Ngram("lter")) } returns 0.28
+            every { getRelativeFrequency(ObjectNgram("alte")) } returns 0.27
+            every { getRelativeFrequency(ObjectNgram("lter")) } returns 0.28
 
             // unknown quadrigrams in model
-            every { getRelativeFrequency(Ngram("wxyz")) } returns 0.0
+            every { getRelativeFrequency(ObjectNgram("wxyz")) } returns 0.0
         }
     }
 
     private fun defineBehaviorOfFivegramLanguageModels() {
         with(fivegramLanguageModelForEnglish) {
-            every { getRelativeFrequency(Ngram("alter")) } returns 0.29
+            every { getRelativeFrequency(ObjectNgram("alter")) } returns 0.29
 
             // unknown fivegrams in model
-            every { getRelativeFrequency(Ngram("aquas")) } returns 0.0
+            every { getRelativeFrequency(ObjectNgram("aquas")) } returns 0.0
         }
 
         with(fivegramLanguageModelForGerman) {
-            every { getRelativeFrequency(Ngram("alter")) } returns 0.30
+            every { getRelativeFrequency(ObjectNgram("alter")) } returns 0.30
         }
     }
 
@@ -954,29 +954,29 @@ class LanguageDetectorTest {
 
     private fun defineBehaviorOfTestDataLanguageModels() {
         with(unigramTestDataLanguageModel) {
-            every { ngrams } returns setOf(
-                Ngram("a"),
-                Ngram("l"),
-                Ngram("t"),
-                Ngram("e"),
-                Ngram("r")
+            every { objectNgrams } returns setOf(
+                ObjectNgram("a"),
+                ObjectNgram("l"),
+                ObjectNgram("t"),
+                ObjectNgram("e"),
+                ObjectNgram("r")
             )
         }
 
         with(trigramTestDataLanguageModel) {
-            every { ngrams } returns setOf(
-                Ngram("alt"),
-                Ngram("lte"),
-                Ngram("ter"),
-                Ngram("wxy")
+            every { objectNgrams } returns setOf(
+                ObjectNgram("alt"),
+                ObjectNgram("lte"),
+                ObjectNgram("ter"),
+                ObjectNgram("wxy")
             )
         }
 
         with(quadrigramTestDataLanguageModel) {
-            every { ngrams } returns setOf(
-                Ngram("alte"),
-                Ngram("lter"),
-                Ngram("wxyz")
+            every { objectNgrams } returns setOf(
+                ObjectNgram("alte"),
+                ObjectNgram("lter"),
+                ObjectNgram("wxyz")
             )
         }
     }

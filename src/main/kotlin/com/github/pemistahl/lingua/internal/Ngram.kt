@@ -16,6 +16,13 @@
 
 package com.github.pemistahl.lingua.internal
 
+/**
+ * Ngram encoded as primitive [Long].
+ *
+ * This class is an _inline_ class, care must be taken to not accidentally
+ * pass it to contexts where an [Any] or is used, otherwise the primitive
+ * value is wrapped in an object.
+ */
 @JvmInline
 internal value class PrimitiveNgram(val value: Long) {
     fun getLength(): Int {
@@ -121,7 +128,10 @@ internal value class PrimitiveNgram(val value: Long) {
     }
 }
 
-internal data class Ngram(val value: String) : Comparable<Ngram> {
+/**
+ * Ngram encoded as [String].
+ */
+internal data class ObjectNgram(val value: String) {
     init {
         require(value.length in 0..5) {
             "length of ngram '$value' is not in range 0..5"
@@ -130,15 +140,9 @@ internal data class Ngram(val value: String) : Comparable<Ngram> {
 
     override fun toString() = value
 
-    override fun compareTo(other: Ngram) = when {
-        this.value.length > other.value.length -> 1
-        this.value.length < other.value.length -> -1
-        else -> 0
-    }
-
-    fun getLowerOrderNgram(): Ngram? {
+    fun getLowerOrderNgram(): ObjectNgram? {
         return if (value.length == 1) null
-        else Ngram(value.substring(0, value.length - 1))
+        else ObjectNgram(value.substring(0, value.length - 1))
     }
 
     companion object {

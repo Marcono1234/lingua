@@ -33,11 +33,11 @@ class TestDataLanguageModelTest {
     fun `assert that unigram language model can be created from test data`() {
         val model = TestDataLanguageModel.fromText(text, ngramLength = 1)
 
-        assertThat(model.ngrams).containsExactlyInAnyOrderElementsOf(
+        assertThat(model.objectNgrams).containsExactlyInAnyOrderElementsOf(
             setOf(
                 "a", "b", "c", "d", "e", "f", "g", "h", "i", "l",
                 "m", "n", "o", "p", "r", "s", "t", "u", "w", "y"
-            ).map { Ngram(it) }
+            ).map { ObjectNgram(it) }
         )
     }
 
@@ -45,7 +45,7 @@ class TestDataLanguageModelTest {
     fun `assert that bigram language model can be created from test data`() {
         val model = TestDataLanguageModel.fromText(text, ngramLength = 2)
 
-        assertThat(model.ngrams).containsExactlyInAnyOrderElementsOf(
+        assertThat(model.objectNgrams).containsExactlyInAnyOrderElementsOf(
             setOf(
                 "de", "pr", "pu", "do", "uc", "ds", "du", "ur", "us", "ed",
                 "in", "io", "em", "en", "is", "al", "es", "ar", "rd", "re",
@@ -53,7 +53,7 @@ class TestDataLanguageModelTest {
                 "fo", "wa", "se", "od", "si", "by", "of", "wo", "on", "st",
                 "ce", "or", "os", "ot", "co", "ta", "te", "ct", "th", "ti",
                 "to", "he", "po"
-            ).map { Ngram(it) }
+            ).map { ObjectNgram(it) }
         )
     }
 
@@ -61,7 +61,7 @@ class TestDataLanguageModelTest {
     fun `assert that trigram language model can be created from test data`() {
         val model = TestDataLanguageModel.fromText(text, ngramLength = 3)
 
-        assertThat(model.ngrams).containsExactlyInAnyOrderElementsOf(
+        assertThat(model.objectNgrams).containsExactlyInAnyOrderElementsOf(
             setOf(
                 "rds", "ose", "ded", "con", "use", "est", "ion", "ist", "pur",
                 "hem", "hes", "tin", "cti", "tio", "wor", "ten", "hey", "ota",
@@ -69,7 +69,7 @@ class TestDataLanguageModelTest {
                 "ces", "nce", "not", "are", "pos", "tot", "end", "enc", "sis",
                 "sen", "nte", "ses", "ord", "ing", "ent", "int", "nde", "way",
                 "the", "rpo", "urp", "duc", "ons", "ese"
-            ).map { Ngram(it) }
+            ).map { ObjectNgram(it) }
         )
     }
 
@@ -77,14 +77,14 @@ class TestDataLanguageModelTest {
     fun `assert that quadrigram language model can be created from test data`() {
         val model = TestDataLanguageModel.fromText(text, ngramLength = 4)
 
-        assertThat(model.ngrams).containsExactlyInAnyOrderElementsOf(
+        assertThat(model.objectNgrams).containsExactlyInAnyOrderElementsOf(
             setOf(
                 "onsi", "sist", "ende", "ords", "esti", "tenc", "nces", "oduc",
                 "tend", "thes", "rpos", "ting", "nten", "nsis", "they", "tota",
                 "cons", "tion", "prod", "ence", "test", "otal", "pose", "nded",
                 "oses", "inte", "urpo", "them", "sent", "duct", "stin", "ente",
                 "ucti", "purp", "ctio", "rodu", "word", "hese"
-            ).map { Ngram(it) }
+            ).map { ObjectNgram(it) }
         )
     }
 
@@ -92,13 +92,13 @@ class TestDataLanguageModelTest {
     fun `assert that fivegram language model can be created from test data`() {
         val model = TestDataLanguageModel.fromText(text, ngramLength = 5)
 
-        assertThat(model.ngrams).containsExactlyInAnyOrderElementsOf(
+        assertThat(model.objectNgrams).containsExactlyInAnyOrderElementsOf(
             setOf(
                 "testi", "sente", "ences", "tende", "these", "ntenc", "ducti",
                 "ntend", "onsis", "total", "uctio", "enten", "poses", "ction",
                 "produ", "inten", "nsist", "words", "sting", "tence", "purpo",
                 "estin", "roduc", "urpos", "ended", "rpose", "oduct", "consi"
-            ).map { Ngram(it) }
+            ).map { ObjectNgram(it) }
         )
     }
 }

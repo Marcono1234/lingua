@@ -17,7 +17,7 @@
 package com.github.pemistahl.lingua.api.io
 
 import com.github.pemistahl.lingua.api.Language
-import com.github.pemistahl.lingua.internal.Ngram
+import com.github.pemistahl.lingua.internal.ObjectNgram
 import com.github.pemistahl.lingua.internal.TrainingDataLanguageModel
 import com.github.pemistahl.lingua.internal.io.FilesWriter
 import java.nio.charset.Charset
@@ -101,7 +101,7 @@ object LanguageModelFilesWriter : FilesWriter() {
         language: Language,
         ngramLength: Int,
         charClass: String,
-        lowerNgramAbsoluteFrequencies: Map<Ngram, Int>
+        lowerNgramAbsoluteFrequencies: Map<ObjectNgram, Int>
     ): TrainingDataLanguageModel {
 
         lateinit var model: TrainingDataLanguageModel
