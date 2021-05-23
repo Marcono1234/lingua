@@ -135,7 +135,7 @@ class LanguageDetector internal constructor(
         val ngramSizeRange = if (cleanedUpText.length >= 120) (3..3) else (1..5)
         val allProbabilitiesAndUnigramCounts = runBlocking {
             ngramSizeRange.filter { i -> cleanedUpText.length >= i }.map { i ->
-                async(Dispatchers.IO) {
+                async(Dispatchers.Default) {
                     val testDataModel = TestDataLanguageModel.fromText(cleanedUpText, ngramLength = i)
                     val probabilities = computeLanguageProbabilities(testDataModel, filteredLanguages)
                     val languages = probabilities.keys
