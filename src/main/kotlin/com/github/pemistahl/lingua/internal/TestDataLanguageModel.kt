@@ -32,7 +32,7 @@ internal data class TestDataLanguageModel(val objectNgrams: Set<ObjectNgram>, va
 
             sliceLoop@ for (i in 0..text.length - ngramLength) {
                 for (sliceIndex in i until i + ngramLength) {
-                    if (!Character.isLetter(text[i])) {
+                    if (!Character.isLetter(text[sliceIndex])) {
                         continue@sliceLoop
                     }
                 }
