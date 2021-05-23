@@ -398,28 +398,40 @@ class LanguageDetector internal constructor(
     ): Double {
         var probabilitySum = 0.0
 
-        for (ngram in objectNgrams) {
+        ngramLoop@ for (ngram in objectNgrams) {
             var current = ngram
+            var currentPrimitive: PrimitiveNgram
             while (true) {
                 val probability = lookUpNgramProbability(language, current)
                 if (probability > 0) {
                     probabilitySum += ln(probability)
-                    break
+                    continue@ngramLoop
                 }
 
                 val newCurrent = current.getLowerOrderNgram()
                 if (newCurrent == null) {
+                    currentPrimitive = current.getLowerOrderPrimitiveNgram()
                     break
                 } else {
                     current = newCurrent
                 }
             }
+
+            do {
+                val probability = lookUpNgramProbability(language, currentPrimitive)
+                if (probability > 0) {
+                    probabilitySum += ln(probability)
+                    break
+                }
+
+                currentPrimitive = currentPrimitive.getLowerOrderNgram()
+            } while(currentPrimitive.value != PrimitiveNgram.NONE.value)
         }
 
         // Must explicitly specify LongConsumer type, otherwise Kotlin picks the wrong overload
         primitiveNgrams.forEach(LongConsumer {
             var current = PrimitiveNgram(it)
-            while (true) {
+            do {
                 val probability = lookUpNgramProbability(language, current)
                 if (probability > 0) {
                     probabilitySum += ln(probability)
@@ -427,10 +439,7 @@ class LanguageDetector internal constructor(
                 }
 
                 current = current.getLowerOrderNgram()
-                if (current.value == PrimitiveNgram.NONE.value) {
-                    break
-                }
-            }
+            } while(current.value != PrimitiveNgram.NONE.value)
         })
 
         return probabilitySum

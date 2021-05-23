@@ -17,7 +17,8 @@
 package com.github.pemistahl.lingua.internal
 
 /**
- * Ngram encoded as primitive [Long].
+ * Ngram encoded as primitive [Long]. Ngrams which cannot be encoded as
+ * primitive are represented as [ObjectNgram].
  *
  * This class is an _inline_ class, care must be taken to not accidentally
  * pass it to contexts where an [Any] or is used, otherwise the primitive
@@ -93,6 +94,10 @@ internal value class PrimitiveNgram(val value: Long) {
         )
     }
 
+    /**
+     * Returns the next lower order ngram or [PrimitiveNgram.NONE] if there is no
+     * lower order ngram.
+     */
     fun getLowerOrderNgram(): PrimitiveNgram {
         return when(getLength()) {
             1 -> NONE
@@ -104,6 +109,8 @@ internal value class PrimitiveNgram(val value: Long) {
     }
 
     companion object {
+        /** Maximum ngram length supported by [PrimitiveNgram] */
+        const val MAX_NGRAM_LENGTH = 3
         val NONE = PrimitiveNgram(0)
 
         fun of(string: String, startIndex: Int, length: Int): PrimitiveNgram {
@@ -129,7 +136,8 @@ internal value class PrimitiveNgram(val value: Long) {
 }
 
 /**
- * Ngram encoded as [String].
+ * Ngram encoded as [String]. Only used for ngrams which cannot be represented
+ * as [PrimitiveNgram].
  */
 internal data class ObjectNgram(val value: String) {
     init {
@@ -140,9 +148,24 @@ internal data class ObjectNgram(val value: String) {
 
     override fun toString() = value
 
+    /**
+     * Returns the next lower order ngram or `null` if the next lower
+     * order ngrams are encoded as primitive and can be obtained from
+     * [getLowerOrderPrimitiveNgram].
+     */
     fun getLowerOrderNgram(): ObjectNgram? {
-        return if (value.length == 1) null
+        // Switch to PrimitiveNgram if possible
+        return if (value.length <= PrimitiveNgram.MAX_NGRAM_LENGTH + 1) null
         else ObjectNgram(value.substring(0, value.length - 1))
+    }
+
+    /**
+     * Returns the next lower order ngram.
+     *
+     * Must only be called if [getLowerOrderNgram] returned `null`.
+     */
+    fun getLowerOrderPrimitiveNgram(): PrimitiveNgram {
+        return PrimitiveNgram.of(value, 0, value.length - 1)
     }
 
     companion object {
