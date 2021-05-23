@@ -27,6 +27,7 @@ import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
 import com.github.pemistahl.lingua.internal.ObjectNgram
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
+import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.TrainingDataLanguageModel
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
@@ -459,7 +460,7 @@ class LanguageDetector internal constructor(
             else -> throw IllegalArgumentException("unsupported ngram length detected: ${ngram.value.length}")
         }
 
-        return languageModels.getValue(language).value.getRelativeFrequency(ngram)
+        return languageModels.getValue(language).value.getFrequency(ngram).toDouble()
     }
 
     internal fun lookUpNgramProbability(
@@ -476,7 +477,7 @@ class LanguageDetector internal constructor(
             else -> throw IllegalArgumentException("unsupported ngram length detected: ${ngram.getLength()}")
         }
 
-        return languageModels.getValue(language).value.getRelativeFrequency(ngram)
+        return languageModels.getValue(language).value.getFrequency(ngram).toDouble()
     }
 
     private fun preloadLanguageModels() {
@@ -512,19 +513,19 @@ class LanguageDetector internal constructor(
             fivegramLanguageModels
         )
 
-        private fun loadLanguageModels(ngramLength: Int): Map<Language, Lazy<TrainingDataLanguageModel>> {
-            val languageModels = hashMapOf<Language, Lazy<TrainingDataLanguageModel>>()
+        private fun loadLanguageModels(ngramLength: Int): Map<Language, Lazy<RelativeFrequencyLookup>> {
+            val languageModels = hashMapOf<Language, Lazy<RelativeFrequencyLookup>>()
             for (language in Language.all()) {
                 languageModels[language] = lazy { loadLanguageModel(language, ngramLength) }
             }
             return languageModels
         }
 
-        private fun loadLanguageModel(language: Language, ngramLength: Int): TrainingDataLanguageModel {
+        private fun loadLanguageModel(language: Language, ngramLength: Int): RelativeFrequencyLookup {
             val fileName = "${ObjectNgram.getNgramNameByLength(ngramLength)}s.json"
             val filePath = "/language-models/${language.isoCode639_1}/$fileName"
             return Language::class.java.getResourceAsStream(filePath).use {
-                TrainingDataLanguageModel.fromJson(it!!)
+                RelativeFrequencyLookup.fromJson(it!!)
             }
         }
     }

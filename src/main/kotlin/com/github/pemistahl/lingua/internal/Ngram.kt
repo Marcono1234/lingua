@@ -16,13 +16,21 @@
 
 package com.github.pemistahl.lingua.internal
 
+import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.BIGRAM_AS_INT
+import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.BIGRAM_AS_SHORT
+import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.TRIGRAM_AS_INT
+import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.TRIGRAM_AS_INT_BITS_PER_CHAR
+import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.TRIGRAM_AS_LONG
+import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.UNIGRAM_AS_BYTE
+import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup.Companion.UNIGRAM_AS_CHAR
+
 /**
  * Ngram encoded as primitive [Long]. Ngrams which cannot be encoded as
  * primitive are represented as [ObjectNgram].
  *
  * This class is an _inline_ class, care must be taken to not accidentally
- * pass it to contexts where an [Any] or is used, otherwise the primitive
- * value is wrapped in an object.
+ * use it in contexts where an [Any] is used, otherwise the primitive
+ * value would be wrapped in an object.
  */
 @JvmInline
 internal value class PrimitiveNgram(val value: Long) {
