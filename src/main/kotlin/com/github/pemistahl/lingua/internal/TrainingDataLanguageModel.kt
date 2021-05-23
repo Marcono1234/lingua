@@ -49,15 +49,14 @@ internal const val TRIGRAM_AS_INT_BITS_PER_CHAR = Int.SIZE_BITS / 3
  * Maximum code point value (inclusive) a char of a trigram may have to
  * allow encoding the trigram as int.
  */
-private const val TRIGRAM_AS_INT_MAX_CHAR = (2 shl (TRIGRAM_AS_INT_BITS_PER_CHAR - 1)) - 1
-private const val TRIGRAM_AS_LONG_BITS_PER_CHAR = Long.SIZE_BITS / 3
+private const val TRIGRAM_AS_INT_MAX_CHAR = (1 shl (TRIGRAM_AS_INT_BITS_PER_CHAR - 1)) - 1
 
 private const val FIVEGRAM_AS_LONG_BITS_PER_CHAR = Long.SIZE_BITS / 5
 /**
  * Maximum code point value (inclusive) a char of a fivegram may have to
  * allow encoding the fivegram as long.
  */
-private const val FIVEGRAM_AS_LONG_MAX_CHAR = (2 shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR - 1)) - 1
+private const val FIVEGRAM_AS_LONG_MAX_CHAR = (1 shl (FIVEGRAM_AS_LONG_BITS_PER_CHAR - 1)) - 1
 
 internal data class TrainingDataLanguageModel(
     val language: Language,
@@ -133,8 +132,8 @@ internal data class TrainingDataLanguageModel(
 
         private fun String.trigramToLong(): Long {
             return (
-                (this[2].code.toLong() shl (TRIGRAM_AS_LONG_BITS_PER_CHAR * 2))
-                or (this[1].code.toLong() shl TRIGRAM_AS_LONG_BITS_PER_CHAR)
+                (this[2].code.toLong() shl 32)
+                or (this[1].code.toLong() shl 16)
                 or this[0].code.toLong()
             )
         }
@@ -157,8 +156,8 @@ internal data class TrainingDataLanguageModel(
 
         private fun String.quadrigramToLong(): Long {
             return (
-                (this[1].code.toLong() shl 48)
-                or (this[1].code.toLong() shl 32)
+                (this[3].code.toLong() shl 48)
+                or (this[2].code.toLong() shl 32)
                 or (this[1].code.toLong() shl 16)
                 or this[0].code.toLong()
             )
