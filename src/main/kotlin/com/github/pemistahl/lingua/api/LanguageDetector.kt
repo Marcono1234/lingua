@@ -351,7 +351,8 @@ class LanguageDetector internal constructor(
             return languages
         }
 
-        val mostFrequentAlphabet = detectedAlphabets.entries.maxByOrNull { it.value }!!.key
+        // Note: Using wrapping call maxByOrNull is fine since number of alphabets is small
+        val mostFrequentAlphabet = detectedAlphabets.maxByOrNull { it.value }!!.key
         val filteredLanguages = languages.filter { it.alphabets.contains(mostFrequentAlphabet) }
         val languageCounts = Object2IntOpenHashMap<Language>()
 
