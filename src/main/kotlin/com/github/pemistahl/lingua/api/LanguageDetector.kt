@@ -29,11 +29,9 @@ import com.github.pemistahl.lingua.internal.ObjectNgram
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.RelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
-import com.github.pemistahl.lingua.internal.TrainingDataLanguageModel
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
-import it.unimi.dsi.fastutil.longs.LongSet
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2IntMap
@@ -383,7 +381,7 @@ class LanguageDetector internal constructor(
     ): Object2DoubleMap<Language> {
         val probabilities = Object2DoubleOpenHashMap<Language>()
         for (language in filteredLanguages) {
-            val probability = computeSumOfNgramProbabilities(language, testDataModel.objectNgrams, testDataModel.primitiveNgrams)
+            val probability = computeSumOfNgramProbabilities(language, testDataModel)
             if (probability < 0.0) {
                 // Note: Don't convert to assignment, would choose wrong overload then (?)
                 probabilities.put(language, probability)
@@ -394,12 +392,11 @@ class LanguageDetector internal constructor(
 
     internal fun computeSumOfNgramProbabilities(
         language: Language,
-        objectNgrams: Set<ObjectNgram>,
-        primitiveNgrams: LongSet
+        testDataModel: TestDataLanguageModel
     ): Double {
         var probabilitySum = 0.0
 
-        ngramLoop@ for (ngram in objectNgrams) {
+        ngramLoop@ for (ngram in testDataModel.objectNgrams) {
             var current = ngram
             var currentPrimitive: PrimitiveNgram
             while (true) {
@@ -426,11 +423,11 @@ class LanguageDetector internal constructor(
                 }
 
                 currentPrimitive = currentPrimitive.getLowerOrderNgram()
-            } while(currentPrimitive.value != PrimitiveNgram.NONE.value)
+            } while (currentPrimitive.value != PrimitiveNgram.NONE.value)
         }
 
         // Must explicitly specify LongConsumer type, otherwise Kotlin picks the wrong overload
-        primitiveNgrams.forEach(LongConsumer {
+        testDataModel.primitiveNgrams.forEach(LongConsumer {
             var current = PrimitiveNgram(it)
             do {
                 val probability = lookUpNgramProbability(language, current)
@@ -440,7 +437,7 @@ class LanguageDetector internal constructor(
                 }
 
                 current = current.getLowerOrderNgram()
-            } while(current.value != PrimitiveNgram.NONE.value)
+            } while (current.value != PrimitiveNgram.NONE.value)
         })
 
         return probabilitySum
