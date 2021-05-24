@@ -139,7 +139,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
          * Maximum code point value (inclusive) a char of a trigram may have to
          * allow encoding the trigram as int.
          */
-        private const val TRIGRAM_AS_INT_MAX_CHAR = (1 shl (TRIGRAM_AS_INT_BITS_PER_CHAR - 1)) - 1
+        private const val TRIGRAM_AS_INT_MAX_CHAR = (1 shl TRIGRAM_AS_INT_BITS_PER_CHAR) - 1
 
         private fun String.bigramFitsShort(): Boolean {
             return this[0].code <= 255 && this[1].code <= 255
