@@ -431,10 +431,10 @@ class LanguageDetector internal constructor(
 
     private fun preloadLanguageModels() {
         runBlocking {
-            languageModels.map {
+            languages.map {
                 async {
                     // Initialize values of Lazy objects
-                    val modelHolder = it.value.value
+                    val modelHolder = languageModels[it]!!.value
                     modelHolder.quadriFivegramLookup.value
                 }
             }.awaitAll()
