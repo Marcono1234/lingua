@@ -463,7 +463,7 @@ class LanguageDetector internal constructor(
     private fun preloadLanguageModels() {
         runBlocking {
             languageModels.map {
-                async(Dispatchers.IO) {
+                async {
                     // Initialize values of Lazy objects
                     val modelHolder = it.value.value
                     modelHolder.quadriFivegramLookup.value
@@ -484,6 +484,8 @@ class LanguageDetector internal constructor(
 
     internal data class LanguageModelHolder(
         val uniBiTrigramsLookup: UniBiTrigramRelativeFrequencyLookup,
+        // Lookup for quadrigrams and fivegrams is lazy since it won't be used when
+        // large texts are analyzed
         val quadriFivegramLookup: Lazy<QuadriFivegramRelativeFrequencyLookup>
     )
 
@@ -493,8 +495,12 @@ class LanguageDetector internal constructor(
                 { language -> language },
                 { language -> lazy {
                     LanguageModelHolder(
-                        UniBiTrigramRelativeFrequencyLookup.fromJson(language),
-                        lazy { QuadriFivegramRelativeFrequencyLookup.fromJson(language) }
+                        runBlocking(Dispatchers.IO) {
+                            UniBiTrigramRelativeFrequencyLookup.fromBinary(language)
+                        },
+                        lazy { runBlocking(Dispatchers.IO) {
+                            QuadriFivegramRelativeFrequencyLookup.fromBinary(language)
+                        }}
                     )
                 }}
             ))

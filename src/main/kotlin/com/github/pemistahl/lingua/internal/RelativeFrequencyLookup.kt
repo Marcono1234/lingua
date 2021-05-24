@@ -10,7 +10,11 @@ import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
 import it.unimi.dsi.fastutil.shorts.Short2FloatOpenHashMap
 import okio.buffer
 import okio.source
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.Path
 
 internal typealias ModelEncodingType = Int
 
@@ -69,6 +73,21 @@ internal interface FrequencyLookupBuilder {
                 }
             }
         }
+
+        fun getBinaryModelResourceName(language: Language, fileName: String): String {
+            return "/language-models/${language.isoCode639_1}/$fileName"
+        }
+
+        fun openBinaryDataInput(resourcePath: String): DataInputStream {
+            return DataInputStream(FrequencyLookupBuilder::class.java.getResourceAsStream(resourcePath)!!.buffered())
+        }
+
+        fun openBinaryDataOutput(resourcesDirectory: Path, resourcePath: String): DataOutputStream {
+            val file = resourcesDirectory.resolve(resourcePath.removePrefix("/"))
+            Files.createDirectories(file.parent)
+
+            return DataOutputStream(Files.newOutputStream(file).buffered())
+        }
     }
 
     fun putFrequency(ngram: String, frequency: Float)
@@ -87,7 +106,14 @@ internal interface FrequencyLookupBuilder {
 /**
  * Frequency lookup for uni-, bi- and trigrams.
  */
-internal class UniBiTrigramRelativeFrequencyLookup: FrequencyLookupBuilder {
+internal class UniBiTrigramRelativeFrequencyLookup private constructor(
+    private val unigramsAsByte: Byte2FloatOpenHashMap,
+    private val unigramsAsChar: Char2FloatOpenHashMap,
+    private val bigramsAsShort: Short2FloatOpenHashMap,
+    private val bigramsAsInt: Int2FloatOpenHashMap,
+    private val trigramsAsInt: Int2FloatOpenHashMap,
+    private val trigramsAsLong: Long2FloatOpenHashMap
+): FrequencyLookupBuilder {
     companion object {
         private const val loadFactor = 0.9f
         private const val initialCapacity = 16
@@ -151,16 +177,72 @@ internal class UniBiTrigramRelativeFrequencyLookup: FrequencyLookupBuilder {
             FrequencyLookupBuilder.fromJson(lookup, language, listOf("unigrams.json", "bigrams.json", "trigrams.json"))
             return lookup
         }
+
+        fun getBinaryModelResourceName(language: Language): String {
+            return FrequencyLookupBuilder.getBinaryModelResourceName(language, "uni-bi-trigrams.bin")
+        }
+
+        fun fromBinary(language: Language): UniBiTrigramRelativeFrequencyLookup {
+            FrequencyLookupBuilder.openBinaryDataInput(getBinaryModelResourceName(language)).use {
+                val unigramsAsByteSize = it.readInt()
+                val unigramsAsByte = Byte2FloatOpenHashMap(unigramsAsByteSize, loadFactor)
+                for (i in 1..unigramsAsByteSize) {
+                    unigramsAsByte.put(it.readByte(), it.readFloat())
+                }
+
+                val unigramsAsCharSize = it.readInt()
+                val unigramsAsChar = Char2FloatOpenHashMap(unigramsAsCharSize, loadFactor)
+                for (i in 1..unigramsAsCharSize) {
+                    unigramsAsChar.put(it.readChar(), it.readFloat())
+                }
+
+                val bigramsAsShortSize = it.readInt()
+                val bigramsAsShort = Short2FloatOpenHashMap(bigramsAsShortSize, loadFactor)
+                for (i in 1..bigramsAsShortSize) {
+                    bigramsAsShort.put(it.readShort(), it.readFloat())
+                }
+
+                val bigramsAsIntSize = it.readInt()
+                val bigramsAsInt = Int2FloatOpenHashMap(bigramsAsIntSize, loadFactor)
+                for (i in 1..bigramsAsIntSize) {
+                    bigramsAsInt.put(it.readInt(), it.readFloat())
+                }
+
+                val trigramsAsIntSize = it.readInt()
+                val trigramsAsInt = Int2FloatOpenHashMap(trigramsAsIntSize, loadFactor)
+                for (i in 1..trigramsAsIntSize) {
+                    trigramsAsInt.put(it.readInt(), it.readFloat())
+                }
+
+                val trigramsAsLongSize = it.readInt()
+                val trigramsAsLong = Long2FloatOpenHashMap(trigramsAsLongSize, loadFactor)
+                for (i in 1..trigramsAsLongSize) {
+                    trigramsAsLong.put(it.readLong(), it.readFloat())
+                }
+
+                // Should have reached end of data
+                assert(it.read() == -1)
+
+                return UniBiTrigramRelativeFrequencyLookup(
+                    unigramsAsByte,
+                    unigramsAsChar,
+                    bigramsAsShort,
+                    bigramsAsInt,
+                    trigramsAsInt,
+                    trigramsAsLong
+                )
+            }
+        }
     }
 
-    private val unigramsAsByte = Byte2FloatOpenHashMap(initialCapacity, loadFactor)
-    private val unigramsAsChar = Char2FloatOpenHashMap(initialCapacity, loadFactor)
-
-    private val bigramsAsShort = Short2FloatOpenHashMap(initialCapacity, loadFactor)
-    private val bigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
-
-    private val trigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
-    private val trigramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
+    private constructor() : this(
+        Byte2FloatOpenHashMap(initialCapacity, loadFactor),
+        Char2FloatOpenHashMap(initialCapacity, loadFactor),
+        Short2FloatOpenHashMap(initialCapacity, loadFactor),
+        Int2FloatOpenHashMap(initialCapacity, loadFactor),
+        Int2FloatOpenHashMap(initialCapacity, loadFactor),
+        Long2FloatOpenHashMap(initialCapacity, loadFactor)
+    )
 
     override fun putFrequency(ngram: String, frequency: Float) {
         when (ngram.length) {
@@ -205,12 +287,65 @@ internal class UniBiTrigramRelativeFrequencyLookup: FrequencyLookupBuilder {
             else -> throw AssertionError("Unknown encoding type")
         }.toDouble()
     }
+
+    /**
+     * Writes the binary representation of the model data to a sub directory for
+     * the specified language of the resources directory.
+     *
+     * @see fromBinary
+     */
+    fun writeBinary(resourcesDirectory: Path, language: Language) {
+        val resourceName = getBinaryModelResourceName(language)
+
+        FrequencyLookupBuilder.openBinaryDataOutput(resourcesDirectory, resourceName).use { dataOut ->
+            dataOut.writeInt(unigramsAsByte.size)
+            unigramsAsByte.byte2FloatEntrySet().fastForEach {
+                dataOut.writeByte(it.byteKey.toInt())
+                dataOut.writeFloat(it.floatValue)
+            }
+
+            dataOut.writeInt(unigramsAsChar.size)
+            unigramsAsChar.char2FloatEntrySet().fastForEach {
+                dataOut.writeChar(it.charKey.code)
+                dataOut.writeFloat(it.floatValue)
+            }
+
+            dataOut.writeInt(bigramsAsShort.size)
+            bigramsAsShort.short2FloatEntrySet().fastForEach {
+                dataOut.writeShort(it.shortKey.toInt())
+                dataOut.writeFloat(it.floatValue)
+            }
+
+            dataOut.writeInt(bigramsAsInt.size)
+            bigramsAsInt.int2FloatEntrySet().fastForEach {
+                dataOut.writeInt(it.intKey)
+                dataOut.writeFloat(it.floatValue)
+            }
+
+            dataOut.writeInt(trigramsAsInt.size)
+            trigramsAsInt.int2FloatEntrySet().fastForEach {
+                dataOut.writeInt(it.intKey)
+                dataOut.writeFloat(it.floatValue)
+            }
+
+            dataOut.writeInt(trigramsAsLong.size)
+            trigramsAsLong.long2FloatEntrySet().fastForEach {
+                dataOut.writeLong(it.longKey)
+                dataOut.writeFloat(it.floatValue)
+            }
+        }
+    }
 }
 
 /**
  * Frequency lookup for quadri- and fivegrams.
  */
-internal class QuadriFivegramRelativeFrequencyLookup : FrequencyLookupBuilder {
+internal class QuadriFivegramRelativeFrequencyLookup private constructor(
+    private val quadrigramsAsInt: Int2FloatOpenHashMap,
+    private val quadrigramsAsLong: Long2FloatOpenHashMap,
+    private val fivegramsAsLong: Long2FloatOpenHashMap,
+    private val fivegramsAsObject: Object2FloatOpenHashMap<String>
+) : FrequencyLookupBuilder {
     companion object {
         val empty = QuadriFivegramRelativeFrequencyLookup()
 
@@ -292,13 +427,64 @@ internal class QuadriFivegramRelativeFrequencyLookup : FrequencyLookupBuilder {
             FrequencyLookupBuilder.fromJson(lookup, language, listOf("quadrigrams.json", "fivegrams.json"))
             return lookup
         }
+
+        fun getBinaryModelResourceName(language: Language): String {
+            return FrequencyLookupBuilder.getBinaryModelResourceName(language, "quadri-fivegrams.bin")
+        }
+
+        fun fromBinary(language: Language): QuadriFivegramRelativeFrequencyLookup {
+            FrequencyLookupBuilder.openBinaryDataInput(getBinaryModelResourceName(language)).use {
+                val quadrigramsAsIntSize = it.readInt()
+                val quadrigramsAsInt = Int2FloatOpenHashMap(quadrigramsAsIntSize, loadFactor)
+                for (i in 1..quadrigramsAsIntSize) {
+                    quadrigramsAsInt.put(it.readInt(), it.readFloat())
+                }
+
+                val quadrigramsAsLongSize = it.readInt()
+                val quadrigramsAsLong = Long2FloatOpenHashMap(quadrigramsAsLongSize, loadFactor)
+                for (i in 1..quadrigramsAsLongSize) {
+                    quadrigramsAsLong.put(it.readLong(), it.readFloat())
+                }
+
+                val fivegramsAsLongSize = it.readInt()
+                val fivegramsAsLong = Long2FloatOpenHashMap(fivegramsAsLongSize, loadFactor)
+                for (i in 1..fivegramsAsLongSize) {
+                    fivegramsAsLong.put(it.readLong(), it.readFloat())
+                }
+
+                val fivegramsAsObjectSize = it.readInt()
+                val fivegramsAsObject = Object2FloatOpenHashMap<String>(fivegramsAsObjectSize, loadFactor)
+                for (i in 1..fivegramsAsObjectSize) {
+                    val charArray = CharArray(5)
+                    charArray[0] = it.readChar()
+                    charArray[1] = it.readChar()
+                    charArray[2] = it.readChar()
+                    charArray[3] = it.readChar()
+                    charArray[4] = it.readChar()
+                    val fivegram = String(charArray)
+
+                    fivegramsAsObject.put(fivegram, it.readFloat())
+                }
+
+                // Should have reached end of data
+                assert(it.read() == -1)
+
+                return QuadriFivegramRelativeFrequencyLookup(
+                    quadrigramsAsInt,
+                    quadrigramsAsLong,
+                    fivegramsAsLong,
+                    fivegramsAsObject
+                )
+            }
+        }
     }
 
-    private val quadrigramsAsInt = Int2FloatOpenHashMap(initialCapacity, loadFactor)
-    private val quadrigramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
-
-    private val fivegramsAsLong = Long2FloatOpenHashMap(initialCapacity, loadFactor)
-    private val fivegramsAsObject = Object2FloatOpenHashMap<String>(initialCapacity, loadFactor)
+    private constructor() : this(
+        Int2FloatOpenHashMap(initialCapacity, loadFactor),
+        Long2FloatOpenHashMap(initialCapacity, loadFactor),
+        Long2FloatOpenHashMap(initialCapacity, loadFactor),
+        Object2FloatOpenHashMap<String>(initialCapacity, loadFactor)
+    )
 
     override fun putFrequency(ngram: String, frequency: Float) {
         when (ngram.length) {
@@ -337,5 +523,48 @@ internal class QuadriFivegramRelativeFrequencyLookup : FrequencyLookupBuilder {
             }
             else -> throw IllegalArgumentException("Invalid Ngram length")
         }.toDouble()
+    }
+
+    /**
+     * Writes the binary representation of the model data to a sub directory for
+     * the specified language of the resources directory.
+     *
+     * @see fromBinary
+     */
+    fun writeBinary(resourcesDirectory: Path, language: Language) {
+        val resourceName = getBinaryModelResourceName(language)
+
+        FrequencyLookupBuilder.openBinaryDataOutput(resourcesDirectory, resourceName).use { dataOut ->
+            dataOut.writeInt(quadrigramsAsInt.size)
+            quadrigramsAsInt.int2FloatEntrySet().fastForEach {
+                dataOut.writeInt(it.intKey)
+                dataOut.writeFloat(it.floatValue)
+            }
+
+            dataOut.writeInt(quadrigramsAsLong.size)
+            quadrigramsAsLong.long2FloatEntrySet().fastForEach {
+                dataOut.writeLong(it.longKey)
+                dataOut.writeFloat(it.floatValue)
+            }
+
+            dataOut.writeInt(fivegramsAsLong.size)
+            fivegramsAsLong.long2FloatEntrySet().fastForEach {
+                dataOut.writeLong(it.longKey)
+                dataOut.writeFloat(it.floatValue)
+            }
+
+            dataOut.writeInt(fivegramsAsObject.size)
+            fivegramsAsObject.object2FloatEntrySet().fastForEach {
+                val ngram = it.key
+                // Write String manually since length is known (= 5) so don't have to store it
+                dataOut.writeChar(ngram[0].code)
+                dataOut.writeChar(ngram[1].code)
+                dataOut.writeChar(ngram[2].code)
+                dataOut.writeChar(ngram[3].code)
+                dataOut.writeChar(ngram[4].code)
+
+                dataOut.writeFloat(it.floatValue)
+            }
+        }
     }
 }
