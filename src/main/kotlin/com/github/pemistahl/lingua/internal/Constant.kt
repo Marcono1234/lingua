@@ -119,11 +119,14 @@ internal object Constant {
             ITALIAN, PORTUGUESE, SLOVAK, SPANISH, VIETNAMESE, YORUBA
         )
     )
-    val JAPANESE_CHARACTER_SET = try {
-        Regex("^[\\p{Hiragana}\\p{Katakana}\\p{Han}]+$")
-    } catch (e: PatternSyntaxException) {
-        Regex("^[\\p{IsHiragana}\\p{IsKatakana}\\p{IsHan}]+$")
-    }.toPattern()
+
+    fun isJapaneseCharacter(char: Char): Boolean {
+        val script = Character.UnicodeScript.of(char.code)
+        return script == Character.UnicodeScript.HIRAGANA
+            || script == Character.UnicodeScript.KATAKANA
+            || script == Character.UnicodeScript.HAN
+    }
+
     val LANGUAGES_SUPPORTING_LOGOGRAMS = setOf(CHINESE, JAPANESE, KOREAN)
     val MULTIPLE_WHITESPACE = Regex("\\s+")
     val NUMBERS = Regex("\\p{N}")

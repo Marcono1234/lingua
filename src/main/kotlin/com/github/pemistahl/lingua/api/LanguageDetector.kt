@@ -21,10 +21,10 @@ import com.github.pemistahl.lingua.api.Language.JAPANESE
 import com.github.pemistahl.lingua.api.Language.UNKNOWN
 import com.github.pemistahl.lingua.internal.Alphabet
 import com.github.pemistahl.lingua.internal.Constant.CHARS_TO_LANGUAGES_MAPPING
-import com.github.pemistahl.lingua.internal.Constant.JAPANESE_CHARACTER_SET
 import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
+import com.github.pemistahl.lingua.internal.Constant.isJapaneseCharacter
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
@@ -225,31 +225,8 @@ class LanguageDetector internal constructor(
         return summedUpProbabilities.filter { it.value != 0.0 }
     }
 
-    private class SingleCharSequence : CharSequence {
-        var char = '0'
-
-        override val length: Int
-            get() = 1
-
-        override fun get(index: Int): Char {
-            return if (index == 0) char else throw IndexOutOfBoundsException("Invalid index $index")
-        }
-
-        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
-            return if (startIndex in 0..1 && endIndex == startIndex) ""
-            else if (startIndex == 0 && endIndex == 1) this
-            else throw IndexOutOfBoundsException()
-        }
-
-        override fun toString(): String {
-            return char.toString()
-        }
-    }
-
     internal fun detectLanguageWithRules(words: List<String>): Language {
         val totalLanguageCounts = Object2IntOpenHashMap<Language>()
-        val singleCharSequence = SingleCharSequence()
-        val japaneseMatcher = JAPANESE_CHARACTER_SET.matcher("")
 
         for (word in words) {
             val wordLanguageCounts = Object2IntOpenHashMap<Language>()
@@ -263,24 +240,17 @@ class LanguageDetector internal constructor(
                     }
                 }
                 if (!isMatch) {
-                    if (Alphabet.HAN.matches(character)) {
-                        wordLanguageCounts.incrementCounter(CHINESE)
-                    } else {
-                        // For performance reasons reuse a single CharSequence and a single Matcher
-                        singleCharSequence.char = character
-                        japaneseMatcher.reset(singleCharSequence)
-
-                        when {
-                            japaneseMatcher.matches() -> wordLanguageCounts.incrementCounter(JAPANESE)
-                            Alphabet.LATIN.matches(character) ||
-                                Alphabet.CYRILLIC.matches(character) ||
-                                Alphabet.DEVANAGARI.matches(character) ->
-                                languagesWithUniqueCharacters.filter {
-                                    it.uniqueCharacters?.contains(character) ?: false
-                                }.forEach {
-                                    wordLanguageCounts.incrementCounter(it)
-                                }
-                        }
+                    when {
+                        Alphabet.HAN.matches(character) -> wordLanguageCounts.incrementCounter(CHINESE)
+                        isJapaneseCharacter(character) -> wordLanguageCounts.incrementCounter(JAPANESE)
+                        Alphabet.LATIN.matches(character) ||
+                            Alphabet.CYRILLIC.matches(character) ||
+                            Alphabet.DEVANAGARI.matches(character) ->
+                            languagesWithUniqueCharacters.filter {
+                                it.uniqueCharacters?.contains(character) ?: false
+                            }.forEach {
+                                wordLanguageCounts.incrementCounter(it)
+                            }
                     }
                 }
             }
