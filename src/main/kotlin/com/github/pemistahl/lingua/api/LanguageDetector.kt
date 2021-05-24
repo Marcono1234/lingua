@@ -43,7 +43,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import java.util.*
 import java.util.function.LongConsumer
-import java.util.stream.Collectors
 import kotlin.math.ln
 
 /**
@@ -460,19 +459,18 @@ class LanguageDetector internal constructor(
     )
 
     internal companion object {
-        internal var languageModels = Language.all().stream()
-            .collect(Collectors.toMap(
-                { language -> language },
-                { language -> lazy {
+        internal var languageModels = Language.all().asSequence()
+            .associateWith {
+                lazy {
                     LanguageModelHolder(
                         runBlocking(Dispatchers.IO) {
-                            UniBiTrigramRelativeFrequencyLookup.fromBinary(language)
+                            UniBiTrigramRelativeFrequencyLookup.fromBinary(it)
                         },
                         lazy { runBlocking(Dispatchers.IO) {
-                            QuadriFivegramRelativeFrequencyLookup.fromBinary(language)
+                            QuadriFivegramRelativeFrequencyLookup.fromBinary(it)
                         }}
                     )
-                }}
-            ))
+                }
+            }
     }
 }
