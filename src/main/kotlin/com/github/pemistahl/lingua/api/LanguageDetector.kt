@@ -171,20 +171,29 @@ class LanguageDetector internal constructor(
             .replace(MULTIPLE_WHITESPACE, " ")
     }
 
+    /** Splits text at spaces and between logograms */
     internal fun splitTextIntoWords(text: String): List<String> {
-        val normalizedTextBuilder = StringBuilder()
-        for (chr in text) {
-            normalizedTextBuilder.append(chr)
-            if (chr.isLogogram()) {
-                normalizedTextBuilder.append(' ')
+        val words = mutableListOf<String>()
+        var nextWordStart = 0
+        for (i in text.indices) {
+            val char = text[i]
+
+            if (char == ' ') {
+                // If equal, skip consecutive whitespaces
+                if (nextWordStart != i) {
+                    words.add(text.substring(nextWordStart, i))
+                }
+                nextWordStart = i + 1
+            } else if (char.isLogogram()) {
+                words.add(text.substring(nextWordStart, i + 1))
+                nextWordStart = i + 1
             }
         }
-        val normalizedText = normalizedTextBuilder.toString()
-        return if (normalizedText.contains(' ')) {
-            normalizedText.split(' ').filter { it.isNotBlank() }
-        } else {
-            listOf(normalizedText)
+
+        if (nextWordStart != text.length) {
+            words.add(text.substring(nextWordStart, text.length))
         }
+        return words
     }
 
     internal fun countUnigramsOfInputText(
