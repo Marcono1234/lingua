@@ -19,12 +19,11 @@ package com.github.pemistahl.lingua.api
 import com.github.pemistahl.lingua.api.Language.CHINESE
 import com.github.pemistahl.lingua.api.Language.JAPANESE
 import com.github.pemistahl.lingua.api.Language.UNKNOWN
-import com.github.pemistahl.lingua.internal.Alphabet
 import com.github.pemistahl.lingua.internal.Constant.CHARS_TO_LANGUAGES_MAPPING
 import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
-import com.github.pemistahl.lingua.internal.Constant.isJapaneseCharacter
+import com.github.pemistahl.lingua.internal.Constant.isJapaneseScript
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
@@ -55,7 +54,7 @@ class LanguageDetector internal constructor(
     internal val numberOfLoadedLanguages: Int = languages.size
 ) {
     private val languagesWithUniqueCharacters = languages.filterNot { it.uniqueCharacters.isNullOrBlank() }.asSequence()
-    private val alphabetsSupportingExactlyOneLanguage = Alphabet.allSupportingExactlyOneLanguage().filterValues {
+    private val alphabetsSupportingExactlyOneLanguage = Language.scriptsSupportingExactlyOneLanguage.filterValues {
         it in languages
     }
 
@@ -232,19 +231,22 @@ class LanguageDetector internal constructor(
 
             for (character in word) {
                 var isMatch = false
+                val script = Character.UnicodeScript.of(character.code)
+
                 for ((alphabet, language) in alphabetsSupportingExactlyOneLanguage) {
-                    if (alphabet.matches(character)) {
+                    if (script == alphabet) {
                         wordLanguageCounts.incrementCounter(language)
                         isMatch = true
+                        break
                     }
                 }
                 if (!isMatch) {
                     when {
-                        Alphabet.HAN.matches(character) -> wordLanguageCounts.incrementCounter(CHINESE)
-                        isJapaneseCharacter(character) -> wordLanguageCounts.incrementCounter(JAPANESE)
-                        Alphabet.LATIN.matches(character) ||
-                            Alphabet.CYRILLIC.matches(character) ||
-                            Alphabet.DEVANAGARI.matches(character) ->
+                        script == Character.UnicodeScript.HAN -> wordLanguageCounts.incrementCounter(CHINESE)
+                        isJapaneseScript(script) -> wordLanguageCounts.incrementCounter(JAPANESE)
+                        script == Character.UnicodeScript.LATIN ||
+                            script == Character.UnicodeScript.CYRILLIC ||
+                            script == Character.UnicodeScript.DEVANAGARI ->
                             languagesWithUniqueCharacters.filter {
                                 it.uniqueCharacters?.contains(character) ?: false
                             }.forEach {
@@ -308,12 +310,12 @@ class LanguageDetector internal constructor(
     }
 
     internal fun filterLanguagesByRules(words: List<String>): Set<Language> {
-        val detectedAlphabets = Object2IntOpenHashMap<Alphabet>()
+        val detectedAlphabets = Object2IntOpenHashMap<Character.UnicodeScript>()
 
         for (word in words) {
-            for (alphabet in Alphabet.values()) {
-                if (alphabet.matches(word)) {
-                    detectedAlphabets.incrementCounter(alphabet)
+            for (unicodeScript in Language.allScripts) {
+                if (word.all { Character.UnicodeScript.of(it.code) == unicodeScript }) {
+                    detectedAlphabets.incrementCounter(unicodeScript)
                     break
                 }
             }
@@ -325,7 +327,7 @@ class LanguageDetector internal constructor(
 
         // Note: Using wrapping call maxByOrNull is fine since number of alphabets is small
         val mostFrequentAlphabet = detectedAlphabets.maxByOrNull { it.value }!!.key
-        val filteredLanguages = languages.filter { it.alphabets.contains(mostFrequentAlphabet) }
+        val filteredLanguages = languages.filter { it.unicodeScripts.contains(mostFrequentAlphabet) }
         val languageCounts = Object2IntOpenHashMap<Language>()
 
         for (word in words) {
