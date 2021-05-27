@@ -28,6 +28,7 @@ import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup
+import com.github.pemistahl.lingua.internal.util.extension.asFastSequence
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
@@ -239,17 +240,12 @@ class LanguageDetector internal constructor(
             val wordLanguageCounts = Object2IntOpenHashMap<Language>()
 
             for (character in word) {
-                var isMatch = false
                 val script = Character.UnicodeScript.of(character.code)
 
-                for ((alphabet, language) in alphabetsSupportingExactlyOneLanguage) {
-                    if (script == alphabet) {
-                        wordLanguageCounts.incrementCounter(language)
-                        isMatch = true
-                        break
-                    }
-                }
-                if (!isMatch) {
+                val alphabetLanguage = alphabetsSupportingExactlyOneLanguage[script]
+                if (alphabetLanguage != null) {
+                    wordLanguageCounts.incrementCounter(alphabetLanguage)
+                } else {
                     when {
                         script == Character.UnicodeScript.HAN -> wordLanguageCounts.incrementCounter(CHINESE)
                         isJapaneseScript(script) -> wordLanguageCounts.incrementCounter(JAPANESE)
@@ -268,7 +264,7 @@ class LanguageDetector internal constructor(
             if (wordLanguageCounts.isEmpty()) {
                 totalLanguageCounts.incrementCounter(UNKNOWN)
             } else if (wordLanguageCounts.size == 1) {
-                val language = wordLanguageCounts.toList().first().first
+                val language = wordLanguageCounts.keys.first()
                 if (language in languages) {
                     totalLanguageCounts.incrementCounter(language)
                 } else {
@@ -277,9 +273,15 @@ class LanguageDetector internal constructor(
             } else if (wordLanguageCounts.containsKey(CHINESE) && wordLanguageCounts.containsKey(JAPANESE)) {
                 totalLanguageCounts.incrementCounter(JAPANESE)
             } else {
-                val sortedWordLanguageCounts = wordLanguageCounts.toList().sortedByDescending { it.second }
-                val (mostFrequentLanguage, firstCharCount) = sortedWordLanguageCounts[0]
-                val (_, secondCharCount) = sortedWordLanguageCounts[1]
+                // Convert to Sequence and then to Iterator instead of using Map extension functions
+                // to prevent boxing
+                val sortedWordLanguageCounts = wordLanguageCounts.asFastSequence()
+                    .sortedByDescending { it.intValue }
+                    .iterator()
+                val mostFrequent = sortedWordLanguageCounts.next()
+                val mostFrequentLanguage = mostFrequent.key
+                val firstCharCount = mostFrequent.intValue
+                val secondCharCount = sortedWordLanguageCounts.next().intValue
 
                 if (firstCharCount > secondCharCount && mostFrequentLanguage in languages) {
                     totalLanguageCounts.incrementCounter(mostFrequentLanguage)
@@ -290,27 +292,31 @@ class LanguageDetector internal constructor(
         }
 
         val unknownLanguageCount = totalLanguageCounts.getOrDefault(UNKNOWN as Any, 0)
-        val filteredLanguageCounts = if (unknownLanguageCount >= (0.5 * words.size)) {
-            totalLanguageCounts
-        } else {
-            totalLanguageCounts.filterNot { it.key == UNKNOWN }
+        if (unknownLanguageCount < (0.5 * words.size)) {
+            totalLanguageCounts.removeInt(UNKNOWN)
         }
 
-        if (filteredLanguageCounts.isEmpty()) {
+        if (totalLanguageCounts.isEmpty()) {
             return UNKNOWN
         }
-        if (filteredLanguageCounts.size == 1) {
-            return filteredLanguageCounts.toList().first().first
+        if (totalLanguageCounts.size == 1) {
+            return totalLanguageCounts.object2IntEntrySet().fastIterator().next().key
         }
-        if (filteredLanguageCounts.size == 2 &&
-            filteredLanguageCounts.containsKey(CHINESE) &&
-            filteredLanguageCounts.containsKey(JAPANESE)
+        if (totalLanguageCounts.size == 2 &&
+            totalLanguageCounts.containsKey(CHINESE) &&
+            totalLanguageCounts.containsKey(JAPANESE)
         ) {
             return JAPANESE
         }
-        val sortedTotalLanguageCounts = filteredLanguageCounts.toList().sortedByDescending { it.second }
-        val (mostFrequentLanguage, firstCharCount) = sortedTotalLanguageCounts[0]
-        val (_, secondCharCount) = sortedTotalLanguageCounts[1]
+        // Convert to Sequence and then to Iterator instead of using Map extension functions
+        // to prevent boxing
+        val sortedTotalLanguageCounts = totalLanguageCounts.asFastSequence()
+            .sortedByDescending { it.intValue }
+            .iterator()
+        val mostFrequent = sortedTotalLanguageCounts.next()
+        val mostFrequentLanguage = mostFrequent.key
+        val firstCharCount = mostFrequent.intValue
+        val secondCharCount = sortedTotalLanguageCounts.next().intValue
 
         return when {
             firstCharCount == secondCharCount -> UNKNOWN

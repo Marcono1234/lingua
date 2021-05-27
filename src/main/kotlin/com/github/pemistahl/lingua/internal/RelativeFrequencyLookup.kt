@@ -249,17 +249,17 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
             1 -> {
                 val char0 = ngram[0].code
                 when {
-                    char0 <= 255 -> unigramsAsByte[char0.toByte()] = frequency
-                    else -> unigramsAsChar[char0.toChar()] = frequency
+                    char0 <= 255 -> unigramsAsByte.put(char0.toByte(), frequency)
+                    else -> unigramsAsChar.put(char0.toChar(), frequency)
                 }
             }
             2 -> when {
-                ngram.bigramFitsShort() -> bigramsAsShort[ngram.bigramToShort()] = frequency
-                else -> bigramsAsInt[ngram.bigramToInt()] = frequency
+                ngram.bigramFitsShort() -> bigramsAsShort.put(ngram.bigramToShort(), frequency)
+                else -> bigramsAsInt.put(ngram.bigramToInt(), frequency)
             }
             3 -> when {
-                ngram.trigramFitsInt() -> trigramsAsInt[ngram.trigramToInt()] = frequency
-                else -> trigramsAsLong[ngram.trigramToLong()] = frequency
+                ngram.trigramFitsInt() -> trigramsAsInt.put(ngram.trigramToInt(), frequency)
+                else -> trigramsAsLong.put(ngram.trigramToLong(), frequency)
             }
             else -> throw IllegalArgumentException("Invalid Ngram length")
         }
@@ -278,12 +278,12 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
 
     fun getFrequency(ngram: PrimitiveNgram): Double {
         return when (ngram.getEncodingType()) {
-            UNIGRAM_AS_BYTE -> unigramsAsByte[ngram.unigramToByte()]
-            UNIGRAM_AS_CHAR -> unigramsAsChar[ngram.unigramToChar()]
-            BIGRAM_AS_SHORT -> bigramsAsShort[ngram.bigramToShort()]
-            BIGRAM_AS_INT -> bigramsAsInt[ngram.bigramToInt()]
-            TRIGRAM_AS_INT -> trigramsAsInt[ngram.trigramToInt()]
-            TRIGRAM_AS_LONG -> trigramsAsLong[ngram.trigramToLong()]
+            UNIGRAM_AS_BYTE -> unigramsAsByte.get(ngram.unigramToByte())
+            UNIGRAM_AS_CHAR -> unigramsAsChar.get(ngram.unigramToChar())
+            BIGRAM_AS_SHORT -> bigramsAsShort.get(ngram.bigramToShort())
+            BIGRAM_AS_INT -> bigramsAsInt.get(ngram.bigramToInt())
+            TRIGRAM_AS_INT -> trigramsAsInt.get(ngram.trigramToInt())
+            TRIGRAM_AS_LONG -> trigramsAsLong.get(ngram.trigramToLong())
             else -> throw AssertionError("Unknown encoding type")
         }
     }
@@ -489,13 +489,13 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     override fun putFrequency(ngram: String, frequency: Double) {
         when (ngram.length) {
             4 -> when {
-                ngram.quadrigramFitsInt() -> quadrigramsAsInt[ngram.quadrigramToInt()] = frequency
-                else -> quadrigramsAsLong[ngram.quadrigramToLong()] = frequency
+                ngram.quadrigramFitsInt() -> quadrigramsAsInt.put(ngram.quadrigramToInt(), frequency)
+                else -> quadrigramsAsLong.put(ngram.quadrigramToLong(), frequency)
             }
             5 -> when {
-                ngram.fivegramFitsLong() -> fivegramsAsLong[ngram.fivegramToLong()] = frequency
+                ngram.fivegramFitsLong() -> fivegramsAsLong.put(ngram.fivegramToLong(), frequency)
                 // Fall back to storing Ngram object
-                else -> fivegramsAsObject[ngram] = frequency
+                else -> fivegramsAsObject.put(ngram, frequency)
             }
             else -> throw IllegalArgumentException("Invalid Ngram length")
         }
@@ -514,11 +514,11 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
 
         return when (ngramStr.length) {
             4 -> when {
-                ngramStr.quadrigramFitsInt() -> quadrigramsAsInt[ngramStr.quadrigramToInt()]
-                else -> quadrigramsAsLong[ngramStr.quadrigramToLong()]
+                ngramStr.quadrigramFitsInt() -> quadrigramsAsInt.get(ngramStr.quadrigramToInt())
+                else -> quadrigramsAsLong.get(ngramStr.quadrigramToLong())
             }
             5 -> when {
-                ngramStr.fivegramFitsLong() -> fivegramsAsLong[ngramStr.fivegramToLong()]
+                ngramStr.fivegramFitsLong() -> fivegramsAsLong.get(ngramStr.fivegramToLong())
                 else -> fivegramsAsObject.getDouble(ngramStr)
             }
             else -> throw IllegalArgumentException("Invalid Ngram length")

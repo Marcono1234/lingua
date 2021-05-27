@@ -16,8 +16,13 @@
 
 package com.github.pemistahl.lingua.internal.util.extension
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 
 internal fun <T> Object2IntOpenHashMap<T>.incrementCounter(key: T) {
     this.addTo(key, 1)
+}
+
+internal fun <T> Object2IntOpenHashMap<T>.asFastSequence(): Sequence<Object2IntMap.Entry<T>> {
+    return this.object2IntEntrySet().fastIterator().asSequence()
 }
