@@ -125,13 +125,6 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         internal const val TRIGRAM_AS_INT: ModelEncodingType = 4
         internal const val TRIGRAM_AS_LONG: ModelEncodingType = 5
 
-        internal const val TRIGRAM_AS_INT_BITS_PER_CHAR = Int.SIZE_BITS / 3
-        /**
-         * Maximum code point value (inclusive) a char of a trigram may have to
-         * allow encoding the trigram as int.
-         */
-        private const val TRIGRAM_AS_INT_MAX_CHAR = (1 shl TRIGRAM_AS_INT_BITS_PER_CHAR) - 1
-
         private fun String.bigramFitsShort(): Boolean {
             return this[0].code <= 255 && this[1].code <= 255
         }
@@ -150,18 +143,57 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
             )
         }
 
+        /**
+         * Number of bits used for encoding the offset for the 2nd and 3rd char compared
+         * to the 1st one.
+         */
+        private const val TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR = 10
+        private const val TRIGRAM_AS_INT_OFFSET_BIT_MASK = (1 shl TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR) - 1
+
+        /**
+         * Number of bits used for encoding the code point value of the 1st char (the "base char").
+         */
+        private const val TRIGRAM_AS_INT_BASE_CHAR_BITS = Int.SIZE_BITS - 2 * TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR
+
+        internal fun trigramFitsInt(char0: Int, char1: Int, char2: Int): Boolean {
+            /*
+             * Trigram is encoded by writing absolute char value of first char (index 0)
+             * followed by the signed offsets of the other chars compared to the first char.
+             *
+             * This allows encoding trigrams where some or all chars would not fit
+             * within Int.SIZE_BITS / 3, but all of the char values are close together.
+             */
+            if (char0 >= (1 shl TRIGRAM_AS_INT_BASE_CHAR_BITS)) return false
+
+            // (2^x) - 1
+            val maxOffset = (1 shl (TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR - 1)) - 1
+            // -2^x
+            val minOffset = -maxOffset - 1
+
+            val diff1 = char1 - char0
+            val diff2 = char2 - char0
+
+            return (diff1 in minOffset..maxOffset)
+                && (diff2 in minOffset..maxOffset)
+        }
+
         private fun String.trigramFitsInt(): Boolean {
-            return this[0].code <= TRIGRAM_AS_INT_MAX_CHAR
-                && this[1].code <= TRIGRAM_AS_INT_MAX_CHAR
-                && this[2].code <= TRIGRAM_AS_INT_MAX_CHAR
+            return trigramFitsInt(this[0].code, this[1].code, this[2].code)
+        }
+
+        internal fun trigramToInt(char0: Int, char1: Int, char2: Int): Int {
+            // AND with bitmask to remove leading 1s for negative values
+            val diff1 = (char1 - char0) and TRIGRAM_AS_INT_OFFSET_BIT_MASK
+            val diff2 = (char2 - char0) and TRIGRAM_AS_INT_OFFSET_BIT_MASK
+            return (
+                char0
+                or (diff1 shl TRIGRAM_AS_INT_BASE_CHAR_BITS)
+                or (diff2 shl (TRIGRAM_AS_INT_BASE_CHAR_BITS + TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR))
+            )
         }
 
         private fun String.trigramToInt(): Int {
-            return (
-                this[0].code
-                or (this[1].code shl TRIGRAM_AS_INT_BITS_PER_CHAR)
-                or (this[2].code shl (TRIGRAM_AS_INT_BITS_PER_CHAR * 2))
-            )
+            return trigramToInt(this[0].code, this[1].code, this[2].code)
         }
 
         private fun String.trigramToLong(): Long {
