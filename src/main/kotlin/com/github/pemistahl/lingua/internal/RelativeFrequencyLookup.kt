@@ -69,7 +69,7 @@ internal interface FrequencyLookupBuilder {
             jsonNames.forEach { jsonName ->
                 val filePath = "/language-models/${language.isoCode639_1}/$jsonName"
                 Language::class.java.getResourceAsStream(filePath)!!.use {
-                   fromJson(builder, language, it)
+                    fromJson(builder, language, it)
                 }
             }
         }
@@ -384,12 +384,6 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         private const val loadFactor = 0.9f
         private const val initialCapacity = 16
 
-        /**
-         * Number of bits per fivegram char used to encode the signed offset compared to
-         * the first char (at index 0).
-         */
-        private const val FIVEGRAM_OFFSET_BITS_PER_CHAR = (Long.SIZE_BITS - Char.SIZE_BITS) / 4
-
         private fun String.quadrigramFitsInt(): Boolean {
             return this[0].code <= 255
                 && this[1].code <= 255
@@ -414,6 +408,18 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 or (this[3].code.toLong() shl 48)
             )
         }
+
+        /**
+         * Number of bits used for encoding the code point value of the first char (the "base char").
+         */
+        private const val FIVEGRAM_BASE_CHAR_BITS = Char.SIZE_BITS // Support encoding all chars
+
+        /**
+         * Number of bits per fivegram char used to encode the signed offset compared to
+         * the first char (at index 0).
+         */
+        private const val FIVEGRAM_OFFSET_BITS_PER_CHAR = (Long.SIZE_BITS - FIVEGRAM_BASE_CHAR_BITS) / 4
+        private const val FIVEGRAM_OFFSET_BIT_MASK = (1L shl FIVEGRAM_OFFSET_BITS_PER_CHAR) - 1
 
         private fun String.fivegramFitsLong(): Boolean {
             /*
@@ -444,13 +450,18 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
 
         private fun String.fivegramToLong(): Long {
             val char0 = this[0].code.toLong()
+            // AND with bitmask to remove leading 1s for negative values
+            val diff1 = (this[1].code.toLong() - char0) and FIVEGRAM_OFFSET_BIT_MASK
+            val diff2 = (this[2].code.toLong() - char0) and FIVEGRAM_OFFSET_BIT_MASK
+            val diff3 = (this[3].code.toLong() - char0) and FIVEGRAM_OFFSET_BIT_MASK
+            val diff4 = (this[4].code.toLong() - char0) and FIVEGRAM_OFFSET_BIT_MASK
 
             return (
                 char0
-                or ((this[1].code.toLong() - char0) shl FIVEGRAM_OFFSET_BITS_PER_CHAR)
-                or ((this[2].code.toLong() - char0) shl (FIVEGRAM_OFFSET_BITS_PER_CHAR * 2))
-                or ((this[3].code.toLong() - char0) shl (FIVEGRAM_OFFSET_BITS_PER_CHAR * 3))
-                or ((this[4].code.toLong() - char0) shl (FIVEGRAM_OFFSET_BITS_PER_CHAR * 4))
+                or (diff1 shl FIVEGRAM_BASE_CHAR_BITS)
+                or (diff2 shl (FIVEGRAM_BASE_CHAR_BITS + FIVEGRAM_OFFSET_BITS_PER_CHAR))
+                or (diff3 shl (FIVEGRAM_BASE_CHAR_BITS + FIVEGRAM_OFFSET_BITS_PER_CHAR * 2))
+                or (diff4 shl (FIVEGRAM_BASE_CHAR_BITS + FIVEGRAM_OFFSET_BITS_PER_CHAR * 3))
             )
         }
 
