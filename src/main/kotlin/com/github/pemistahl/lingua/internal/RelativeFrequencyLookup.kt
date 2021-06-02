@@ -14,12 +14,15 @@ import it.unimi.dsi.fastutil.doubles.Double2ObjectFunction
 import it.unimi.dsi.fastutil.doubles.Double2ObjectMap
 import it.unimi.dsi.fastutil.doubles.Double2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap
+import it.unimi.dsi.fastutil.ints.Int2ShortOpenHashMap
 import it.unimi.dsi.fastutil.ints.IntArrayList
 import it.unimi.dsi.fastutil.ints.IntList
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap
+import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap
 import it.unimi.dsi.fastutil.longs.LongArrayList
 import it.unimi.dsi.fastutil.longs.LongList
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2ShortOpenHashMap
 import it.unimi.dsi.fastutil.shorts.Short2DoubleOpenHashMap
 import it.unimi.dsi.fastutil.shorts.ShortArrayList
 import it.unimi.dsi.fastutil.shorts.ShortConsumer
@@ -507,10 +510,27 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
  * Frequency lookup for quadri- and fivegrams.
  */
 internal class QuadriFivegramRelativeFrequencyLookup private constructor(
-    private val quadrigramsAsInt: Int2DoubleOpenHashMap,
-    private val quadrigramsAsLong: Long2DoubleOpenHashMap,
-    private val fivegramsAsLong: Long2DoubleOpenHashMap,
-    private val fivegramsAsObject: Object2DoubleOpenHashMap<String>
+    /*
+     * Implementation note: This lookup uses 'direct' and 'indirect' maps. The 'direct' maps
+     * directly map to the frequency value, the 'indirect' ones map to an index in an array
+     * at which the frequency is stored. This reduces memory usage at runtime because often
+     * multiple ngrams share the same 64-bit double frequency. Therefore instead of repeating
+     * that value, only store a 16-bit index and store these common frequencies in a separate
+     * array.
+     *
+     * The performance overhead is probably acceptable because LanguageDetector does not
+     * quadrigrams and fivegrams for longer texts.
+     */
+    private val quadrigramsAsIntDirect: Int2DoubleOpenHashMap,
+    private val quadrigramsAsIntIndirect: Int2ShortOpenHashMap,
+    private val quadrigramsAsLongDirect: Long2DoubleOpenHashMap,
+    private val quadrigramsAsLongIndirect: Long2ShortOpenHashMap,
+    private val quadrigramsIndirectFrequencies: DoubleArray,
+    private val fivegramsAsLongDirect: Long2DoubleOpenHashMap,
+    private val fivegramsAsLongIndirect: Long2ShortOpenHashMap,
+    private val fivegramsAsObjectDirect: Object2DoubleOpenHashMap<String>,
+    private val fivegramsAsObjectIndirect: Object2ShortOpenHashMap<String>,
+    private val fivegramsIndirectFrequencies: DoubleArray,
 ) : FrequencyLookupBuilder {
     companion object {
         val empty = QuadriFivegramRelativeFrequencyLookup()
@@ -599,6 +619,23 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
             )
         }
 
+        /**
+         * Minimum number of ngrams which need to share the same frequency for them to be
+         * stored indirectly.
+         */
+        private const val INDIRECT_STORAGE_THRESHOLD = 2
+
+        /**
+         * Maximum number of frequencies which can be stored indirectly.
+         */
+        private const val INDIRECT_MAX_FREQUENCIES_COUNT = 0xFFFF // UShort.MAX_VALUE
+
+        /**
+         * Index value for indirect frequency lookup indicating that frequency is not stored indirectly
+         * (i.e. has no index for indirect lookup).
+         */
+        private const val INDIRECT_NO_INDEX = 0
+
         fun fromJson(language: Language): QuadriFivegramRelativeFrequencyLookup {
             val lookup = QuadriFivegramRelativeFrequencyLookup()
             FrequencyLookupBuilder.fromJson(lookup, language, listOf("quadrigrams.json", "fivegrams.json"))
@@ -609,64 +646,173 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
             return FrequencyLookupBuilder.getBinaryModelResourceName(language, "quadri-fivegrams.bin")
         }
 
-        fun fromBinary(language: Language): QuadriFivegramRelativeFrequencyLookup {
-            FrequencyLookupBuilder.openBinaryDataInput(getBinaryModelResourceName(language)).use {
-                var quadrigramsAsIntCount = it.readInt()
-                val quadrigramsAsInt = Int2DoubleOpenHashMap(quadrigramsAsIntCount, loadFactor)
-                while (quadrigramsAsIntCount > 0) {
-                    val (count, frequency) = decodeNgramCountAndFrequency(it)
-                    for (i in 1..count) {
-                        quadrigramsAsInt.put(it.readInt(), frequency)
-                    }
-                    quadrigramsAsIntCount -= count
-                }
+        private data class QuadrigramsData(
+            val quadrigramsAsIntDirect: Int2DoubleOpenHashMap,
+            val quadrigramsAsIntIndirect: Int2ShortOpenHashMap,
+            val quadrigramsAsLongDirect: Long2DoubleOpenHashMap,
+            val quadrigramsAsLongIndirect: Long2ShortOpenHashMap,
+            val quadrigramsIndirectFrequencies: DoubleArray
+        )
+        private fun quadrigramsFromBinary(dataIn: DataInput): QuadrigramsData {
+            val indirectFrequenciesCount = dataIn.readUnsignedShort()
+            val indirectFrequencies = DoubleArray(indirectFrequenciesCount)
+            var indirectFrequencyIndex = 0
 
-                var quadrigramsAsLongCount = it.readInt()
-                val quadrigramsAsLong = Long2DoubleOpenHashMap(quadrigramsAsLongCount, loadFactor)
-                while (quadrigramsAsLongCount > 0) {
-                    val (count, frequency) = decodeNgramCountAndFrequency(it)
-                    for (i in 1..count) {
-                        quadrigramsAsLong.put(it.readLong(), frequency)
-                    }
-                    quadrigramsAsLongCount -= count
-                }
+            /* Quadrigrams as Int */
+            val directQuadrigramsAsIntCount = dataIn.readInt()
+            val indirectQuadrigramsAsIntCount = dataIn.readInt()
+            val directQuadrigramsAsInt = Int2DoubleOpenHashMap(directQuadrigramsAsIntCount, loadFactor)
+            val indirectQuadrigramAsInt = Int2ShortOpenHashMap(indirectQuadrigramsAsIntCount, loadFactor)
 
-                var fivegramsAsLongCount = it.readInt()
-                val fivegramsAsLong = Long2DoubleOpenHashMap(fivegramsAsLongCount, loadFactor)
-                while (fivegramsAsLongCount > 0) {
-                    val (count, frequency) = decodeNgramCountAndFrequency(it)
+            var quadrigramsAsIntCount = directQuadrigramsAsIntCount + indirectQuadrigramsAsIntCount
+            while (quadrigramsAsIntCount > 0) {
+                val (count, frequency) = decodeNgramCountAndFrequency(dataIn)
+                if (count >= INDIRECT_STORAGE_THRESHOLD) {
+                    indirectFrequencies[indirectFrequencyIndex] = frequency
                     for (i in 1..count) {
-                        fivegramsAsLong.put(it.readLong(), frequency)
+                        indirectQuadrigramAsInt.put(dataIn.readInt(), indirectFrequencyIndex.toShort())
                     }
-                    fivegramsAsLongCount -= count
+                    indirectFrequencyIndex++
+                } else {
+                    for (i in 1..count) {
+                        directQuadrigramsAsInt.put(dataIn.readInt(), frequency)
+                    }
                 }
+                quadrigramsAsIntCount -= count
+            }
 
-                var fivegramsAsObjectCount = it.readInt()
-                val fivegramsAsObject = Object2DoubleOpenHashMap<String>(fivegramsAsObjectCount, loadFactor)
-                while (fivegramsAsObjectCount > 0) {
-                    val (count, frequency) = decodeNgramCountAndFrequency(it)
+            /* Quadrigrams as Long */
+            val directQuadrigramsAsLongCount = dataIn.readInt()
+            val indirectQuadrigramsAsLongCount = dataIn.readInt()
+            val directQuadrigramsAsLong = Long2DoubleOpenHashMap(directQuadrigramsAsLongCount, loadFactor)
+            val indirectQuadrigramAsLong = Long2ShortOpenHashMap(indirectQuadrigramsAsLongCount, loadFactor)
+
+            var quadrigramsAsLongCount = directQuadrigramsAsLongCount + indirectQuadrigramsAsLongCount
+            while (quadrigramsAsLongCount > 0) {
+                val (count, frequency) = decodeNgramCountAndFrequency(dataIn)
+                if (count >= INDIRECT_STORAGE_THRESHOLD) {
+                    indirectFrequencies[indirectFrequencyIndex] = frequency
+                    for (i in 1..count) {
+                        indirectQuadrigramAsLong.put(dataIn.readLong(), indirectFrequencyIndex.toShort())
+                    }
+                    indirectFrequencyIndex++
+                } else {
+                    for (i in 1..count) {
+                        directQuadrigramsAsLong.put(dataIn.readLong(), frequency)
+                    }
+                }
+                quadrigramsAsLongCount -= count
+            }
+
+            return QuadrigramsData(
+                directQuadrigramsAsInt,
+                indirectQuadrigramAsInt,
+                directQuadrigramsAsLong,
+                indirectQuadrigramAsLong,
+                indirectFrequencies
+            )
+        }
+
+        private data class FivegramsData(
+            val fivegramsAsLongDirect: Long2DoubleOpenHashMap,
+            val fivegramsAsLongIndirect: Long2ShortOpenHashMap,
+            val fivegramsAsObjectDirect: Object2DoubleOpenHashMap<String>,
+            val fivegramsAsObjectIndirect: Object2ShortOpenHashMap<String>,
+            val fivegramsIndirectFrequencies: DoubleArray
+        )
+        private fun fivegramsFromBinary(dataIn: DataInput): FivegramsData {
+            val indirectFrequenciesCount = dataIn.readUnsignedShort()
+            val indirectFrequencies = DoubleArray(indirectFrequenciesCount)
+            var indirectFrequencyIndex = 0
+
+            /* Fivegrams as Long */
+            val directFivegramsAsLongCount = dataIn.readInt()
+            val indirectFivegramsAsLongCount = dataIn.readInt()
+            val directFivegramsAsLong = Long2DoubleOpenHashMap(directFivegramsAsLongCount, loadFactor)
+            val indirectFivegramsAsLong = Long2ShortOpenHashMap(indirectFivegramsAsLongCount, loadFactor)
+
+            var fivegramsAsLongCount = directFivegramsAsLongCount + indirectFivegramsAsLongCount
+            while (fivegramsAsLongCount > 0) {
+                val (count, frequency) = decodeNgramCountAndFrequency(dataIn)
+                if (count >= INDIRECT_STORAGE_THRESHOLD) {
+                    indirectFrequencies[indirectFrequencyIndex] = frequency
+                    for (i in 1..count) {
+                        indirectFivegramsAsLong.put(dataIn.readLong(), indirectFrequencyIndex.toShort())
+                    }
+                    indirectFrequencyIndex++
+                } else {
+                    for (i in 1..count) {
+                        directFivegramsAsLong.put(dataIn.readLong(), frequency)
+                    }
+                }
+                fivegramsAsLongCount -= count
+            }
+
+            /* Fivegrams as Object */
+            val directFivegramsAsObjectCount = dataIn.readInt()
+            val indirectFivegramsAsObjectCount = dataIn.readInt()
+            val directFivegramsAsObject = Object2DoubleOpenHashMap<String>(directFivegramsAsObjectCount, loadFactor)
+            val indirectFivegramsAsObject = Object2ShortOpenHashMap<String>(indirectFivegramsAsObjectCount, loadFactor)
+
+            var fivegramsAsObjectCount = directFivegramsAsObjectCount + indirectFivegramsAsObjectCount
+            while (fivegramsAsObjectCount > 0) {
+                val (count, frequency) = decodeNgramCountAndFrequency(dataIn)
+                if (count >= INDIRECT_STORAGE_THRESHOLD) {
+                    indirectFrequencies[indirectFrequencyIndex] = frequency
                     for (i in 1..count) {
                         val charArray = CharArray(5)
-                        charArray[0] = it.readChar()
-                        charArray[1] = it.readChar()
-                        charArray[2] = it.readChar()
-                        charArray[3] = it.readChar()
-                        charArray[4] = it.readChar()
+                        charArray[0] = dataIn.readChar()
+                        charArray[1] = dataIn.readChar()
+                        charArray[2] = dataIn.readChar()
+                        charArray[3] = dataIn.readChar()
+                        charArray[4] = dataIn.readChar()
                         val fivegram = String(charArray)
-
-                        fivegramsAsObject.put(fivegram, frequency)
+                        indirectFivegramsAsObject.put(fivegram, indirectFrequencyIndex.toShort())
                     }
-                    fivegramsAsObjectCount -= count
+                    indirectFrequencyIndex++
+                } else {
+                    for (i in 1..count) {
+                        val charArray = CharArray(5)
+                        charArray[0] = dataIn.readChar()
+                        charArray[1] = dataIn.readChar()
+                        charArray[2] = dataIn.readChar()
+                        charArray[3] = dataIn.readChar()
+                        charArray[4] = dataIn.readChar()
+                        val fivegram = String(charArray)
+                        directFivegramsAsObject.put(fivegram, frequency)
+                    }
                 }
+                fivegramsAsObjectCount -= count
+            }
+
+            return FivegramsData(
+                directFivegramsAsLong,
+                indirectFivegramsAsLong,
+                directFivegramsAsObject,
+                indirectFivegramsAsObject,
+                indirectFrequencies
+            )
+        }
+
+        fun fromBinary(language: Language): QuadriFivegramRelativeFrequencyLookup {
+            FrequencyLookupBuilder.openBinaryDataInput(getBinaryModelResourceName(language)).use {
+                val quadrigramsData = quadrigramsFromBinary(it)
+                val fivegramsData = fivegramsFromBinary(it)
 
                 // Should have reached end of data
                 assert(it.read() == -1)
 
                 return QuadriFivegramRelativeFrequencyLookup(
-                    quadrigramsAsInt,
-                    quadrigramsAsLong,
-                    fivegramsAsLong,
-                    fivegramsAsObject
+                    quadrigramsData.quadrigramsAsIntDirect,
+                    quadrigramsData.quadrigramsAsIntIndirect,
+                    quadrigramsData.quadrigramsAsLongDirect,
+                    quadrigramsData.quadrigramsAsLongIndirect,
+                    quadrigramsData.quadrigramsIndirectFrequencies,
+                    fivegramsData.fivegramsAsLongDirect,
+                    fivegramsData.fivegramsAsLongIndirect,
+                    fivegramsData.fivegramsAsObjectDirect,
+                    fivegramsData.fivegramsAsObjectIndirect,
+                    fivegramsData.fivegramsIndirectFrequencies
                 )
             }
         }
@@ -674,9 +820,15 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
 
     private constructor() : this(
         Int2DoubleOpenHashMap(initialCapacity, loadFactor),
+        Int2ShortOpenHashMap(0), // Won't be used when constructing lookup from JSON
         Long2DoubleOpenHashMap(initialCapacity, loadFactor),
+        Long2ShortOpenHashMap(0), // Won't be used when constructing lookup from JSON
+        DoubleArray(0), // Won't be used when constructing lookup from JSON
         Long2DoubleOpenHashMap(initialCapacity, loadFactor),
-        Object2DoubleOpenHashMap<String>(initialCapacity, loadFactor)
+        Long2ShortOpenHashMap(0), // Won't be used when constructing lookup from JSON
+        Object2DoubleOpenHashMap<String>(initialCapacity, loadFactor),
+        Object2ShortOpenHashMap(0), // Won't be used when constructing lookup from JSON
+        DoubleArray(0) // Won't be used when constructing lookup from JSON
     )
 
     override fun putFrequency(ngram: String, frequency: Double) {
@@ -685,13 +837,13 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         }
         val old = when (ngram.length) {
             4 -> when {
-                ngram.quadrigramFitsInt() -> quadrigramsAsInt.put(ngram.quadrigramToInt(), frequency)
-                else -> quadrigramsAsLong.put(ngram.quadrigramToLong(), frequency)
+                ngram.quadrigramFitsInt() -> quadrigramsAsIntDirect.put(ngram.quadrigramToInt(), frequency)
+                else -> quadrigramsAsLongDirect.put(ngram.quadrigramToLong(), frequency)
             }
             5 -> when {
-                ngram.fivegramFitsLong() -> fivegramsAsLong.put(ngram.fivegramToLong(), frequency)
+                ngram.fivegramFitsLong() -> fivegramsAsLongDirect.put(ngram.fivegramToLong(), frequency)
                 // Fall back to storing Ngram object
-                else -> fivegramsAsObject.put(ngram, frequency)
+                else -> fivegramsAsObjectDirect.put(ngram, frequency)
             }
             else -> throw IllegalArgumentException("Invalid Ngram length")
         }
@@ -701,11 +853,11 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     }
 
     override fun finishCreation() {
-        quadrigramsAsInt.trim()
-        quadrigramsAsLong.trim()
+        quadrigramsAsIntDirect.trim()
+        quadrigramsAsLongDirect.trim()
 
-        fivegramsAsLong.trim()
-        fivegramsAsObject.trim()
+        fivegramsAsLongDirect.trim()
+        fivegramsAsObjectDirect.trim()
     }
 
     fun getFrequency(ngram: ObjectNgram): Double {
@@ -713,14 +865,136 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
 
         return when (ngramStr.length) {
             4 -> when {
-                ngramStr.quadrigramFitsInt() -> quadrigramsAsInt.get(ngramStr.quadrigramToInt())
-                else -> quadrigramsAsLong.get(ngramStr.quadrigramToLong())
+                ngramStr.quadrigramFitsInt() -> {
+                    val encoded = ngramStr.quadrigramToInt()
+                    val index = quadrigramsAsIntIndirect.get(encoded).toUShort().toInt()
+                    return when (index) {
+                        INDIRECT_NO_INDEX -> quadrigramsAsIntDirect.get(encoded)
+                        else -> quadrigramsIndirectFrequencies[index - 1]
+                    }
+                }
+                else -> {
+                    val encoded = ngramStr.quadrigramToLong()
+                    val index = quadrigramsAsLongIndirect.get(encoded).toUShort().toInt()
+                    return when (index) {
+                        INDIRECT_NO_INDEX -> quadrigramsAsLongDirect.get(encoded)
+                        else -> quadrigramsIndirectFrequencies[index - 1]
+                    }
+                }
             }
             5 -> when {
-                ngramStr.fivegramFitsLong() -> fivegramsAsLong.get(ngramStr.fivegramToLong())
-                else -> fivegramsAsObject.getDouble(ngramStr)
+                ngramStr.fivegramFitsLong() -> {
+                    val encoded = ngramStr.fivegramToLong()
+                    val index = fivegramsAsLongIndirect.get(encoded).toUShort().toInt()
+                    return when (index) {
+                        INDIRECT_NO_INDEX -> fivegramsAsLongDirect.get(encoded)
+                        else -> fivegramsIndirectFrequencies[index - 1]
+                    }
+                }
+                else -> {
+                    val index = fivegramsAsObjectIndirect.getShort(ngramStr).toUShort().toInt()
+                    return when (index) {
+                        INDIRECT_NO_INDEX -> fivegramsAsObjectDirect.getDouble(ngramStr)
+                        else -> fivegramsIndirectFrequencies[index - 1]
+                    }
+                }
             }
             else -> throw IllegalArgumentException("Invalid Ngram length")
+        }
+    }
+
+    private fun writeQuadrigrams(dataOut: DataOutput) {
+        val reversedQuadrigramsAsInt = quadrigramsAsIntDirect.reverse().double2ObjectEntrySet()
+        val reversedQuadrigramsAsLong = quadrigramsAsLongDirect.reverse().double2ObjectEntrySet()
+
+        val indirectQuadrigramFrequenciesCount = (
+            reversedQuadrigramsAsInt.count { it.value.size >= INDIRECT_STORAGE_THRESHOLD }
+            + reversedQuadrigramsAsLong.count { it.value.size >= INDIRECT_STORAGE_THRESHOLD }
+        )
+        assert(indirectQuadrigramFrequenciesCount <= INDIRECT_MAX_FREQUENCIES_COUNT)
+        dataOut.writeShort(indirectQuadrigramFrequenciesCount)
+
+        /* Quadrigrams as Int */
+        val directQuadrigramsAsIntCount = reversedQuadrigramsAsInt.sumOf {
+            val count = it.value.size
+            if (count < INDIRECT_STORAGE_THRESHOLD) count else 0
+        }
+        val indirectQuadrigramsAsIntCount = reversedQuadrigramsAsInt.sumOf {
+            val count = it.value.size
+            if (count >= INDIRECT_STORAGE_THRESHOLD) count else 0
+        }
+        dataOut.writeInt(directQuadrigramsAsIntCount)
+        dataOut.writeInt(indirectQuadrigramsAsIntCount)
+        reversedQuadrigramsAsInt.fastForEach { entry ->
+            encodeNgramCountAndFrequency(entry, dataOut)
+            entry.value.forEach(IntConsumer { dataOut.writeInt(it) })
+        }
+
+        /* Quadrigrams as Long */
+        val directQuadrigramsAsLongCount = reversedQuadrigramsAsLong.sumOf {
+            val count = it.value.size
+            if (count < INDIRECT_STORAGE_THRESHOLD) count else 0
+        }
+        val indirectQuadrigramsAsLongCount = reversedQuadrigramsAsLong.sumOf {
+            val count = it.value.size
+            if (count >= INDIRECT_STORAGE_THRESHOLD) count else 0
+        }
+        dataOut.writeInt(directQuadrigramsAsLongCount)
+        dataOut.writeInt(indirectQuadrigramsAsLongCount)
+        reversedQuadrigramsAsLong.fastForEach { entry ->
+            encodeNgramCountAndFrequency(entry, dataOut)
+            entry.value.forEach(LongConsumer { dataOut.writeLong(it) })
+        }
+    }
+
+    private fun writeFivegrams(dataOut: DataOutput) {
+        val reversedFivegramsAsLong = fivegramsAsLongDirect.reverse().double2ObjectEntrySet()
+        val reversedFivegramsAsObject = fivegramsAsObjectDirect.reverse().double2ObjectEntrySet()
+
+        val indirectFivegramFrequenciesCount = (
+            reversedFivegramsAsLong.count { it.value.size >= INDIRECT_STORAGE_THRESHOLD }
+            + reversedFivegramsAsObject.count { it.value.size >= INDIRECT_STORAGE_THRESHOLD }
+        )
+        assert(indirectFivegramFrequenciesCount <= INDIRECT_MAX_FREQUENCIES_COUNT)
+        dataOut.writeShort(indirectFivegramFrequenciesCount)
+
+        /* Fivegrams as Long */
+        val directFivegramsAsLongCount = reversedFivegramsAsLong.sumOf {
+            val count = it.value.size
+            if (count < INDIRECT_STORAGE_THRESHOLD) count else 0
+        }
+        val indirectFivegramsAsLongCount = reversedFivegramsAsLong.sumOf {
+            val count = it.value.size
+            if (count >= INDIRECT_STORAGE_THRESHOLD) count else 0
+        }
+        dataOut.writeInt(directFivegramsAsLongCount)
+        dataOut.writeInt(indirectFivegramsAsLongCount)
+        reversedFivegramsAsLong.fastForEach { entry ->
+            encodeNgramCountAndFrequency(entry, dataOut)
+            entry.value.forEach(LongConsumer { dataOut.writeLong(it) })
+        }
+
+        /* Fivegrams as Object */
+        val directFivegramsAsObjectCount = reversedFivegramsAsObject.sumOf {
+            val count = it.value.size
+            if (count < INDIRECT_STORAGE_THRESHOLD) count else 0
+        }
+        val indirectFivegramsAsObjectCount = reversedFivegramsAsObject.sumOf {
+            val count = it.value.size
+            if (count >= INDIRECT_STORAGE_THRESHOLD) count else 0
+        }
+        dataOut.writeInt(directFivegramsAsObjectCount)
+        dataOut.writeInt(indirectFivegramsAsObjectCount)
+        reversedFivegramsAsObject.fastForEach { entry ->
+            encodeNgramCountAndFrequency(entry, dataOut)
+            entry.value.forEach {
+                // Write String manually since length is known (= 5) so don't have to encode it
+                dataOut.writeChar(it[0].code)
+                dataOut.writeChar(it[1].code)
+                dataOut.writeChar(it[2].code)
+                dataOut.writeChar(it[3].code)
+                dataOut.writeChar(it[4].code)
+            }
         }
     }
 
@@ -734,36 +1008,8 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         val resourceName = getBinaryModelResourceName(language)
 
         FrequencyLookupBuilder.openBinaryDataOutput(resourcesDirectory, resourceName).use { dataOut ->
-            dataOut.writeInt(quadrigramsAsInt.size)
-            quadrigramsAsInt.reverse().double2ObjectEntrySet().fastForEach { entry ->
-                encodeNgramCountAndFrequency(entry, dataOut)
-                entry.value.forEach(IntConsumer { dataOut.writeInt(it) })
-            }
-
-            dataOut.writeInt(quadrigramsAsLong.size)
-            quadrigramsAsLong.reverse().double2ObjectEntrySet().fastForEach { entry ->
-                encodeNgramCountAndFrequency(entry, dataOut)
-                entry.value.forEach(LongConsumer { dataOut.writeLong(it) })
-            }
-
-            dataOut.writeInt(fivegramsAsLong.size)
-            fivegramsAsLong.reverse().double2ObjectEntrySet().fastForEach { entry ->
-                encodeNgramCountAndFrequency(entry, dataOut)
-                entry.value.forEach(LongConsumer { dataOut.writeLong(it) })
-            }
-
-            dataOut.writeInt(fivegramsAsObject.size)
-            fivegramsAsObject.reverse().double2ObjectEntrySet().fastForEach { entry ->
-                encodeNgramCountAndFrequency(entry, dataOut)
-                entry.value.forEach {
-                    // Write String manually since length is known (= 5) so don't have to encode it
-                    dataOut.writeChar(it[0].code)
-                    dataOut.writeChar(it[1].code)
-                    dataOut.writeChar(it[2].code)
-                    dataOut.writeChar(it[3].code)
-                    dataOut.writeChar(it[4].code)
-                }
-            }
+            writeQuadrigrams(dataOut)
+            writeFivegrams(dataOut)
         }
     }
 }
