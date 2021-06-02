@@ -277,7 +277,10 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     )
 
     override fun putFrequency(ngram: String, frequency: Double) {
-        when (ngram.length) {
+        if (frequency.isInfinite() || frequency <= 0.0) {
+            throw IllegalArgumentException("Invalid frequency $frequency for ngram '$ngram'")
+        }
+        val old = when (ngram.length) {
             1 -> {
                 val char0 = ngram[0].code
                 when {
@@ -294,6 +297,9 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
                 else -> trigramsAsLong.put(ngram.trigramToLong(), frequency)
             }
             else -> throw IllegalArgumentException("Invalid Ngram length")
+        }
+        if (old != 0.0) {
+            throw AssertionError("Colliding encoding for '$ngram'")
         }
     }
 
@@ -530,7 +536,10 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     )
 
     override fun putFrequency(ngram: String, frequency: Double) {
-        when (ngram.length) {
+        if (frequency.isInfinite() || frequency <= 0.0) {
+            throw IllegalArgumentException("Invalid frequency $frequency for ngram '$ngram'")
+        }
+        val old = when (ngram.length) {
             4 -> when {
                 ngram.quadrigramFitsInt() -> quadrigramsAsInt.put(ngram.quadrigramToInt(), frequency)
                 else -> quadrigramsAsLong.put(ngram.quadrigramToLong(), frequency)
@@ -541,6 +550,9 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 else -> fivegramsAsObject.put(ngram, frequency)
             }
             else -> throw IllegalArgumentException("Invalid Ngram length")
+        }
+        if (old != 0.0) {
+            throw AssertionError("Colliding encoding for '$ngram'")
         }
     }
 
