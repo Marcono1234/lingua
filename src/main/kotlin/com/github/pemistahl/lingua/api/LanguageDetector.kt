@@ -43,13 +43,14 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import java.util.*
 import java.util.function.LongConsumer
+import kotlin.collections.LinkedHashSet
 import kotlin.math.ln
 
 /**
  * Detects the language of given input text.
  */
 class LanguageDetector internal constructor(
-    internal val languages: MutableSet<Language>,
+    internal val languages: LinkedHashSet<Language>,
     internal val minimumRelativeDistance: Double,
     isEveryLanguageModelPreloaded: Boolean,
     internal val numberOfLoadedLanguages: Int = languages.size
@@ -223,7 +224,7 @@ class LanguageDetector internal constructor(
         unigramCountsOfInputText: Object2IntMap<Language>,
         filteredLanguages: Set<Language>
     ): Map<Language, Double> {
-        val summedUpProbabilities = hashMapOf<Language, Double>()
+        val summedUpProbabilities = linkedMapOf<Language, Double>()
         for (language in filteredLanguages) {
             summedUpProbabilities[language] = probabilities.sumOf { it.getOrDefault(language as Any, 0.0) }
 

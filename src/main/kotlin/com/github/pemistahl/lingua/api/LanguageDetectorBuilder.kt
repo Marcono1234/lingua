@@ -27,7 +27,7 @@ class LanguageDetectorBuilder private constructor(
     /**
      * Creates and returns the configured instance of [LanguageDetector].
      */
-    fun build() = LanguageDetector(languages.toMutableSet(), minimumRelativeDistance, isEveryLanguageModelPreloaded)
+    fun build() = LanguageDetector(LinkedHashSet(languages), minimumRelativeDistance, isEveryLanguageModelPreloaded)
 
     /**
      * Sets the desired value for the minimum relative distance measure.
