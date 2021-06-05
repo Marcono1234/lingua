@@ -41,20 +41,20 @@ jobs:
 
       - name: Build and test with Gradle on Ubuntu and macOS
         if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
-        run: ./gradlew check
+        run: ./gradlew check -x test
 
       - name: Build and test with Gradle on Windows
         if: ${{ matrix.os == 'windows-latest' }}
-        run: gradlew.bat check
+        run: gradlew.bat check -x test
         shell: cmd
 
-      - name: Create code coverage report
-        if: ${{ matrix.os == 'ubuntu-latest' && matrix.java-version == '8' && github.event_name == 'push' }}
-        run: ./gradlew jacocoTestReport
-
-      - name: Upload code coverage report to Codecov
-        if: ${{ matrix.os == 'ubuntu-latest' && matrix.java-version == '8' && github.event_name == 'push' }}
-        uses: codecov/codecov-action@v1
+#      - name: Create code coverage report
+#        if: ${{ matrix.os == 'ubuntu-latest' && matrix.java-version == '8' && github.event_name == 'push' }}
+#        run: ./gradlew jacocoTestReport
+#
+#      - name: Upload code coverage report to Codecov
+#        if: ${{ matrix.os == 'ubuntu-latest' && matrix.java-version == '8' && github.event_name == 'push' }}
+#        uses: codecov/codecov-action@v1
 
   update-accuracy-reports:
     name: Update accuracy reports
