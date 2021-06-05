@@ -3,7 +3,7 @@ name: build
 on:
   push:
     branches:
-      - main
+      - '**'
   pull_request:
     branches:
       - main
@@ -55,3 +55,29 @@ jobs:
       - name: Upload code coverage report to Codecov
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.java-version == '8' && github.event_name == 'push' }}
         uses: codecov/codecov-action@v1
+
+  update-accuracy-reports:
+    name: Update accuracy reports
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Set up Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'adopt'
+          java-version: 11
+
+      - name: Store or retrieve Gradle caches
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Update accuracy reports
+        run: ./.github/workflow-scripts/update-accuracy-reports.sh
