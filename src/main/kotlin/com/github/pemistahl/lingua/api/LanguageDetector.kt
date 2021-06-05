@@ -43,7 +43,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import java.util.*
 import java.util.function.LongConsumer
-import kotlin.collections.LinkedHashSet
 import kotlin.math.ln
 
 /**
@@ -111,25 +110,24 @@ class LanguageDetector internal constructor(
      * @return A map of all possible languages, sorted by their confidence value in descending order.
      */
     fun computeLanguageConfidenceValues(text: String): SortedMap<Language, Double> {
-        val values = TreeMap<Language, Double>()
         val cleanedUpText = cleanUpInputText(text)
 
-        if (cleanedUpText.isEmpty() || !cleanedUpText.codePoints().anyMatch(Character::isLetter)) return values
+        if (cleanedUpText.isEmpty() || !cleanedUpText.codePoints().anyMatch(Character::isLetter)) {
+            return sortedMapOf()
+        }
 
         val words = splitTextIntoWords(cleanedUpText)
         val languageDetectedByRules = detectLanguageWithRules(words)
 
         if (languageDetectedByRules != UNKNOWN) {
-            values[languageDetectedByRules] = 1.0
-            return values
+            return sortedMapOf(languageDetectedByRules to 1.0)
         }
 
         val filteredLanguages = filterLanguagesByRules(words)
 
         if (filteredLanguages.size == 1) {
             val filteredLanguage = filteredLanguages.iterator().next()
-            values[filteredLanguage] = 1.0
-            return values
+            return sortedMapOf(filteredLanguage to 1.0)
         }
 
         val ngramSizeRange = if (cleanedUpText.length >= 120) (3..3) else (1..5)
