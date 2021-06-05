@@ -94,6 +94,11 @@ tasks.withType<Test> {
     useJUnitPlatform { failFast = true }
 }
 
+tasks.jar {
+    // Exclude JSON models, binary models are used instead
+    exclude("language-models/**/*.json")
+}
+
 tasks.jacocoTestReport {
     dependsOn("test")
     reports {
