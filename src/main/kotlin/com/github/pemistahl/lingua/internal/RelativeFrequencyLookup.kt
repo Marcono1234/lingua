@@ -24,6 +24,10 @@ import it.unimi.dsi.fastutil.shorts.Short2IntOpenHashMap
 import it.unimi.dsi.fastutil.shorts.ShortArrayList
 import it.unimi.dsi.fastutil.shorts.ShortConsumer
 import it.unimi.dsi.fastutil.shorts.ShortList
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import okio.buffer
 import okio.source
 import java.io.DataInput
@@ -201,6 +205,8 @@ private inline fun encodeNgramCountAndFrequency(
     /*
      * If count <= 3: Only write frequency
      * Else: Write 32-bit 0 (to differentiate it from frequency), followed by count, followed by frequency
+     *
+     * This encoding saves multiple kilobytes per model file.
      */
 
     val ngramCount = entry.value.size
@@ -831,5 +837,16 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 }
             }
         }
+    }
+}
+
+internal fun writeBinaryModels(resourcesDirectory: Path) {
+    runBlocking {
+        Language.all().map { language ->
+            async(Dispatchers.IO) {
+                UniBiTrigramRelativeFrequencyLookup.fromJson(language).writeBinary(resourcesDirectory, language)
+                QuadriFivegramRelativeFrequencyLookup.fromJson(language).writeBinary(resourcesDirectory, language)
+            }
+        }.awaitAll()
     }
 }
