@@ -225,7 +225,19 @@ private inline fun encodeNgramCountAndFrequency(
     }
 }
 
-private data class NgramCountAndFrequency(val count: Int, val encodedFrequency: Int)
+// Use value class to avoid unnecessary object allocations while reading models
+@JvmInline
+private value class NgramCountAndFrequency(val encoded: Long) {
+    constructor(count: Int, encodedFrequency: Int) : this(
+        (count.toLong() shl 32) or encodedFrequency.toUInt().toLong()
+    )
+
+    fun getCount() = (encoded ushr 32).toInt()
+    fun getEncodedFrequency() = encoded.toInt()
+
+    operator fun component1() = getCount()
+    operator fun component2() = getEncodedFrequency()
+}
 private fun decodeNgramCountAndFrequency(dataIn: DataInput): NgramCountAndFrequency {
     val first32Bits = dataIn.readInt()
     val count: Int
