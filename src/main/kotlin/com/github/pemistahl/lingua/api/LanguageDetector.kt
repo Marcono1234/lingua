@@ -24,20 +24,15 @@ import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
 import com.github.pemistahl.lingua.internal.Constant.isJapaneseScript
+import com.github.pemistahl.lingua.internal.EnumDoubleMap
+import com.github.pemistahl.lingua.internal.EnumIntMap
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.loadLetterIndexMap
-import com.github.pemistahl.lingua.internal.util.extension.asFastSequence
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
-import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
-import it.unimi.dsi.fastutil.objects.Object2DoubleMap
-import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
-import it.unimi.dsi.fastutil.objects.Object2IntMap
-import it.unimi.dsi.fastutil.objects.Object2IntMaps
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -139,7 +134,7 @@ class LanguageDetector internal constructor(
                     val probabilities = computeLanguageProbabilities(testDataModel, filteredLanguages)
 
                     val unigramCounts = if (i == 1) {
-                        val languages = probabilities.keys
+                        val languages = probabilities.getNonZeroKeys()
 
                         val unigramFilteredLanguages =
                             if (languages.isNotEmpty()) filteredLanguages.asSequence()
@@ -157,14 +152,11 @@ class LanguageDetector internal constructor(
         }
 
         val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
-        val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: Object2IntMaps.emptyMap()
+        val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: EnumIntMap.newMap()
         val summedUpProbabilities = sumUpProbabilities(allProbabilities, unigramCounts, filteredLanguages)
-        val highestProbability = summedUpProbabilities.maxByOrNull { it.value }?.value ?: return sortedMapOf()
-        val confidenceValues = summedUpProbabilities.mapValues { highestProbability / it.value }
-        val sortedByConfidenceValue = compareByDescending<Language> { language -> confidenceValues[language] }
-        val sortedByConfidenceValueThenByLanguage = sortedByConfidenceValue.thenBy { language -> language }
-
-        return confidenceValues.toSortedMap(sortedByConfidenceValueThenByLanguage)
+        val highestProbability = summedUpProbabilities.maxValueOrNull() ?: return sortedMapOf()
+        val confidenceValues = summedUpProbabilities.mapNonZeroValues { highestProbability / it }
+        return confidenceValues.sortedByNonZeroDescendingValue()
     }
 
     internal fun cleanUpInputText(text: String): String {
@@ -202,8 +194,8 @@ class LanguageDetector internal constructor(
     internal fun countUnigramsOfInputText(
         unigramLanguageModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>
-    ): Object2IntMap<Language> {
-        val unigramCounts = Object2IntOpenHashMap<Language>()
+    ): EnumIntMap<Language> {
+        val unigramCounts = EnumIntMap.newMap<Language>()
         for (language in filteredLanguages) {
             val lookup = languageModels[language]!!.value.uniBiTrigramsLookup
 
@@ -211,7 +203,7 @@ class LanguageDetector internal constructor(
             unigramLanguageModel.primitiveNgrams.forEach(LongConsumer {
                 val probability = lookup.getFrequency(PrimitiveNgram(it))
                 if (probability > 0) {
-                    unigramCounts.incrementCounter(language)
+                    unigramCounts.increment(language)
                 }
             })
         }
@@ -219,106 +211,102 @@ class LanguageDetector internal constructor(
     }
 
     internal fun sumUpProbabilities(
-        probabilities: List<Object2DoubleMap<Language>>,
-        unigramCountsOfInputText: Object2IntMap<Language>,
+        probabilities: List<EnumDoubleMap<Language>>,
+        unigramCountsOfInputText: EnumIntMap<Language>,
         filteredLanguages: Set<Language>
-    ): Map<Language, Double> {
-        val summedUpProbabilities = linkedMapOf<Language, Double>()
+    ): EnumDoubleMap<Language> {
+        val summedUpProbabilities = EnumDoubleMap.newMap<Language>()
         for (language in filteredLanguages) {
-            summedUpProbabilities[language] = probabilities.sumOf { it.getOrDefault(language as Any, 0.0) }
+            summedUpProbabilities.put(language, probabilities.sumOf { it.getOrZero(language) })
 
-            if (unigramCountsOfInputText.containsKey(language)) {
-                summedUpProbabilities[language] = summedUpProbabilities.getValue(language) /
-                    unigramCountsOfInputText.getInt(language)
+            unigramCountsOfInputText.ifNonZero(language) { unigramCount ->
+                summedUpProbabilities.put(language, summedUpProbabilities.getOrZero(language) / unigramCount)
             }
         }
-        return summedUpProbabilities.filter { it.value != 0.0 }
+        return summedUpProbabilities
     }
 
     internal fun detectLanguageWithRules(words: List<String>): Language {
-        val totalLanguageCounts = Object2IntOpenHashMap<Language>()
+        val totalLanguageCounts = EnumIntMap.newMap<Language>()
 
         for (word in words) {
-            val wordLanguageCounts = Object2IntOpenHashMap<Language>()
+            val wordLanguageCounts = EnumIntMap.newMap<Language>()
 
             for (character in word) {
                 val script = Character.UnicodeScript.of(character.code)
 
                 val alphabetLanguage = alphabetsSupportingExactlyOneLanguage[script]
                 if (alphabetLanguage != null) {
-                    wordLanguageCounts.incrementCounter(alphabetLanguage)
+                    wordLanguageCounts.increment(alphabetLanguage)
                 } else {
                     when {
-                        script == Character.UnicodeScript.HAN -> wordLanguageCounts.incrementCounter(CHINESE)
-                        isJapaneseScript(script) -> wordLanguageCounts.incrementCounter(JAPANESE)
+                        script == Character.UnicodeScript.HAN -> wordLanguageCounts.increment(CHINESE)
+                        isJapaneseScript(script) -> wordLanguageCounts.increment(JAPANESE)
                         script == Character.UnicodeScript.LATIN ||
                             script == Character.UnicodeScript.CYRILLIC ||
                             script == Character.UnicodeScript.DEVANAGARI ->
                             languagesWithUniqueCharacters.filter {
                                 it.uniqueCharacters?.contains(character) ?: false
                             }.forEach {
-                                wordLanguageCounts.incrementCounter(it)
+                                wordLanguageCounts.increment(it)
                             }
                     }
                 }
             }
 
-            if (wordLanguageCounts.isEmpty()) {
-                totalLanguageCounts.incrementCounter(UNKNOWN)
-            } else if (wordLanguageCounts.size == 1) {
-                val language = wordLanguageCounts.keys.first()
+            val languageCounts = wordLanguageCounts.countNonZeroValues()
+            if (languageCounts == 0) {
+                totalLanguageCounts.increment(UNKNOWN)
+            } else if (languageCounts == 1) {
+                val language = wordLanguageCounts.firstNonZero()!!
                 if (language in languages) {
-                    totalLanguageCounts.incrementCounter(language)
+                    totalLanguageCounts.increment(language)
                 } else {
-                    totalLanguageCounts.incrementCounter(UNKNOWN)
+                    totalLanguageCounts.increment(UNKNOWN)
                 }
-            } else if (wordLanguageCounts.containsKey(CHINESE) && wordLanguageCounts.containsKey(JAPANESE)) {
-                totalLanguageCounts.incrementCounter(JAPANESE)
+            } else if (languageCounts == 2 &&
+                wordLanguageCounts.hasNonZeroValue(CHINESE) &&
+                wordLanguageCounts.hasNonZeroValue(JAPANESE)
+            ) {
+                totalLanguageCounts.increment(JAPANESE)
             } else {
-                // Convert to Sequence and then to Iterator instead of using Map extension functions
-                // to prevent boxing
-                val sortedWordLanguageCounts = wordLanguageCounts.asFastSequence()
-                    .sortedByDescending { it.intValue }
-                    .iterator()
+                val sortedWordLanguageCounts = wordLanguageCounts.descendingIterator()
                 val mostFrequent = sortedWordLanguageCounts.next()
                 val mostFrequentLanguage = mostFrequent.key
-                val firstCharCount = mostFrequent.intValue
-                val secondCharCount = sortedWordLanguageCounts.next().intValue
+                val firstCharCount = mostFrequent.value
+                val secondCharCount = sortedWordLanguageCounts.next().value
 
                 if (firstCharCount > secondCharCount && mostFrequentLanguage in languages) {
-                    totalLanguageCounts.incrementCounter(mostFrequentLanguage)
+                    totalLanguageCounts.increment(mostFrequentLanguage)
                 } else {
-                    totalLanguageCounts.incrementCounter(UNKNOWN)
+                    totalLanguageCounts.increment(UNKNOWN)
                 }
             }
         }
 
-        val unknownLanguageCount = totalLanguageCounts.getOrDefault(UNKNOWN as Any, 0)
+        val unknownLanguageCount = totalLanguageCounts.getOrZero(UNKNOWN)
         if (unknownLanguageCount < (0.5 * words.size)) {
-            totalLanguageCounts.removeInt(UNKNOWN)
+            totalLanguageCounts.set(UNKNOWN, 0)
         }
 
-        if (totalLanguageCounts.isEmpty()) {
+        val languagesCount = totalLanguageCounts.countNonZeroValues()
+        if (languagesCount == 0) {
             return UNKNOWN
         }
-        if (totalLanguageCounts.size == 1) {
-            return totalLanguageCounts.object2IntEntrySet().fastIterator().next().key
+        if (totalLanguageCounts.countNonZeroValues() == 1) {
+            return totalLanguageCounts.firstNonZero()!!
         }
-        if (totalLanguageCounts.size == 2 &&
-            totalLanguageCounts.containsKey(CHINESE) &&
-            totalLanguageCounts.containsKey(JAPANESE)
+        if (languagesCount == 2 &&
+            totalLanguageCounts.hasNonZeroValue(CHINESE) &&
+            totalLanguageCounts.hasNonZeroValue(JAPANESE)
         ) {
             return JAPANESE
         }
-        // Convert to Sequence and then to Iterator instead of using Map extension functions
-        // to prevent boxing
-        val sortedTotalLanguageCounts = totalLanguageCounts.asFastSequence()
-            .sortedByDescending { it.intValue }
-            .iterator()
+        val sortedTotalLanguageCounts = totalLanguageCounts.descendingIterator()
         val mostFrequent = sortedTotalLanguageCounts.next()
         val mostFrequentLanguage = mostFrequent.key
-        val firstCharCount = mostFrequent.intValue
-        val secondCharCount = sortedTotalLanguageCounts.next().intValue
+        val firstCharCount = mostFrequent.value
+        val secondCharCount = sortedTotalLanguageCounts.next().value
 
         return when {
             firstCharCount == secondCharCount -> UNKNOWN
@@ -327,38 +315,39 @@ class LanguageDetector internal constructor(
     }
 
     internal fun filterLanguagesByRules(words: List<String>): Set<Language> {
-        val detectedAlphabets = Object2IntOpenHashMap<Character.UnicodeScript>()
+        val detectedAlphabets = EnumIntMap.newMap<Character.UnicodeScript>()
 
         for (word in words) {
             for (unicodeScript in Language.allScripts) {
                 if (word.all { Character.UnicodeScript.of(it.code) == unicodeScript }) {
-                    detectedAlphabets.incrementCounter(unicodeScript)
+                    detectedAlphabets.increment(unicodeScript)
                     break
                 }
             }
         }
 
-        if (detectedAlphabets.isEmpty()) {
+        if (detectedAlphabets.hasOnlyZeroValues()) {
             return languages
         }
 
-        // Note: Using wrapping call maxByOrNull is fine since number of alphabets is small
-        val mostFrequentAlphabet = detectedAlphabets.maxByOrNull { it.value }!!.key
-        val filteredLanguages = languages.filter { it.unicodeScripts.contains(mostFrequentAlphabet) }
-        val languageCounts = Object2IntOpenHashMap<Language>()
+        val mostFrequentAlphabets = detectedAlphabets.maxNonZero()
+        val filteredLanguages = languages.filter {
+            it.unicodeScripts.any { script -> mostFrequentAlphabets.contains(script) }
+        }
+        val languageCounts = EnumIntMap.newMap<Language>()
 
         for (word in words) {
             for ((characters, languages) in CHARS_TO_LANGUAGES_MAPPING) {
                 if (word.containsAnyOf(characters)) {
                     for (language in languages) {
-                        languageCounts.incrementCounter(language)
+                        languageCounts.increment(language)
                     }
                     break
                 }
             }
         }
 
-        val languagesSubset = languageCounts.filterValues { it >= words.size / 2.0 }.keys
+        val languagesSubset = languageCounts.keysWithValueLargerEqualThan(words.size / 2.0)
 
         return if (languagesSubset.isNotEmpty()) {
             filteredLanguages.filter { it in languagesSubset }.toSet()
@@ -370,8 +359,8 @@ class LanguageDetector internal constructor(
     internal fun computeLanguageProbabilities(
         testDataModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>
-    ): Object2DoubleMap<Language> {
-        val probabilities = Object2DoubleOpenHashMap<Language>()
+    ): EnumDoubleMap<Language> {
+        val probabilities = EnumDoubleMap.newMap<Language>()
         for (language in filteredLanguages) {
             val modelHolder = languageModels[language]!!.value
             val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
@@ -387,7 +376,6 @@ class LanguageDetector internal constructor(
                 testDataModel
             )
             if (probability < 0.0) {
-                // Note: Don't convert to assignment, would choose wrong overload then (?)
                 probabilities.put(language, probability)
             }
         }
