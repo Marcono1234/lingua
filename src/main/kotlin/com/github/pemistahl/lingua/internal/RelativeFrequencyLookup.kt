@@ -621,6 +621,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     private val letterIndexMap: ShortArray,
     private val quadrigramsAsInt: Int2IntOpenHashMap,
     private val quadrigramsAsLong: Long2IntOpenHashMap,
+    private val fivegramsAsInt: Int2IntOpenHashMap,
     private val fivegramsAsLong: Long2IntOpenHashMap,
     private val fivegramsAsObject: Object2IntOpenHashMap<String>
 ) : FrequencyLookupBuilder {
@@ -671,6 +672,16 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                     quadrigramsAsLongCount -= count
                 }
 
+                var fivegramsAsIntCount = it.readInt()
+                val fivegramsAsInt = Int2IntOpenHashMap(fivegramsAsIntCount, loadFactor)
+                while (fivegramsAsIntCount > 0) {
+                    val (count, frequency) = decodeNgramCountAndFrequency(it)
+                    for (i in 1..count) {
+                        fivegramsAsInt.put(it.readInt(), frequency)
+                    }
+                    fivegramsAsIntCount -= count
+                }
+
                 var fivegramsAsLongCount = it.readInt()
                 val fivegramsAsLong = Long2IntOpenHashMap(fivegramsAsLongCount, loadFactor)
                 while (fivegramsAsLongCount > 0) {
@@ -706,6 +717,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                     letterIndexMap,
                     quadrigramsAsInt,
                     quadrigramsAsLong,
+                    fivegramsAsInt,
                     fivegramsAsLong,
                     fivegramsAsObject
                 )
@@ -717,6 +729,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         letterIndexMap,
         Int2IntOpenHashMap(initialCapacity, loadFactor),
         Long2IntOpenHashMap(initialCapacity, loadFactor),
+        Int2IntOpenHashMap(initialCapacity, loadFactor),
         Long2IntOpenHashMap(initialCapacity, loadFactor),
         Object2IntOpenHashMap<String>(initialCapacity, loadFactor)
     )
@@ -761,30 +774,54 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     }
 
     private inline fun <R> String.useEncodedFivegram(
+        asInt: (encodedNgram: Int) -> R,
         asLong: (encodedNgram: Long) -> R,
         asObject: (encodedNgram: String) -> R
     ): R {
-        /*
-        * Fivegram is encoded by writing absolute char value of first char (index 0)
-        * using 16 bits followed by the signed offsets of the other chars compared
-        * to the first char.
-        *
-        * This allows encoding fivegrams where some or all chars would not fit
-        * within Long.SIZE_BITS / 5, but all of the char values are close together.
-        */
-
         val letterIndex0 = letterIndex(this[0].code)
-        val diff1 = letterIndex(this[1].code) - letterIndex0
-        val diff2 = letterIndex(this[2].code) - letterIndex0
-        val diff3 = letterIndex(this[3].code) - letterIndex0
-        val diff4 = letterIndex(this[4].code) - letterIndex0
+        val letterIndex1 = letterIndex(this[1].code)
+        val letterIndex2 = letterIndex(this[2].code)
+        val letterIndex3 = letterIndex(this[3].code)
+        val letterIndex4 = letterIndex(this[4].code)
+        val diff1 = letterIndex1 - letterIndex0
+        val diff2 = letterIndex2 - letterIndex0
+        val diff3 = letterIndex3 - letterIndex0
+        val diff4 = letterIndex4 - letterIndex0
 
         // (2^x) - 1
         val maxOffset = (1 shl (FIVEGRAM_OFFSET_BITS_PER_CHAR - 1)) - 1
         // -2^x
         val minOffset = -maxOffset - 1
 
+        /*
+         * Fivegram as Int is encoded by storing absolute values for each char;
+         * first two get 7 bits each, last three get 6 bits (2*7 + 3*6 = 32)
+         */
         return if (
+            letterIndex0 < (1 shl 7)
+            && letterIndex1 < (1 shl 7)
+            && letterIndex2 < (1 shl 6)
+            && letterIndex3 < (1 shl 6)
+            && letterIndex4 < (1 shl 6)
+        ) {
+            val encoded = (
+                letterIndex0
+                or (letterIndex1 shl 7)
+                or (letterIndex2 shl (7 * 2))
+                or (letterIndex3 shl (7 * 2 + 6))
+                or (letterIndex4 shl (7 * 2 + 6 * 2))
+            )
+            asInt(encoded)
+        }
+        /*
+         * Fivegram as Long is encoded by writing absolute char value of first
+         * char (index 0) using 16 bits followed by the signed offsets of the other
+         * chars compared to the first char.
+         *
+         * This allows encoding fivegrams where some or all chars would not fit
+         * within Long.SIZE_BITS / 5, but all of the char values are close together.
+         */
+        else if (
             // Make sure char0 has a letter index
             letterIndex0 != NO_LETTER_INDEX
             && (diff1 in minOffset..maxOffset)
@@ -817,6 +854,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 { quadrigramsAsLong.put(it, encodedFrequency) }
             )
             5 -> ngram.useEncodedFivegram(
+                { fivegramsAsInt.put(it, encodedFrequency) },
                 { fivegramsAsLong.put(it, encodedFrequency) },
                 { fivegramsAsObject.put(it, encodedFrequency) }
             )
@@ -831,6 +869,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         quadrigramsAsInt.trim()
         quadrigramsAsLong.trim()
 
+        fivegramsAsInt.trim()
         fivegramsAsLong.trim()
         fivegramsAsObject.trim()
     }
@@ -844,6 +883,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 { quadrigramsAsLong.get(it) }
             )
             5 -> ngramStr.useEncodedFivegram(
+                { fivegramsAsInt.get(it) },
                 { fivegramsAsLong.get(it) },
                 { fivegramsAsObject.getInt(it) }
             )
@@ -876,6 +916,15 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 entry.value.forEach(LongConsumer {
                     frequencyWriter()
                     dataOut.writeLong(it)
+                })
+            }
+
+            dataOut.writeInt(fivegramsAsInt.size)
+            fivegramsAsInt.reverse().int2ObjectEntrySet().fastForEach { entry ->
+                val frequencyWriter = encodeNgramCountAndFrequency(entry, dataOut)
+                entry.value.forEach(IntConsumer {
+                    frequencyWriter()
+                    dataOut.writeInt(it)
                 })
             }
 
