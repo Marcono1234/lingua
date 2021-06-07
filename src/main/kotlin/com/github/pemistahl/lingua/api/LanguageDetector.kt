@@ -28,6 +28,7 @@ import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup
+import com.github.pemistahl.lingua.internal.loadLetterIndexMap
 import com.github.pemistahl.lingua.internal.util.extension.asFastSequence
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
@@ -477,15 +478,16 @@ class LanguageDetector internal constructor(
     )
 
     internal companion object {
+        internal var letterIndexMap = lazy { loadLetterIndexMap() }
         internal var languageModels = Language.all().asSequence()
             .associateWith {
                 lazy {
                     LanguageModelHolder(
                         runBlocking(Dispatchers.IO) {
-                            UniBiTrigramRelativeFrequencyLookup.fromBinary(it)
+                            UniBiTrigramRelativeFrequencyLookup.fromBinary(it, letterIndexMap.value)
                         },
                         lazy { runBlocking(Dispatchers.IO) {
-                            QuadriFivegramRelativeFrequencyLookup.fromBinary(it)
+                            QuadriFivegramRelativeFrequencyLookup.fromBinary(it, letterIndexMap.value)
                         }}
                     )
                 }

@@ -40,7 +40,29 @@ import java.nio.file.Path
 import java.util.function.IntConsumer
 import java.util.function.LongConsumer
 
-internal typealias ModelEncodingType = Int
+/*
+ * Currently as part of input text preprocessing it is lower cased and ngrams
+ * containing non-letters are skipped. Therefore instead of encoding Unicode
+ * code points, maintain a map (in form of an unsigned ShortArray) from code
+ * point to 'letter index'; this allows more compact model storage.
+ *
+ * However, because Java versions adhere to different Unicode standard versions
+ * write the 'letter index map' to file to get consistent results regardless
+ * of Java version.
+ */
+private const val LETTER_INDEX_MAP_RESOURCE_NAME = "/letter-index-map.bin"
+private const val NO_LETTER_INDEX = 65535 // UShort.MAX_VALUE
+
+private fun openBinaryDataInput(resourcePath: String): DataInputStream {
+    return DataInputStream(FrequencyLookupBuilder::class.java.getResourceAsStream(resourcePath)!!.buffered())
+}
+
+private fun openBinaryDataOutput(resourcesDirectory: Path, resourcePath: String): DataOutputStream {
+    val file = resourcesDirectory.resolve(resourcePath.removePrefix("/"))
+    Files.createDirectories(file.parent)
+
+    return DataOutputStream(Files.newOutputStream(file).buffered())
+}
 
 /**
  * Helper interface which allows creating lookups from model files.
@@ -100,17 +122,6 @@ internal interface FrequencyLookupBuilder {
 
         fun getBinaryModelResourceName(language: Language, fileName: String): String {
             return "/language-models/${language.isoCode639_1}/$fileName"
-        }
-
-        fun openBinaryDataInput(resourcePath: String): DataInputStream {
-            return DataInputStream(FrequencyLookupBuilder::class.java.getResourceAsStream(resourcePath)!!.buffered())
-        }
-
-        fun openBinaryDataOutput(resourcesDirectory: Path, resourcePath: String): DataOutputStream {
-            val file = resourcesDirectory.resolve(resourcePath.removePrefix("/"))
-            Files.createDirectories(file.parent)
-
-            return DataOutputStream(Files.newOutputStream(file).buffered())
         }
     }
 
@@ -253,6 +264,9 @@ private fun decodeNgramCountAndFrequency(dataIn: DataInput): NgramCountAndFreque
     return NgramCountAndFrequency(count, encodedFrequency)
 }
 
+private const val loadFactor = 0.9f
+private const val initialCapacity = 16
+
 /*
  * Implementation note:
  * Declares two types of lookups (uni-, bi- and trigrams, and quadri- and fivegrams)
@@ -266,6 +280,7 @@ private fun decodeNgramCountAndFrequency(dataIn: DataInput): NgramCountAndFreque
  * Frequency lookup for uni-, bi- and trigrams.
  */
 internal class UniBiTrigramRelativeFrequencyLookup private constructor(
+    private val letterIndexMap: ShortArray,
     private val unigramsAsByte: Byte2IntOpenHashMap,
     private val unigramsAsChar: Char2IntOpenHashMap,
     private val bigramsAsShort: Short2IntOpenHashMap,
@@ -274,34 +289,6 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     private val trigramsAsLong: Long2IntOpenHashMap
 ): FrequencyLookupBuilder {
     companion object {
-        private const val loadFactor = 0.9f
-        private const val initialCapacity = 16
-
-        internal const val UNIGRAM_AS_BYTE: ModelEncodingType = 0
-        internal const val UNIGRAM_AS_CHAR: ModelEncodingType = 1
-        internal const val BIGRAM_AS_SHORT: ModelEncodingType = 2
-        internal const val BIGRAM_AS_INT: ModelEncodingType = 3
-        internal const val TRIGRAM_AS_INT: ModelEncodingType = 4
-        internal const val TRIGRAM_AS_LONG: ModelEncodingType = 5
-
-        private fun String.bigramFitsShort(): Boolean {
-            return this[0].code <= 255 && this[1].code <= 255
-        }
-
-        private fun String.bigramToShort(): Short {
-            return (
-                this[0].code
-                or (this[1].code shl 8)
-            ).toShort()
-        }
-
-        private fun String.bigramToInt(): Int {
-            return (
-                this[0].code
-                or (this[1].code shl 16)
-            )
-        }
-
         /**
          * Number of bits used for encoding the offset for the 2nd and 3rd char compared
          * to the 1st one.
@@ -314,57 +301,8 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
          */
         private const val TRIGRAM_AS_INT_BASE_CHAR_BITS = Int.SIZE_BITS - 2 * TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR
 
-        internal fun trigramFitsInt(char0: Int, char1: Int, char2: Int): Boolean {
-            /*
-             * Trigram is encoded by writing absolute char value of first char (index 0)
-             * followed by the signed offsets of the other chars compared to the first char.
-             *
-             * This allows encoding trigrams where some or all chars would not fit
-             * within Int.SIZE_BITS / 3, but all of the char values are close together.
-             */
-            if (char0 >= (1 shl TRIGRAM_AS_INT_BASE_CHAR_BITS)) return false
-
-            // (2^x) - 1
-            val maxOffset = (1 shl (TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR - 1)) - 1
-            // -2^x
-            val minOffset = -maxOffset - 1
-
-            val diff1 = char1 - char0
-            val diff2 = char2 - char0
-
-            return (diff1 in minOffset..maxOffset)
-                && (diff2 in minOffset..maxOffset)
-        }
-
-        private fun String.trigramFitsInt(): Boolean {
-            return trigramFitsInt(this[0].code, this[1].code, this[2].code)
-        }
-
-        internal fun trigramToInt(char0: Int, char1: Int, char2: Int): Int {
-            // AND with bitmask to remove leading 1s for negative values
-            val diff1 = (char1 - char0) and TRIGRAM_AS_INT_OFFSET_BIT_MASK
-            val diff2 = (char2 - char0) and TRIGRAM_AS_INT_OFFSET_BIT_MASK
-            return (
-                char0
-                or (diff1 shl TRIGRAM_AS_INT_BASE_CHAR_BITS)
-                or (diff2 shl (TRIGRAM_AS_INT_BASE_CHAR_BITS + TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR))
-            )
-        }
-
-        private fun String.trigramToInt(): Int {
-            return trigramToInt(this[0].code, this[1].code, this[2].code)
-        }
-
-        private fun String.trigramToLong(): Long {
-            return (
-                this[0].code.toLong()
-                or (this[1].code.toLong() shl 16)
-                or (this[2].code.toLong() shl 32)
-            )
-        }
-
-        fun fromJson(language: Language): UniBiTrigramRelativeFrequencyLookup {
-            val lookup = UniBiTrigramRelativeFrequencyLookup()
+        fun fromJson(language: Language, letterIndexMap: ShortArray): UniBiTrigramRelativeFrequencyLookup {
+            val lookup = UniBiTrigramRelativeFrequencyLookup(letterIndexMap)
             FrequencyLookupBuilder.fromJson(lookup, language, listOf("unigrams.json", "bigrams.json", "trigrams.json"))
             return lookup
         }
@@ -373,8 +311,8 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
             return FrequencyLookupBuilder.getBinaryModelResourceName(language, "uni-bi-trigrams.bin")
         }
 
-        fun fromBinary(language: Language): UniBiTrigramRelativeFrequencyLookup {
-            FrequencyLookupBuilder.openBinaryDataInput(getBinaryModelResourceName(language)).use {
+        fun fromBinary(language: Language, letterIndexMap: ShortArray): UniBiTrigramRelativeFrequencyLookup {
+            openBinaryDataInput(getBinaryModelResourceName(language)).use {
                 var unigramsAsByteCount = it.readInt()
                 val unigramsAsByte = Byte2IntOpenHashMap(unigramsAsByteCount, loadFactor)
                 while (unigramsAsByteCount > 0) {
@@ -439,6 +377,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
                 assert(it.read() == -1)
 
                 return UniBiTrigramRelativeFrequencyLookup(
+                    letterIndexMap,
                     unigramsAsByte,
                     unigramsAsChar,
                     bigramsAsShort,
@@ -450,7 +389,8 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         }
     }
 
-    private constructor() : this(
+    private constructor(letterIndexMap: ShortArray) : this(
+        letterIndexMap,
         Byte2IntOpenHashMap(initialCapacity, loadFactor),
         Char2IntOpenHashMap(initialCapacity, loadFactor),
         Short2IntOpenHashMap(initialCapacity, loadFactor),
@@ -459,26 +399,114 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         Long2IntOpenHashMap(initialCapacity, loadFactor)
     )
 
+    private fun letterIndex(char: Int) = letterIndexMap[char].toUShort().toInt()
+
+    private inline fun <R> useEncodedUnigram(
+        char0: Int,
+        asByte: (encodedNgram: Byte) -> R,
+        asChar: (encodedNgram: Char) -> R
+    ): R {
+        val letterIndex0 = letterIndex(char0)
+        return if (letterIndex0 <= 255) asByte(letterIndex0.toByte()) else asChar(char0.toChar())
+    }
+
+    private inline fun <R> String.useEncodedUnigram(
+        asByte: (encodedNgram: Byte) -> R,
+        asChar: (encodedNgram: Char) -> R
+    ): R = useEncodedUnigram(this[0].code, asByte, asChar)
+
+    private inline fun <R> useEncodedBigram(
+        char0: Int,
+        char1: Int,
+        asShort: (encodedNgram: Short) -> R,
+        asInt: (encodedNgram: Int) -> R
+    ): R {
+        val letterIndex0 = letterIndex(char0)
+        val letterIndex1 = letterIndex(char1)
+        return if (letterIndex0 <= 255 && letterIndex1 <= 255) {
+            val encoded = letterIndex0 or (letterIndex1 shl 8)
+            asShort(encoded.toShort())
+        } else {
+            val encoded = char0 or (char1 shl 16)
+            asInt(encoded)
+        }
+    }
+
+    private inline fun <R> String.useEncodedBigram(
+        asShort: (encodedNgram: Short) -> R,
+        asInt: (encodedNgram: Int) -> R
+    ): R = useEncodedBigram(this[0].code, this[1].code, asShort, asInt)
+
+    private inline fun <R> useEncodedTrigram(
+        char0: Int,
+        char1: Int,
+        char2: Int,
+        asInt: (encodedNgram: Int) -> R,
+        asLong: (encodedNgram: Long) -> R
+    ): R {
+        /*
+         * Trigram as Int is encoded by writing absolute char value of first char (index 0)
+         * followed by the signed offsets of the other chars compared to the first char.
+         *
+         * This allows encoding trigrams where some or all chars would not fit
+         * within Int.SIZE_BITS / 3, but all of the char values are close together.
+         */
+
+        val letterIndex0 = letterIndex(char0)
+        val letterIndex1 = letterIndex(char1)
+        val diff1 = letterIndex1 - letterIndex0
+        val letterIndex2 = letterIndex(char2)
+        val diff2 = letterIndex2 - letterIndex0
+
+        // (2^x) - 1
+        val maxOffset = (1 shl (TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR - 1)) - 1
+        // -2^x
+        val minOffset = -maxOffset - 1
+
+        return if (
+            letterIndex0 < (1 shl TRIGRAM_AS_INT_BASE_CHAR_BITS)
+            && diff1 in minOffset..maxOffset
+            && diff2 in minOffset..maxOffset
+        ) {
+            val encoded = (
+                letterIndex0
+                // AND with bitmask to remove leading 1s for negative values
+                or ((diff1 and TRIGRAM_AS_INT_OFFSET_BIT_MASK) shl TRIGRAM_AS_INT_BASE_CHAR_BITS)
+                or ((diff2 and TRIGRAM_AS_INT_OFFSET_BIT_MASK) shl (TRIGRAM_AS_INT_BASE_CHAR_BITS + TRIGRAM_AS_INT_OFFSET_BITS_PER_CHAR))
+            )
+            asInt(encoded)
+        } else {
+            val encoded = (
+                char0.toLong()
+                or (char1.toLong() shl 16)
+                or (char2.toLong() shl 32)
+            )
+            asLong(encoded)
+        }
+    }
+
+    private inline fun <R> String.useEncodedTrigram(
+        asInt: (encodedNgram: Int) -> R,
+        asLong: (encodedNgram: Long) -> R
+    ): R = useEncodedTrigram(this[0].code, this[1].code, this[2].code, asInt, asLong)
+
     override fun putFrequency(ngram: String, encodedFrequency: Int) {
         if (encodedFrequency == 0) {
             throw AssertionError("Invalid encoded frequency $encodedFrequency for ngram '$ngram'")
         }
         val old = when (ngram.length) {
-            1 -> {
-                val char0 = ngram[0].code
-                when {
-                    char0 <= 255 -> unigramsAsByte.put(char0.toByte(), encodedFrequency)
-                    else -> unigramsAsChar.put(char0.toChar(), encodedFrequency)
-                }
-            }
-            2 -> when {
-                ngram.bigramFitsShort() -> bigramsAsShort.put(ngram.bigramToShort(), encodedFrequency)
-                else -> bigramsAsInt.put(ngram.bigramToInt(), encodedFrequency)
-            }
-            3 -> when {
-                ngram.trigramFitsInt() -> trigramsAsInt.put(ngram.trigramToInt(), encodedFrequency)
-                else -> trigramsAsLong.put(ngram.trigramToLong(), encodedFrequency)
-            }
+            1 -> ngram.useEncodedUnigram(
+                { unigramsAsByte.put(it, encodedFrequency) },
+                { unigramsAsChar.put(it, encodedFrequency) }
+            )
+            2 -> ngram.useEncodedBigram(
+                { bigramsAsShort.put(it, encodedFrequency) },
+                { bigramsAsInt.put(it, encodedFrequency) }
+            )
+            3 -> ngram.useEncodedTrigram(
+                { trigramsAsInt.put(it, encodedFrequency) },
+                { trigramsAsLong.put(it, encodedFrequency) }
+            )
             else -> throw IllegalArgumentException("Invalid Ngram length")
         }
         if (old != 0) {
@@ -498,14 +526,24 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     }
 
     fun getFrequency(ngram: PrimitiveNgram): Double {
-        return decodeFrequency(when (ngram.getEncodingType()) {
-            UNIGRAM_AS_BYTE -> unigramsAsByte.get(ngram.unigramToByte())
-            UNIGRAM_AS_CHAR -> unigramsAsChar.get(ngram.unigramToChar())
-            BIGRAM_AS_SHORT -> bigramsAsShort.get(ngram.bigramToShort())
-            BIGRAM_AS_INT -> bigramsAsInt.get(ngram.bigramToInt())
-            TRIGRAM_AS_INT -> trigramsAsInt.get(ngram.trigramToInt())
-            TRIGRAM_AS_LONG -> trigramsAsLong.get(ngram.trigramToLong())
-            else -> throw AssertionError("Unknown encoding type")
+        val (length, char0, char1, char2) = ngram
+        return decodeFrequency(when (length) {
+            1 -> useEncodedUnigram(
+                char0,
+                { unigramsAsByte.get(it) },
+                { unigramsAsChar.get(it) }
+            )
+            2 -> useEncodedBigram(
+                char0, char1,
+                { bigramsAsShort.get(it) },
+                { bigramsAsInt.get(it) }
+            )
+            3 -> useEncodedTrigram(
+                char0, char1, char2,
+                { trigramsAsInt.get(it) },
+                { trigramsAsLong.get(it) }
+            )
+            else -> throw AssertionError("Invalid ngram length $length")
         })
     }
 
@@ -518,7 +556,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     fun writeBinary(resourcesDirectory: Path, language: Language) {
         val resourceName = getBinaryModelResourceName(language)
 
-        FrequencyLookupBuilder.openBinaryDataOutput(resourcesDirectory, resourceName).use { dataOut ->
+        openBinaryDataOutput(resourcesDirectory, resourceName).use { dataOut ->
             dataOut.writeInt(unigramsAsByte.size)
             unigramsAsByte.reverse().int2ObjectEntrySet().fastForEach { entry ->
                 val frequencyWriter = encodeNgramCountAndFrequency(entry, dataOut)
@@ -580,41 +618,14 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
  * Frequency lookup for quadri- and fivegrams.
  */
 internal class QuadriFivegramRelativeFrequencyLookup private constructor(
+    private val letterIndexMap: ShortArray,
     private val quadrigramsAsInt: Int2IntOpenHashMap,
     private val quadrigramsAsLong: Long2IntOpenHashMap,
     private val fivegramsAsLong: Long2IntOpenHashMap,
     private val fivegramsAsObject: Object2IntOpenHashMap<String>
 ) : FrequencyLookupBuilder {
     companion object {
-        val empty = QuadriFivegramRelativeFrequencyLookup()
-
-        private const val loadFactor = 0.9f
-        private const val initialCapacity = 16
-
-        private fun String.quadrigramFitsInt(): Boolean {
-            return this[0].code <= 255
-                && this[1].code <= 255
-                && this[2].code <= 255
-                && this[3].code <= 255
-        }
-
-        private fun String.quadrigramToInt(): Int {
-            return (
-                this[0].code
-                or (this[1].code shl 8)
-                or (this[2].code shl 16)
-                or (this[3].code shl 24)
-            )
-        }
-
-        private fun String.quadrigramToLong(): Long {
-            return (
-                this[0].code.toLong()
-                or (this[1].code.toLong() shl 16)
-                or (this[2].code.toLong() shl 32)
-                or (this[3].code.toLong() shl 48)
-            )
-        }
+        val empty = QuadriFivegramRelativeFrequencyLookup(shortArrayOf())
 
         /**
          * Number of bits used for encoding the code point value of the first char (the "base char").
@@ -628,52 +639,8 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         private const val FIVEGRAM_OFFSET_BITS_PER_CHAR = (Long.SIZE_BITS - FIVEGRAM_BASE_CHAR_BITS) / 4
         private const val FIVEGRAM_OFFSET_BIT_MASK = (1L shl FIVEGRAM_OFFSET_BITS_PER_CHAR) - 1
 
-        private fun String.fivegramFitsLong(): Boolean {
-            /*
-             * Fivegram is encoded by writing absolute char value of first char (index 0)
-             * using 16 bits followed by the signed offsets of the other chars compared
-             * to the first char.
-             *
-             * This allows encoding fivegrams where some or all chars would not fit
-             * within Long.SIZE_BITS / 5, but all of the char values are close together.
-             */
-
-            val char0 = this[0].code
-            // (2^x) - 1
-            val maxOffset = (1 shl (FIVEGRAM_OFFSET_BITS_PER_CHAR - 1)) - 1
-            // -2^x
-            val minOffset = -maxOffset - 1
-
-            val diff1 = this[1].code - char0
-            val diff2 = this[2].code - char0
-            val diff3 = this[3].code - char0
-            val diff4 = this[4].code - char0
-
-            return (diff1 in minOffset..maxOffset)
-                && (diff2 in minOffset..maxOffset)
-                && (diff3 in minOffset..maxOffset)
-                && (diff4 in minOffset..maxOffset)
-        }
-
-        private fun String.fivegramToLong(): Long {
-            val char0 = this[0].code.toLong()
-            // AND with bitmask to remove leading 1s for negative values
-            val diff1 = (this[1].code.toLong() - char0) and FIVEGRAM_OFFSET_BIT_MASK
-            val diff2 = (this[2].code.toLong() - char0) and FIVEGRAM_OFFSET_BIT_MASK
-            val diff3 = (this[3].code.toLong() - char0) and FIVEGRAM_OFFSET_BIT_MASK
-            val diff4 = (this[4].code.toLong() - char0) and FIVEGRAM_OFFSET_BIT_MASK
-
-            return (
-                char0
-                or (diff1 shl FIVEGRAM_BASE_CHAR_BITS)
-                or (diff2 shl (FIVEGRAM_BASE_CHAR_BITS + FIVEGRAM_OFFSET_BITS_PER_CHAR))
-                or (diff3 shl (FIVEGRAM_BASE_CHAR_BITS + FIVEGRAM_OFFSET_BITS_PER_CHAR * 2))
-                or (diff4 shl (FIVEGRAM_BASE_CHAR_BITS + FIVEGRAM_OFFSET_BITS_PER_CHAR * 3))
-            )
-        }
-
-        fun fromJson(language: Language): QuadriFivegramRelativeFrequencyLookup {
-            val lookup = QuadriFivegramRelativeFrequencyLookup()
+        fun fromJson(language: Language, letterIndexMap: ShortArray): QuadriFivegramRelativeFrequencyLookup {
+            val lookup = QuadriFivegramRelativeFrequencyLookup(letterIndexMap)
             FrequencyLookupBuilder.fromJson(lookup, language, listOf("quadrigrams.json", "fivegrams.json"))
             return lookup
         }
@@ -682,8 +649,8 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
             return FrequencyLookupBuilder.getBinaryModelResourceName(language, "quadri-fivegrams.bin")
         }
 
-        fun fromBinary(language: Language): QuadriFivegramRelativeFrequencyLookup {
-            FrequencyLookupBuilder.openBinaryDataInput(getBinaryModelResourceName(language)).use {
+        fun fromBinary(language: Language, letterIndexMap: ShortArray): QuadriFivegramRelativeFrequencyLookup {
+            openBinaryDataInput(getBinaryModelResourceName(language)).use {
                 var quadrigramsAsIntCount = it.readInt()
                 val quadrigramsAsInt = Int2IntOpenHashMap(quadrigramsAsIntCount, loadFactor)
                 while (quadrigramsAsIntCount > 0) {
@@ -736,6 +703,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 assert(it.read() == -1)
 
                 return QuadriFivegramRelativeFrequencyLookup(
+                    letterIndexMap,
                     quadrigramsAsInt,
                     quadrigramsAsLong,
                     fivegramsAsLong,
@@ -745,27 +713,113 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         }
     }
 
-    private constructor() : this(
+    private constructor(letterIndexMap: ShortArray) : this(
+        letterIndexMap,
         Int2IntOpenHashMap(initialCapacity, loadFactor),
         Long2IntOpenHashMap(initialCapacity, loadFactor),
         Long2IntOpenHashMap(initialCapacity, loadFactor),
         Object2IntOpenHashMap<String>(initialCapacity, loadFactor)
     )
 
+    private fun letterIndex(char: Int) = letterIndexMap[char].toUShort().toInt()
+
+    private inline fun <R> String.useEncodedQuadrigram(
+        asInt: (encodedNgram: Int) -> R,
+        asLong: (encodedNgram: Long) -> R
+    ): R {
+        val char0 = this[0].code
+        val char1 = this[1].code
+        val char2 = this[2].code
+        val char3 = this[3].code
+        val letterIndex0 = letterIndex(char0)
+        val letterIndex1 = letterIndex(char1)
+        val letterIndex2 = letterIndex(char2)
+        val letterIndex3 = letterIndex(char3)
+
+        return if (
+            letterIndex0 <= 255
+            && letterIndex1 <= 255
+            && letterIndex2 <= 255
+            && letterIndex3 <= 255
+        ) {
+            val encoded = (
+                letterIndex0
+                or (letterIndex1 shl 8)
+                or (letterIndex2 shl 16)
+                or (letterIndex3 shl 24)
+            )
+            asInt(encoded)
+        } else {
+            val encoded = (
+                char0.toLong()
+                or (char1.toLong() shl 16)
+                or (char2.toLong() shl 32)
+                or (char3.toLong() shl 48)
+            )
+            asLong(encoded)
+        }
+    }
+
+    private inline fun <R> String.useEncodedFivegram(
+        asLong: (encodedNgram: Long) -> R,
+        asObject: (encodedNgram: String) -> R
+    ): R {
+        /*
+        * Fivegram is encoded by writing absolute char value of first char (index 0)
+        * using 16 bits followed by the signed offsets of the other chars compared
+        * to the first char.
+        *
+        * This allows encoding fivegrams where some or all chars would not fit
+        * within Long.SIZE_BITS / 5, but all of the char values are close together.
+        */
+
+        val letterIndex0 = letterIndex(this[0].code)
+        val diff1 = letterIndex(this[1].code) - letterIndex0
+        val diff2 = letterIndex(this[2].code) - letterIndex0
+        val diff3 = letterIndex(this[3].code) - letterIndex0
+        val diff4 = letterIndex(this[4].code) - letterIndex0
+
+        // (2^x) - 1
+        val maxOffset = (1 shl (FIVEGRAM_OFFSET_BITS_PER_CHAR - 1)) - 1
+        // -2^x
+        val minOffset = -maxOffset - 1
+
+        return if (
+            // Make sure char0 has a letter index
+            letterIndex0 != NO_LETTER_INDEX
+            && (diff1 in minOffset..maxOffset)
+            && (diff2 in minOffset..maxOffset)
+            && (diff3 in minOffset..maxOffset)
+            && (diff4 in minOffset..maxOffset)
+        ) {
+            val encoded = (
+                letterIndex0.toLong()
+                // AND with bitmask to remove leading 1s for negative values
+                or ((diff1.toLong() and FIVEGRAM_OFFSET_BIT_MASK) shl FIVEGRAM_BASE_CHAR_BITS)
+                or ((diff2.toLong() and FIVEGRAM_OFFSET_BIT_MASK) shl (FIVEGRAM_BASE_CHAR_BITS + FIVEGRAM_OFFSET_BITS_PER_CHAR))
+                or ((diff3.toLong() and FIVEGRAM_OFFSET_BIT_MASK) shl (FIVEGRAM_BASE_CHAR_BITS + FIVEGRAM_OFFSET_BITS_PER_CHAR * 2))
+                or ((diff4.toLong() and FIVEGRAM_OFFSET_BIT_MASK) shl (FIVEGRAM_BASE_CHAR_BITS + FIVEGRAM_OFFSET_BITS_PER_CHAR * 3))
+            )
+            asLong(encoded)
+        } else {
+            // Fall back to using ngram object
+            asObject(this)
+        }
+    }
+
     override fun putFrequency(ngram: String, encodedFrequency: Int) {
         if (encodedFrequency == 0) {
             throw AssertionError("Invalid encoded frequency $encodedFrequency for ngram '$ngram'")
         }
         val old = when (ngram.length) {
-            4 -> when {
-                ngram.quadrigramFitsInt() -> quadrigramsAsInt.put(ngram.quadrigramToInt(), encodedFrequency)
-                else -> quadrigramsAsLong.put(ngram.quadrigramToLong(), encodedFrequency)
-            }
-            5 -> when {
-                ngram.fivegramFitsLong() -> fivegramsAsLong.put(ngram.fivegramToLong(), encodedFrequency)
-                // Fall back to storing Ngram object
-                else -> fivegramsAsObject.put(ngram, encodedFrequency)
-            }
+            4 -> ngram.useEncodedQuadrigram(
+                { quadrigramsAsInt.put(it, encodedFrequency) },
+                { quadrigramsAsLong.put(it, encodedFrequency) }
+            )
+            5 -> ngram.useEncodedFivegram(
+                { fivegramsAsLong.put(it, encodedFrequency) },
+                { fivegramsAsObject.put(it, encodedFrequency) }
+            )
             else -> throw IllegalArgumentException("Invalid Ngram length")
         }
         if (old != 0) {
@@ -785,14 +839,14 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         val ngramStr = ngram.value
 
         return decodeFrequency(when (ngramStr.length) {
-            4 -> when {
-                ngramStr.quadrigramFitsInt() -> quadrigramsAsInt.get(ngramStr.quadrigramToInt())
-                else -> quadrigramsAsLong.get(ngramStr.quadrigramToLong())
-            }
-            5 -> when {
-                ngramStr.fivegramFitsLong() -> fivegramsAsLong.get(ngramStr.fivegramToLong())
-                else -> fivegramsAsObject.getInt(ngramStr)
-            }
+            4 -> ngramStr.useEncodedQuadrigram(
+                { quadrigramsAsInt.get(it) },
+                { quadrigramsAsLong.get(it) }
+            )
+            5 -> ngramStr.useEncodedFivegram(
+                { fivegramsAsLong.get(it) },
+                { fivegramsAsObject.getInt(it) }
+            )
             else -> throw IllegalArgumentException("Invalid Ngram length")
         })
     }
@@ -806,7 +860,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     fun writeBinary(resourcesDirectory: Path, language: Language) {
         val resourceName = getBinaryModelResourceName(language)
 
-        FrequencyLookupBuilder.openBinaryDataOutput(resourcesDirectory, resourceName).use { dataOut ->
+        openBinaryDataOutput(resourcesDirectory, resourceName).use { dataOut ->
             dataOut.writeInt(quadrigramsAsInt.size)
             quadrigramsAsInt.reverse().int2ObjectEntrySet().fastForEach { entry ->
                 val frequencyWriter = encodeNgramCountAndFrequency(entry, dataOut)
@@ -852,12 +906,43 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     }
 }
 
+internal fun loadLetterIndexMap(): ShortArray {
+    openBinaryDataInput(LETTER_INDEX_MAP_RESOURCE_NAME).use { dataIn ->
+        return ShortArray(Char.MAX_VALUE.code) {
+            dataIn.readShort()
+        }
+    }
+}
+
 internal fun writeBinaryModels(resourcesDirectory: Path) {
+    val letterIndexMap = ShortArray(Char.MAX_VALUE.code) { NO_LETTER_INDEX.toShort() }
+    var index = 0.toShort()
+    for (c in '0'..Char.MAX_VALUE) {
+        /*
+         * During language detection ngrams are converted to lower case and filtered for letters;
+         * therefore only include letters here.
+         * However, there are letters which are neither lower nor upper case (however some of
+         * these also have lower case versions, such as `U+01C5`), and also for some letters
+         * there is no lower case representation, therefore simply checking `c.isLowerCase()`
+         * is not enough.
+         */
+        if (c.isLetter() && (c.isLowerCase() || c.lowercaseChar() == c)) {
+            letterIndexMap[c.code] = index
+            index++
+        }
+    }
+
+    runBlocking(Dispatchers.IO) {
+        openBinaryDataOutput(resourcesDirectory, LETTER_INDEX_MAP_RESOURCE_NAME).use { dataOut ->
+            letterIndexMap.forEach { dataOut.writeShort(it.toInt()) }
+        }
+    }
+
     runBlocking {
         Language.all().map { language ->
             async(Dispatchers.IO) {
-                UniBiTrigramRelativeFrequencyLookup.fromJson(language).writeBinary(resourcesDirectory, language)
-                QuadriFivegramRelativeFrequencyLookup.fromJson(language).writeBinary(resourcesDirectory, language)
+                UniBiTrigramRelativeFrequencyLookup.fromJson(language, letterIndexMap).writeBinary(resourcesDirectory, language)
+                QuadriFivegramRelativeFrequencyLookup.fromJson(language, letterIndexMap).writeBinary(resourcesDirectory, language)
             }
         }.awaitAll()
     }

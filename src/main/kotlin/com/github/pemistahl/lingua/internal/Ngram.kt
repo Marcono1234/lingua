@@ -16,15 +16,6 @@
 
 package com.github.pemistahl.lingua.internal
 
-import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.BIGRAM_AS_INT
-import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.BIGRAM_AS_SHORT
-import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.TRIGRAM_AS_INT
-import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.TRIGRAM_AS_LONG
-import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.UNIGRAM_AS_BYTE
-import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.UNIGRAM_AS_CHAR
-import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.trigramFitsInt
-import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup.Companion.trigramToInt
-
 /**
  * Ngram encoded as primitive [Long]. Ngrams which cannot be encoded as
  * primitive are represented as [ObjectNgram].
@@ -39,65 +30,10 @@ internal value class PrimitiveNgram(val value: Long) {
         return (value and 0xFF).toInt()
     }
 
-    fun getEncodingType(): ModelEncodingType {
-        when (getLength()) {
-            1 -> {
-                val char0 = (value shr 8) and 0xFFFF
-                return if (char0 <= 255) UNIGRAM_AS_BYTE else UNIGRAM_AS_CHAR
-            }
-            2 -> {
-                val char0 = (value shr 8) and 0xFFFF
-                val char1 = (value shr 24) and 0xFFFF
-                return if (char0 <= 255 && char1 <= 255) BIGRAM_AS_SHORT else BIGRAM_AS_INT
-            }
-            3 -> {
-                val char0 = (value shr 8).toInt() and 0xFFFF
-                val char1 = (value shr 24).toInt() and 0xFFFF
-                val char2 = (value shr 40).toInt() and 0xFFFF
-                return if (trigramFitsInt(char0, char1, char2)) TRIGRAM_AS_INT else TRIGRAM_AS_LONG
-            }
-            // Larger ngrams are not supported yet
-            else -> throw AssertionError("Invalid length")
-        }
-    }
-
-    fun unigramToByte(): Byte {
-        return (value shr 8).toByte()
-    }
-
-    fun unigramToChar(): Char {
-        return (value shr 8).toInt().toChar()
-    }
-
-    fun bigramToShort(): Short {
-        return (
-            ((value shr 8) and 0xFFFF)
-            or ((value shr 24) shl 8)
-        ).toShort()
-    }
-
-    fun bigramToInt(): Int {
-        return (
-            ((value shr 8) and 0xFFFF)
-            or ((value shr 24) shl 16)
-        ).toInt()
-    }
-
-    fun trigramToInt(): Int {
-        return trigramToInt(
-            (value shr 8).toInt() and 0xFFFF,
-            (value shr 24).toInt() and 0xFFFF,
-            (value shr 40).toInt()
-        )
-    }
-
-    fun trigramToLong(): Long {
-        return (
-            ((value shr 8) and 0xFFFF)
-            or (((value shr 24) and 0xFFFF) shl 16)
-            or ((value shr 40) shl 32)
-        )
-    }
+    operator fun component1() = getLength()
+    operator fun component2() = (value shr 8).toInt() and 0xFFFF
+    operator fun component3() = (value shr 24).toInt() and 0xFFFF
+    operator fun component4() = (value shr 40).toInt() and 0xFFFF
 
     /**
      * Returns the next lower order ngram or [PrimitiveNgram.NONE] if there is no
