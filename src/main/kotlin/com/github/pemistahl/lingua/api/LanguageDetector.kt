@@ -276,11 +276,6 @@ class LanguageDetector internal constructor(
                 } else {
                     totalLanguageCounts.increment(UNKNOWN)
                 }
-            } else if (languageCounts == 2 &&
-                wordLanguageCounts.hasNonZeroValue(CHINESE) &&
-                wordLanguageCounts.hasNonZeroValue(JAPANESE)
-            ) {
-                totalLanguageCounts.increment(JAPANESE)
             } else {
                 val sortedWordLanguageCounts = wordLanguageCounts.descendingIterator()
                 val mostFrequent = sortedWordLanguageCounts.next()
