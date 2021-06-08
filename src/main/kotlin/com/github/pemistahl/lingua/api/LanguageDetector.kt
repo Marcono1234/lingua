@@ -168,7 +168,7 @@ class LanguageDetector internal constructor(
     }
 
     internal fun cleanUpInputText(text: String): String {
-        return text.trim().toLowerCase(Locale.ROOT)
+        return text.trim().lowercase()
             .replace(PUNCTUATION, "")
             .replace(NUMBERS, "")
             .replace(MULTIPLE_WHITESPACE, " ")

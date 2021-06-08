@@ -16,8 +16,6 @@
 
 package com.github.pemistahl.lingua.internal
 
-import com.squareup.moshi.FromJson
-
 internal data class Fraction(
     var numerator: Int,
     var denominator: Int
@@ -27,14 +25,6 @@ internal data class Fraction(
         val (num, den) = reduceToLowestTerms(numerator, denominator)
         this.numerator = num
         this.denominator = den
-    }
-
-    companion object Adapter {
-        @FromJson
-        fun fromJson(string: String): Fraction {
-            val (numerator, denominator) = string.split('/')
-            return Fraction(numerator.toInt(), denominator.toInt())
-        }
     }
 
     override fun compareTo(other: Fraction): Int {
