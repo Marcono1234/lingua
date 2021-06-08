@@ -18,12 +18,14 @@ package com.github.pemistahl.lingua.internal.util.extension
 
 import com.github.pemistahl.lingua.api.Language
 import com.github.pemistahl.lingua.internal.Constant.LANGUAGES_SUPPORTING_LOGOGRAMS
+import java.util.*
 
 // Cache set of scripts here to avoid evaluating it every time
 // for isLogogram()
-private val scriptsWithLogograms = LANGUAGES_SUPPORTING_LOGOGRAMS.asSequence()
+private val scriptsWithLogograms = EnumSet.copyOf(LANGUAGES_SUPPORTING_LOGOGRAMS.asSequence()
     .flatMap(Language::unicodeScripts)
     .toSet()
+)
 
 fun Char.isLogogram(): Boolean {
     return if (this.isWhitespace()) {

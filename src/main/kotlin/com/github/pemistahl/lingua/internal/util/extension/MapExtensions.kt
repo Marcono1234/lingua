@@ -17,7 +17,13 @@
 package com.github.pemistahl.lingua.internal.util.extension
 
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
+import java.util.*
 
 internal fun <T> Object2IntOpenHashMap<T>.incrementCounter(key: T) {
     this.addTo(key, 1)
+}
+
+internal fun <E : Enum<E>> setOfEnum(first: E, vararg others: E): Set<E> {
+    return if (others.isNotEmpty()) EnumSet.of(first, *others) else Collections.singleton(first)
+
 }

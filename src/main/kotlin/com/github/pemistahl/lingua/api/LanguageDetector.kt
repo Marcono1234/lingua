@@ -47,15 +47,16 @@ import kotlin.math.ln
  * Detects the language of given input text.
  */
 class LanguageDetector internal constructor(
-    internal val languages: LinkedHashSet<Language>,
+    internal val languages: EnumSet<Language>,
     internal val minimumRelativeDistance: Double,
     isEveryLanguageModelPreloaded: Boolean,
     internal val numberOfLoadedLanguages: Int = languages.size
 ) {
     private val languagesWithUniqueCharacters = languages.filterNot { it.uniqueCharacters.isNullOrBlank() }.asSequence()
-    private val alphabetsSupportingExactlyOneLanguage = Language.scriptsSupportingExactlyOneLanguage.filterValues {
+    private val alphabetsSupportingExactlyOneLanguage = EnumMap(
+        Language.scriptsSupportingExactlyOneLanguage.filterValues {
         it in languages
-    }
+    })
     /** Indexer for maps containing only the constants of [languages] as key */
     private val languagesSubsetIndexer = KeyIndexer.fromEnumConstants(languages)
     /** Indexer for maps used as part of rule based word detection */
@@ -474,7 +475,7 @@ class LanguageDetector internal constructor(
 
     internal companion object {
         internal var letterIndexMap = lazy { loadLetterIndexMap() }
-        internal var languageModels = Language.all().asSequence()
+        internal var languageModels: Map<Language, Lazy<LanguageModelHolder>> = EnumMap(Language.all().asSequence()
             .associateWith {
                 lazy {
                     LanguageModelHolder(
@@ -486,6 +487,6 @@ class LanguageDetector internal constructor(
                         }}
                     )
                 }
-            }
+            })
     }
 }

@@ -16,6 +16,8 @@
 
 package com.github.pemistahl.lingua.api
 
+import java.util.*
+
 /**
  * Configures and creates an instance of [LanguageDetector].
  */
@@ -27,7 +29,7 @@ class LanguageDetectorBuilder private constructor(
     /**
      * Creates and returns the configured instance of [LanguageDetector].
      */
-    fun build() = LanguageDetector(LinkedHashSet(languages), minimumRelativeDistance, isEveryLanguageModelPreloaded)
+    fun build() = LanguageDetector(EnumSet.copyOf(languages), minimumRelativeDistance, isEveryLanguageModelPreloaded)
 
     /**
      * Sets the desired value for the minimum relative distance measure.
