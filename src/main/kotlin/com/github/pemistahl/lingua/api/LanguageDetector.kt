@@ -24,8 +24,10 @@ import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
 import com.github.pemistahl.lingua.internal.Constant.isJapaneseScript
+import com.github.pemistahl.lingua.internal.Constant.languagesWithCharsIndexer
 import com.github.pemistahl.lingua.internal.EnumDoubleMap
 import com.github.pemistahl.lingua.internal.EnumIntMap
+import com.github.pemistahl.lingua.internal.KeyIndexer
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
@@ -54,6 +56,16 @@ class LanguageDetector internal constructor(
     private val alphabetsSupportingExactlyOneLanguage = Language.scriptsSupportingExactlyOneLanguage.filterValues {
         it in languages
     }
+    /** Indexer for maps containing only the constants of [languages] as key */
+    private val languagesSubsetIndexer = KeyIndexer.fromEnumConstants(languages)
+    /** Indexer for maps used as part of rule based word detection */
+    private val wordLanguagesSubsetIndexer = KeyIndexer.fromEnumConstants(
+        languagesWithUniqueCharacters
+            .plus(alphabetsSupportingExactlyOneLanguage.values)
+            // Japanese and Chinese have custom detection
+            .plus(listOf(UNKNOWN, JAPANESE, CHINESE))
+            .toSet()
+    )
 
     init {
         if (isEveryLanguageModelPreloaded) {
@@ -152,7 +164,7 @@ class LanguageDetector internal constructor(
         }
 
         val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
-        val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: EnumIntMap.newMap()
+        val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: EnumIntMap.newMap(languagesSubsetIndexer)
         val summedUpProbabilities = sumUpProbabilities(allProbabilities, unigramCounts, filteredLanguages)
         val highestProbability = summedUpProbabilities.maxValueOrNull() ?: return sortedMapOf()
         val confidenceValues = summedUpProbabilities.mapNonZeroValues { highestProbability / it }
@@ -195,7 +207,7 @@ class LanguageDetector internal constructor(
         unigramLanguageModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>
     ): EnumIntMap<Language> {
-        val unigramCounts = EnumIntMap.newMap<Language>()
+        val unigramCounts = EnumIntMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
             val lookup = languageModels[language]!!.value.uniBiTrigramsLookup
 
@@ -215,7 +227,7 @@ class LanguageDetector internal constructor(
         unigramCountsOfInputText: EnumIntMap<Language>,
         filteredLanguages: Set<Language>
     ): EnumDoubleMap<Language> {
-        val summedUpProbabilities = EnumDoubleMap.newMap<Language>()
+        val summedUpProbabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
             summedUpProbabilities.put(language, probabilities.sumOf { it.getOrZero(language) })
 
@@ -227,10 +239,10 @@ class LanguageDetector internal constructor(
     }
 
     internal fun detectLanguageWithRules(words: List<String>): Language {
-        val totalLanguageCounts = EnumIntMap.newMap<Language>()
+        val totalLanguageCounts = EnumIntMap.newMap(wordLanguagesSubsetIndexer)
 
         for (word in words) {
-            val wordLanguageCounts = EnumIntMap.newMap<Language>()
+            val wordLanguageCounts = EnumIntMap.newMap(wordLanguagesSubsetIndexer)
 
             for (character in word) {
                 val script = Character.UnicodeScript.of(character.code)
@@ -315,7 +327,7 @@ class LanguageDetector internal constructor(
     }
 
     internal fun filterLanguagesByRules(words: List<String>): Set<Language> {
-        val detectedAlphabets = EnumIntMap.newMap<Character.UnicodeScript>()
+        val detectedAlphabets = EnumIntMap.newMap(Language.allScriptsIndexer)
 
         for (word in words) {
             for (unicodeScript in Language.allScripts) {
@@ -334,7 +346,7 @@ class LanguageDetector internal constructor(
         val filteredLanguages = languages.filter {
             it.unicodeScripts.any { script -> mostFrequentAlphabets.contains(script) }
         }
-        val languageCounts = EnumIntMap.newMap<Language>()
+        val languageCounts = EnumIntMap.newMap(languagesWithCharsIndexer)
 
         for (word in words) {
             for ((characters, languages) in CHARS_TO_LANGUAGES_MAPPING) {
@@ -360,7 +372,7 @@ class LanguageDetector internal constructor(
         testDataModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>
     ): EnumDoubleMap<Language> {
-        val probabilities = EnumDoubleMap.newMap<Language>()
+        val probabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
             val modelHolder = languageModels[language]!!.value
             val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup

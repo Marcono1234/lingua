@@ -119,6 +119,9 @@ internal object Constant {
         )
     )
 
+    /** Indexer for all Languages which are the values of [CHARS_TO_LANGUAGES_MAPPING] */
+    val languagesWithCharsIndexer = KeyIndexer.fromEnumConstants(CHARS_TO_LANGUAGES_MAPPING.flatMap { it.value })
+
     fun isJapaneseScript(script: Character.UnicodeScript): Boolean {
         return script == Character.UnicodeScript.HIRAGANA
             || script == Character.UnicodeScript.KATAKANA

@@ -18,6 +18,7 @@ package com.github.pemistahl.lingua.api
 
 import com.github.pemistahl.lingua.api.IsoCode639_1.*
 import com.github.pemistahl.lingua.api.IsoCode639_3.*
+import com.github.pemistahl.lingua.internal.KeyIndexer
 import java.lang.Character.UnicodeScript
 
 /**
@@ -120,6 +121,7 @@ enum class Language(
 
     companion object {
         internal val allScripts = values().asSequence().flatMap(Language::unicodeScripts).toSet()
+        internal val allScriptsIndexer = KeyIndexer.fromEnumConstants(allScripts)
 
         internal val scriptsSupportingExactlyOneLanguage: Map<UnicodeScript, Language>
         init {

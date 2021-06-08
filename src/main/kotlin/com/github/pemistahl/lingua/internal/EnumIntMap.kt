@@ -6,7 +6,7 @@ import java.util.*
 import java.util.function.IntConsumer
 import kotlin.NoSuchElementException
 
-private const val NO_ORDINAL = -1
+private const val NO_INDEX = -1
 
 /**
  * Custom `Map` implementation with `Enum` as key type and `Int` as value type.
@@ -17,47 +17,46 @@ private const val NO_ORDINAL = -1
  * - It provides a function for handling multiple entries with maximum value
  * - It does not implement [Map] so it is not possible to use boxing functions by accident
  */
-internal class EnumIntMap<E : Enum<E>>(private val enumClass: Class<E>) {
+internal class EnumIntMap<E : Enum<E>>(
+    private val enumClass: Class<E>,
+    private val keyIndexer: KeyIndexer<E>
+) {
     companion object {
-        inline fun <reified E : Enum<E>> newMap(): EnumIntMap<E> {
-            return EnumIntMap(E::class.java)
+        inline fun <reified E : Enum<E>> newMap(keyIndexer: KeyIndexer<E>): EnumIntMap<E> {
+            return EnumIntMap(E::class.java, keyIndexer)
         }
     }
 
-    private val values = IntArray(enumClass.enumConstants.size)
+    private val values = IntArray(keyIndexer.indicesCount())
 
-    private fun enumConstantForOrdinal(ordinal: Int): E {
-        return enumClass.enumConstants[ordinal]
-    }
-
-    fun increment(enum: E) {
-        values[enum.ordinal]++
+    fun increment(enumConstant: E) {
+        values[keyIndexer.keyToIndex(enumConstant)]++
     }
 
     fun hasOnlyZeroValues() = values.all { it == 0 }
 
     fun countNonZeroValues() = values.count { it != 0 }
 
-    fun hasNonZeroValue(enumConstant: E) = values[enumConstant.ordinal] != 0
+    fun hasNonZeroValue(enumConstant: E) = values[keyIndexer.keyToIndex(enumConstant)] != 0
 
     fun firstNonZero(): E? {
-        values.forEachIndexed { ordinal, value ->
-            if (value != 0) return enumConstantForOrdinal(ordinal)
+        values.forEachIndexed { index, value ->
+            if (value != 0) return keyIndexer.indexToKey(index)
         }
         return null
     }
 
     /** Returns the value or 0 if the constant has no value. */
-    fun getOrZero(enumConstant: E) = values[enumConstant.ordinal]
+    fun getOrZero(enumConstant: E) = values[keyIndexer.keyToIndex(enumConstant)]
 
     fun set(enumConstant: E, value: Int) {
-        values[enumConstant.ordinal] = value
+        values[keyIndexer.keyToIndex(enumConstant)] = value
     }
 
-    inline fun ifNonZero(enumConstant: E, consumer: IntConsumer) {
-        val value = values[enumConstant.ordinal]
+    inline fun ifNonZero(enumConstant: E, consumer: (Int) -> Unit) {
+        val value = values[keyIndexer.keyToIndex(enumConstant)]
         if (value != 0) {
-            consumer.accept(value)
+            consumer(value)
         }
     }
 
@@ -65,53 +64,53 @@ internal class EnumIntMap<E : Enum<E>>(private val enumClass: Class<E>) {
 
     fun descendingIterator() = object: Iterator<Entry<E>> {
         var lastMax = Int.MAX_VALUE
-        var nextOrdinal = Int.MAX_VALUE // Move to end to skip `lastMax` check for first `hasNext()` call
+        var nextIndex = Int.MAX_VALUE // Move to end to skip `lastMax` check for first `hasNext()` call
 
         var next: E? = null
         var nextValue = 0
 
         override fun hasNext(): Boolean {
             if (next != null) return true
-            if (nextOrdinal == NO_ORDINAL) return false
+            if (nextIndex == NO_INDEX) return false
 
-            var maxOrdinal = NO_ORDINAL
+            var maxIndex = NO_INDEX
             var maxValue = 0
 
             // First try finding constant with same value behind last result
-            for (ordinal in nextOrdinal until values.size) {
-                val value = values[ordinal]
+            for (index in nextIndex until values.size) {
+                val value = values[index]
                 if (value == lastMax && value > maxValue) {
-                    maxOrdinal = ordinal
+                    maxIndex = index
                     maxValue = value
                 }
             }
 
-            if (maxOrdinal != NO_ORDINAL) {
-                next = enumConstantForOrdinal(maxOrdinal)
+            if (maxIndex != NO_INDEX) {
+                next = keyIndexer.indexToKey(maxIndex)
                 nextValue = maxValue
                 // Next iteration search one constant further for max
-                nextOrdinal = maxOrdinal + 1
+                nextIndex = maxIndex + 1
                 return true
             }
 
             // No other constant found with `value == lastMax`, now check all constants
-            values.forEachIndexed { ordinal, value ->
+            values.forEachIndexed { index, value ->
                 if (value < lastMax && value > maxValue) {
-                    maxOrdinal = ordinal
+                    maxIndex = index
                     maxValue = value
                 }
             }
 
-            if (maxOrdinal != NO_ORDINAL) {
-                next = enumConstantForOrdinal(maxOrdinal)
+            if (maxIndex != NO_INDEX) {
+                next = keyIndexer.indexToKey(maxIndex)
                 nextValue = maxValue
                 // Next iteration search one constant further for max
-                nextOrdinal = maxOrdinal + 1
+                nextIndex = maxIndex + 1
                 lastMax = maxValue
                 return true
             } else {
                 // Reached end
-                nextOrdinal = NO_ORDINAL
+                nextIndex = NO_INDEX
                 return false
             }
         }
@@ -135,13 +134,13 @@ internal class EnumIntMap<E : Enum<E>>(private val enumClass: Class<E>) {
         val set = EnumSet.noneOf(enumClass)
         var maxValue = 1 // Ignore 0
 
-        values.forEachIndexed { ordinal, value ->
+        values.forEachIndexed { index, value ->
             if (value == maxValue) {
-                set.add(enumConstantForOrdinal(ordinal))
+                set.add(keyIndexer.indexToKey(index))
             } else if (value > maxValue) {
                 // Found new maximum
                 set.clear()
-                set.add(enumConstantForOrdinal(ordinal))
+                set.add(keyIndexer.indexToKey(index))
                 maxValue = value
             }
         }
@@ -155,9 +154,9 @@ internal class EnumIntMap<E : Enum<E>>(private val enumClass: Class<E>) {
         // 0 acts as no-value, so don't consider it
         if (value <= 0) return set
 
-        values.forEachIndexed { ordinal, entryValue ->
+        values.forEachIndexed { index, entryValue ->
             if (entryValue >= value) {
-               set.add(enumConstantForOrdinal(ordinal))
+               set.add(keyIndexer.indexToKey(index))
             }
         }
         return set
@@ -165,9 +164,9 @@ internal class EnumIntMap<E : Enum<E>>(private val enumClass: Class<E>) {
 
     override fun toString(): String {
         val joiner = StringJoiner(", ", "{", "}")
-        values.forEachIndexed { ordinal, value ->
+        values.forEachIndexed { index, value ->
             if (value != 0) {
-                val enumConstant = enumConstantForOrdinal(ordinal)
+                val enumConstant = keyIndexer.indexToKey(index)
                 joiner.add("$enumConstant=$value")
             }
         }
