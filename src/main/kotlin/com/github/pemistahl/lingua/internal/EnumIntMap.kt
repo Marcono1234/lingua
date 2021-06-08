@@ -3,8 +3,6 @@ package com.github.pemistahl.lingua.internal
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import java.util.*
-import java.util.function.IntConsumer
-import kotlin.NoSuchElementException
 
 private const val NO_INDEX = -1
 
