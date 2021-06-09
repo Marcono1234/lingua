@@ -212,7 +212,7 @@ private typealias FrequencyWriter = () -> Unit
  * has to be invoked before writing each ngram; if the frequency has not been
  * encoded by this method the frequency writer will write it.
  */
-private inline fun encodeNgramCountAndFrequency(
+private fun encodeNgramCountAndFrequency(
     entry: Int2ObjectMap.Entry<out Collection<*>>,
     dataOut: DataOutput
 ): FrequencyWriter {

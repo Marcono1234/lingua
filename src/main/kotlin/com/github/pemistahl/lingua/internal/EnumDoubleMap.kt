@@ -56,11 +56,11 @@ internal class EnumDoubleMap<E : Enum<E>>(
         return set
     }
 
-    inline fun mapNonZeroValues(mapper: DoubleUnaryOperator): EnumDoubleMap<E> {
+    inline fun mapNonZeroValues(mapper: (Double) -> Double): EnumDoubleMap<E> {
         val copy = EnumDoubleMap(enumClass, keyIndexer)
         values.forEachIndexed { index, value ->
             if (value != 0.0) {
-                copy.values[index] = mapper.applyAsDouble(value)
+                copy.values[index] = mapper(value)
             }
         }
         return copy
