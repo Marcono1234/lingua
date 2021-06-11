@@ -10,10 +10,10 @@ import it.unimi.dsi.fastutil.chars.Char2IntOpenHashMap
 import it.unimi.dsi.fastutil.chars.CharArrayList
 import it.unimi.dsi.fastutil.chars.CharConsumer
 import it.unimi.dsi.fastutil.chars.CharList
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import it.unimi.dsi.fastutil.ints.Int2ObjectFunction
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import it.unimi.dsi.fastutil.ints.IntArrayList
 import it.unimi.dsi.fastutil.ints.IntList
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap
@@ -37,8 +37,10 @@ import java.io.DataOutputStream
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.*
 import java.util.function.IntConsumer
 import java.util.function.LongConsumer
+import kotlin.math.abs
 import kotlin.math.min
 
 /*
@@ -63,11 +65,22 @@ private fun openBinaryDataInput(resourcePath: String): DataInputStream {
     return DataInputStream(openResourceInputStream(resourcePath).buffered())
 }
 
-private fun openBinaryDataOutput(resourcesDirectory: Path, resourcePath: String): DataOutputStream {
+private fun openBinaryDataOutput(
+    resourcesDirectory: Path,
+    resourcePath: String,
+    changeSummaryCallback: (oldSizeBytes: Long?, newSizeBytes: Long) -> Unit
+): DataOutputStream {
     val file = resourcesDirectory.resolve(resourcePath.removePrefix("/"))
     Files.createDirectories(file.parent)
 
-    return DataOutputStream(Files.newOutputStream(file).buffered())
+    val oldSizeBytes = if (Files.isRegularFile(file)) Files.size(file) else null
+    return object : DataOutputStream(Files.newOutputStream(file).buffered()) {
+        override fun close() {
+            super.close()
+            val newSizeBytes = Files.size(file)
+            changeSummaryCallback(oldSizeBytes, newSizeBytes)
+        }
+    }
 }
 
 private data class MinIndexAndNgrams(
@@ -75,8 +88,6 @@ private data class MinIndexAndNgrams(
     /** Mapping from ngram to [encoded frequency][encodeFrequency] */
     val ngramsMap: Object2IntOpenHashMap<String>
 )
-
-private val jsonModelNameOptions = JsonReader.Options.of("language", "ngrams")
 
 private fun fromJson(language: Language, letterIndexMap: ShortArray, jsonStream: InputStream): MinIndexAndNgrams {
     val jsonReader = JsonReader.of(jsonStream.source().buffer())
@@ -87,31 +98,35 @@ private fun fromJson(language: Language, letterIndexMap: ShortArray, jsonStream:
     var minLetterIndex = NO_LETTER_INDEX
 
     while (jsonReader.hasNext()) {
-        when (jsonReader.selectName(jsonModelNameOptions)) {
-            -1 -> throw IllegalArgumentException("Unknown name '${jsonReader.nextName()}' at ${jsonReader.path}")
-            0 -> if (isLanguageMissing) {
-                isLanguageMissing = false
-                if (Language.valueOf(jsonReader.nextString()) != language) {
-                    throw IllegalArgumentException("JSON file is for wrong language")
-                }
-            } else throw IllegalArgumentException("Duplicate language at ${jsonReader.path}")
-            1 -> if (ngramsMap == null) {
-                ngramsMap = Object2IntOpenHashMap()
-                jsonReader.beginObject()
-                while (jsonReader.hasNext()) {
-                    val (numerator, denominator) = jsonReader.nextName().split('/')
-                        .map(String::toInt)
-                    val encodedFrequency = encodeFrequency(numerator, denominator)
-                    val ngrams = jsonReader.nextString().split(' ')
-                    ngrams.forEach { ngram ->
-                        ngramsMap.put(ngram, encodedFrequency)
-                        ngram.chars().forEach {
-                            minLetterIndex = min(minLetterIndex, letterIndexMap[it].toUShort().toInt())
+        when (val name = jsonReader.nextName()) {
+            "language" -> {
+                if (isLanguageMissing) {
+                    isLanguageMissing = false
+                    if (Language.valueOf(jsonReader.nextString()) != language) {
+                        throw IllegalArgumentException("JSON file is for wrong language")
+                    }
+                } else throw IllegalArgumentException("Duplicate language at ${jsonReader.path}")
+            }
+            "ngrams" -> {
+                if (ngramsMap == null) {
+                    ngramsMap = Object2IntOpenHashMap()
+                    jsonReader.beginObject()
+                    while (jsonReader.hasNext()) {
+                        val (numerator, denominator) = jsonReader.nextName().split('/')
+                            .map(String::toInt)
+                        val encodedFrequency = encodeFrequency(numerator, denominator)
+                        val ngrams = jsonReader.nextString().split(' ')
+                        ngrams.forEach { ngram ->
+                            ngramsMap.put(ngram, encodedFrequency)
+                            ngram.chars().forEach {
+                                minLetterIndex = min(minLetterIndex, letterIndexMap[it].toUShort().toInt())
+                            }
                         }
                     }
-                }
-                jsonReader.endObject()
-            } else throw IllegalArgumentException("Duplicate ngrams at ${jsonReader.path}")
+                    jsonReader.endObject()
+                } else throw IllegalArgumentException("Duplicate ngrams at ${jsonReader.path}")
+            }
+            else -> throw IllegalArgumentException("Unknown name '$name' at ${jsonReader.path}")
         }
     }
     jsonReader.endObject()
@@ -625,10 +640,14 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
      *
      * @see fromBinary
      */
-    fun writeBinary(resourcesDirectory: Path, language: Language) {
+    fun writeBinary(
+        resourcesDirectory: Path,
+        language: Language,
+        changeSummaryCallback: (oldSizeBytes: Long?, newSizeBytes: Long) -> Unit
+    ) {
         val resourceName = getBinaryModelResourceName(language)
 
-        openBinaryDataOutput(resourcesDirectory, resourceName).use { dataOut ->
+        openBinaryDataOutput(resourcesDirectory, resourceName, changeSummaryCallback).use { dataOut ->
             dataOut.writeShort(unigramBaseIndex)
             dataOut.writeShort(bigramBaseIndex)
             dataOut.writeShort(trigramBaseIndex)
@@ -1010,10 +1029,14 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
      *
      * @see fromBinary
      */
-    fun writeBinary(resourcesDirectory: Path, language: Language) {
+    fun writeBinary(
+        resourcesDirectory: Path,
+        language: Language,
+        changeSummaryCallback: (oldSizeBytes: Long?, newSizeBytes: Long) -> Unit
+    ) {
         val resourceName = getBinaryModelResourceName(language)
 
-        openBinaryDataOutput(resourcesDirectory, resourceName).use { dataOut ->
+        openBinaryDataOutput(resourcesDirectory, resourceName, changeSummaryCallback).use { dataOut ->
             dataOut.writeShort(quadrigramBaseIndex)
             dataOut.writeShort(fivegramBaseIndex)
 
@@ -1098,7 +1121,7 @@ internal fun writeBinaryModels(resourcesDirectory: Path) {
     }
 
     runBlocking(Dispatchers.IO) {
-        openBinaryDataOutput(resourcesDirectory, LETTER_INDEX_MAP_RESOURCE_NAME).use { dataOut ->
+        openBinaryDataOutput(resourcesDirectory, LETTER_INDEX_MAP_RESOURCE_NAME) { _, _ -> }.use { dataOut ->
             letterIndexMap.forEach { dataOut.writeShort(it.toInt()) }
         }
     }
@@ -1106,9 +1129,48 @@ internal fun writeBinaryModels(resourcesDirectory: Path) {
     runBlocking {
         Language.all().map { language ->
             async(Dispatchers.IO) {
-                UniBiTrigramRelativeFrequencyLookup.fromJson(language, letterIndexMap).writeBinary(resourcesDirectory, language)
-                QuadriFivegramRelativeFrequencyLookup.fromJson(language, letterIndexMap).writeBinary(resourcesDirectory, language)
+                UniBiTrigramRelativeFrequencyLookup.fromJson(language, letterIndexMap)
+                    .writeBinary(resourcesDirectory, language, printingSizeChange(language, "uni-bi-trigram"))
+                QuadriFivegramRelativeFrequencyLookup.fromJson(language, letterIndexMap)
+                    .writeBinary(resourcesDirectory, language, printingSizeChange(language, "quadri-fivegram"))
             }
         }.awaitAll()
     }
+}
+
+private fun printingSizeChange(language: Language, name: String): (oldSizeBytes: Long?, newSizeBytes: Long) -> Unit {
+    return { oldSizeBytes: Long?, newSizeBytes: Long ->
+        if (oldSizeBytes == null) {
+            println("NEW: ${language.isoCode639_1} $name ${formatFileSize(newSizeBytes, false)}")
+        } else if (oldSizeBytes != newSizeBytes) {
+            val sizeDiff = formatFileSize(newSizeBytes - oldSizeBytes, true)
+            val percentage = String.format(Locale.ENGLISH, "%+.1f", newSizeBytes / oldSizeBytes.toDouble())
+            println("CHANGE: ${language.isoCode639_1} $name $sizeDiff ($percentage%)")
+        }
+    }
+}
+
+private fun formatFileSize(sizeBytes: Long, addSign: Boolean): String {
+    if (abs(sizeBytes) < 1024) {
+        return if (addSign && sizeBytes > 0) {
+            "+$sizeBytes B"
+        } else {
+            // Only adds sign for negative values
+            "$sizeBytes B"
+        }
+    }
+
+    // Kilo, Mega, Giga, Tera, Peta, Exa
+    val prefixes = "KMGTPE"
+    var convertedSize = sizeBytes
+    for (i in prefixes.indices) {
+        val preConvertedSize = convertedSize
+        convertedSize /= 1024
+        if (abs(convertedSize) < 1024 || i  >= prefixes.length - 1) {
+            val pattern = if (addSign) "%+.2f" else "%.2f"
+            val formatted = String.format(Locale.ENGLISH, pattern, preConvertedSize / 1024.0)
+            return "$formatted ${prefixes[i]}iB"
+        }
+    }
+    throw AssertionError("unreachable")
 }

@@ -296,6 +296,14 @@ tasks.register<JavaExec>("runLinguaOnConsole") {
     classpath = sourceSets["main"].runtimeClasspath
 }
 
+java {
+    // Register conversion from JSON to binary models as feature because it will not be needed
+    // by consumers of this library
+    registerFeature("modelFileConversion") {
+        usingSourceSet(sourceSets.main.get())
+    }
+}
+
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.5.10")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.0")
@@ -304,7 +312,7 @@ dependencies {
             because("Version used by moshi is too old")
         }
     }
-    implementation("com.squareup.moshi:moshi-kotlin:1.12.0")
+    "modelFileConversionImplementation"("com.squareup.moshi:moshi-kotlin:1.12.0")
     implementation("it.unimi.dsi:fastutil:8.5.4")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.7.1")
