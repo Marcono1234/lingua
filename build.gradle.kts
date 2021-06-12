@@ -398,3 +398,8 @@ signing {
 repositories {
     mavenCentral()
 }
+
+// TODO: Signing is temporarily disabled
+tasks.withType<Sign>() {
+    enabled = false
+}
