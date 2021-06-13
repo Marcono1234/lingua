@@ -25,5 +25,4 @@ internal fun <T> Object2IntOpenHashMap<T>.incrementCounter(key: T) {
 
 internal fun <E : Enum<E>> setOfEnum(first: E, vararg others: E): Set<E> {
     return if (others.isNotEmpty()) EnumSet.of(first, *others) else Collections.singleton(first)
-
 }

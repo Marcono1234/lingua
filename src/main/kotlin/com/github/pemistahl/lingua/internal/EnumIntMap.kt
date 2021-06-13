@@ -31,11 +31,7 @@ internal class EnumIntMap<E : Enum<E>>(
         values[keyIndexer.keyToIndex(enumConstant)]++
     }
 
-    fun hasOnlyZeroValues() = values.all { it == 0 }
-
     fun countNonZeroValues() = values.count { it != 0 }
-
-    fun hasNonZeroValue(enumConstant: E) = values[keyIndexer.keyToIndex(enumConstant)] != 0
 
     fun firstNonZero(): E? {
         values.forEachIndexed { index, value ->
@@ -43,9 +39,6 @@ internal class EnumIntMap<E : Enum<E>>(
         }
         return null
     }
-
-    /** Returns the value or 0 if the constant has no value. */
-    fun getOrZero(enumConstant: E) = values[keyIndexer.keyToIndex(enumConstant)]
 
     fun set(enumConstant: E, value: Int) {
         values[keyIndexer.keyToIndex(enumConstant)] = value
@@ -122,28 +115,6 @@ internal class EnumIntMap<E : Enum<E>>(
                 throw NoSuchElementException()
             }
         }
-    }
-
-    /**
-     * Returns the enum constants with the maximum > 0 value, or an empty set if all
-     * enum constants have the value 0.
-     */
-    fun maxNonZero(): EnumSet<E> {
-        val set = EnumSet.noneOf(enumClass)
-        var maxValue = 1 // Ignore 0
-
-        values.forEachIndexed { index, value ->
-            if (value == maxValue) {
-                set.add(keyIndexer.indexToKey(index))
-            } else if (value > maxValue) {
-                // Found new maximum
-                set.clear()
-                set.add(keyIndexer.indexToKey(index))
-                maxValue = value
-            }
-        }
-
-        return set
     }
 
     fun keysWithValueLargerEqualThan(value: Double): EnumSet<E> {

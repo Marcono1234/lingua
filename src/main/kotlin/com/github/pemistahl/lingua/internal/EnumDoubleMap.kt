@@ -3,7 +3,8 @@ package com.github.pemistahl.lingua.internal
 import it.unimi.dsi.fastutil.objects.Object2DoubleLinkedOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
 import java.util.*
-import java.util.function.DoubleUnaryOperator
+
+private const val NO_INDEX = -1
 
 /**
  * Custom `Map` implementation with `Enum` as key type and `Double` as value type.
@@ -25,12 +26,29 @@ internal class EnumDoubleMap<E : Enum<E>>(
 
     private val values = DoubleArray(keyIndexer.indicesCount())
 
-    fun put(enumConstant: E, value: Double) {
+    fun set(enumConstant: E, value: Double) {
         values[keyIndexer.keyToIndex(enumConstant)] = value
+    }
+
+    fun increment(enumConstant: E, value: Double) {
+        values[keyIndexer.keyToIndex(enumConstant)] += value
     }
 
     /** Returns the value or 0 if the constant has no value. */
     fun getOrZero(enumConstant: E) = values[keyIndexer.keyToIndex(enumConstant)]
+
+    fun countNonZeroValues() = values.count { it != 0.0 }
+
+    fun hasNonZeroValue(enumConstant: E) = values[keyIndexer.keyToIndex(enumConstant)] != 0.0
+
+    fun hasOnlyZeroValues() = values.all { it == 0.0 }
+
+    fun firstNonZero(): E? {
+        values.forEachIndexed { index, value ->
+            if (value != 0.0) return keyIndexer.indexToKey(index)
+        }
+        return null
+    }
 
     fun maxValueOrNull(): Double? {
         var max = Double.NEGATIVE_INFINITY
@@ -93,5 +111,71 @@ internal class EnumDoubleMap<E : Enum<E>>(
             }
         }
         return joiner.toString()
+    }
+
+    data class Entry<E: Enum<E>>(val key: E, val value: Double)
+
+    fun descendingIterator() = object: Iterator<Entry<E>> {
+        var lastMax = Double.MAX_VALUE
+        var nextIndex = Int.MAX_VALUE // Move to end to skip `lastMax` check for first `hasNext()` call
+
+        var next: E? = null
+        var nextValue = 0.0
+
+        override fun hasNext(): Boolean {
+            if (next != null) return true
+            if (nextIndex == NO_INDEX) return false
+
+            var maxIndex = NO_INDEX
+            var maxValue = 0.0
+
+            // First try finding constant with same value behind last result
+            for (index in nextIndex until values.size) {
+                val value = values[index]
+                if (value == lastMax && value > maxValue) {
+                    maxIndex = index
+                    maxValue = value
+                }
+            }
+
+            if (maxIndex != NO_INDEX) {
+                next = keyIndexer.indexToKey(maxIndex)
+                nextValue = maxValue
+                // Next iteration search one constant further for max
+                nextIndex = maxIndex + 1
+                return true
+            }
+
+            // No other constant found with `value == lastMax`, now check all constants
+            values.forEachIndexed { index, value ->
+                if (value < lastMax && value > maxValue) {
+                    maxIndex = index
+                    maxValue = value
+                }
+            }
+
+            if (maxIndex != NO_INDEX) {
+                next = keyIndexer.indexToKey(maxIndex)
+                nextValue = maxValue
+                // Next iteration search one constant further for max
+                nextIndex = maxIndex + 1
+                lastMax = maxValue
+                return true
+            } else {
+                // Reached end
+                nextIndex = NO_INDEX
+                return false
+            }
+        }
+
+        override fun next(): Entry<E> {
+            if (hasNext()) {
+                val result = next
+                next = null
+                return Entry(result!!, nextValue)
+            } else {
+                throw NoSuchElementException()
+            }
+        }
     }
 }

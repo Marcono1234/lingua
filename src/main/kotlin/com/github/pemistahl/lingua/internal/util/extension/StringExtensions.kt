@@ -19,3 +19,7 @@ package com.github.pemistahl.lingua.internal.util.extension
 internal fun String.containsAnyOf(characters: String): Boolean {
     return characters.any { this.contains(it) }
 }
+
+internal fun String.isLogogram(): Boolean {
+    return length == 1 && this[0].isLogogram()
+}

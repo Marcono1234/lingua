@@ -20,6 +20,7 @@ import com.github.pemistahl.lingua.api.Language.CHINESE
 import com.github.pemistahl.lingua.api.Language.JAPANESE
 import com.github.pemistahl.lingua.api.Language.UNKNOWN
 import com.github.pemistahl.lingua.internal.Constant.CHARS_TO_LANGUAGES_MAPPING
+import com.github.pemistahl.lingua.internal.Constant.LANGUAGES_SUPPORTING_LOGOGRAMS
 import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
@@ -42,6 +43,16 @@ import kotlinx.coroutines.runBlocking
 import java.util.*
 import java.util.function.LongConsumer
 import kotlin.math.ln
+
+private const val FULL_WORD_VALUE = 1.0
+/**
+ * Word value for a logogram.
+ *
+ * At least compared to English it appears for languages with logograms, such as Chinese,
+ * more words (=logograms) are needed to express the same thing, therefore don't count a
+ * logogram as [full word][FULL_WORD_VALUE]
+ */
+private const val LOGOGRAM_WORD_VALUE = 0.7
 
 /**
  * Detects the language of given input text.
@@ -230,17 +241,19 @@ class LanguageDetector internal constructor(
     ): EnumDoubleMap<Language> {
         val summedUpProbabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
-            summedUpProbabilities.put(language, probabilities.sumOf { it.getOrZero(language) })
+            summedUpProbabilities.set(language, probabilities.sumOf { it.getOrZero(language) })
 
             unigramCountsOfInputText.ifNonZero(language) { unigramCount ->
-                summedUpProbabilities.put(language, summedUpProbabilities.getOrZero(language) / unigramCount)
+                summedUpProbabilities.set(language, summedUpProbabilities.getOrZero(language) / unigramCount)
             }
         }
         return summedUpProbabilities
     }
 
     internal fun detectLanguageWithRules(words: List<String>): Language {
-        val totalLanguageCounts = EnumIntMap.newMap(wordLanguagesSubsetIndexer)
+        // Using Double because logograms are not counted as full word
+        var adjustedWordCount = 0.0
+        val totalLanguageCounts = EnumDoubleMap.newMap(wordLanguagesSubsetIndexer)
 
         for (word in words) {
             val wordLanguageCounts = EnumIntMap.newMap(wordLanguagesSubsetIndexer)
@@ -267,15 +280,20 @@ class LanguageDetector internal constructor(
                 }
             }
 
+            var wordValue = FULL_WORD_VALUE
             val languageCounts = wordLanguageCounts.countNonZeroValues()
+
             if (languageCounts == 0) {
-                totalLanguageCounts.increment(UNKNOWN)
+                totalLanguageCounts.increment(UNKNOWN, wordValue)
             } else if (languageCounts == 1) {
                 val language = wordLanguageCounts.firstNonZero()!!
                 if (language in languages) {
-                    totalLanguageCounts.increment(language)
+                    if (word.isLogogram()) {
+                        wordValue = LOGOGRAM_WORD_VALUE
+                    }
+                    totalLanguageCounts.increment(language, wordValue)
                 } else {
-                    totalLanguageCounts.increment(UNKNOWN)
+                    totalLanguageCounts.increment(UNKNOWN, wordValue)
                 }
             } else {
                 val sortedWordLanguageCounts = wordLanguageCounts.descendingIterator()
@@ -285,23 +303,25 @@ class LanguageDetector internal constructor(
                 val secondCharCount = sortedWordLanguageCounts.next().value
 
                 if (firstCharCount > secondCharCount && mostFrequentLanguage in languages) {
-                    totalLanguageCounts.increment(mostFrequentLanguage)
+                    totalLanguageCounts.increment(mostFrequentLanguage, wordValue)
                 } else {
-                    totalLanguageCounts.increment(UNKNOWN)
+                    totalLanguageCounts.increment(UNKNOWN, wordValue)
                 }
             }
+
+            adjustedWordCount += wordValue
         }
 
         val unknownLanguageCount = totalLanguageCounts.getOrZero(UNKNOWN)
-        if (unknownLanguageCount < (0.5 * words.size)) {
-            totalLanguageCounts.set(UNKNOWN, 0)
+        if (unknownLanguageCount < (0.4 * adjustedWordCount)) {
+            totalLanguageCounts.set(UNKNOWN, 0.0)
         }
 
         val languagesCount = totalLanguageCounts.countNonZeroValues()
         if (languagesCount == 0) {
             return UNKNOWN
         }
-        if (totalLanguageCounts.countNonZeroValues() == 1) {
+        if (languagesCount == 1) {
             return totalLanguageCounts.firstNonZero()!!
         }
         if (languagesCount == 2 &&
@@ -313,32 +333,54 @@ class LanguageDetector internal constructor(
         val sortedTotalLanguageCounts = totalLanguageCounts.descendingIterator()
         val mostFrequent = sortedTotalLanguageCounts.next()
         val mostFrequentLanguage = mostFrequent.key
-        val firstCharCount = mostFrequent.value
-        val secondCharCount = sortedTotalLanguageCounts.next().value
+        val firstWordCount = mostFrequent.value
+        val secondWordCount = sortedTotalLanguageCounts.next().value
 
         return when {
-            firstCharCount == secondCharCount -> UNKNOWN
+            // If word counts are too close to each other return UNKNOWN
+            secondWordCount / firstWordCount > 0.8 -> UNKNOWN
             else -> mostFrequentLanguage
         }
     }
 
     internal fun filterLanguagesByRules(words: List<String>): Set<Language> {
-        val detectedAlphabets = EnumIntMap.newMap(Language.allScriptsIndexer)
+        // Using Double because logograms are not counted as full word
+        var adjustedWordCount = 0.0
+        val detectedAlphabets = EnumDoubleMap.newMap(Language.allScriptsIndexer)
 
         for (word in words) {
+            var wordValue = FULL_WORD_VALUE
             for (unicodeScript in Language.allScripts) {
                 if (word.all { Character.UnicodeScript.of(it.code) == unicodeScript }) {
-                    detectedAlphabets.increment(unicodeScript)
+                    if (word.isLogogram()) {
+                        wordValue = LOGOGRAM_WORD_VALUE
+                    }
+                    detectedAlphabets.increment(unicodeScript, wordValue)
                     break
                 }
             }
+            adjustedWordCount += wordValue
         }
 
         if (detectedAlphabets.hasOnlyZeroValues()) {
             return languages
         }
 
-        val mostFrequentAlphabets = detectedAlphabets.maxNonZero()
+        val alphabetsIterator = detectedAlphabets.descendingIterator()
+        val mostFrequentAlphabet = alphabetsIterator.next()
+        val mostFrequentAlphabets = EnumSet.of(mostFrequentAlphabet.key)
+        val mostFrequentAlphabetCount = mostFrequentAlphabet.value
+
+        // Add all alphabets which are close to the most frequent one
+        while (alphabetsIterator.hasNext()) {
+            val nextMostFrequent = alphabetsIterator.next()
+            if (nextMostFrequent.value / mostFrequentAlphabetCount >= 0.8) {
+                mostFrequentAlphabets.add(nextMostFrequent.key)
+            } else {
+                break
+            }
+        }
+
         val filteredLanguages = languages.filter {
             it.unicodeScripts.any { script -> mostFrequentAlphabets.contains(script) }
         }
@@ -355,7 +397,7 @@ class LanguageDetector internal constructor(
             }
         }
 
-        val languagesSubset = languageCounts.keysWithValueLargerEqualThan(words.size / 2.0)
+        val languagesSubset = languageCounts.keysWithValueLargerEqualThan(adjustedWordCount / 2.0)
 
         return if (languagesSubset.isNotEmpty()) {
             filteredLanguages.filter { it in languagesSubset }.toSet()
@@ -378,13 +420,20 @@ class LanguageDetector internal constructor(
                 else -> modelHolder.quadriFivegramLookup.value
             }
 
-            val probability = computeSumOfNgramProbabilities(
+            var probability = computeSumOfNgramProbabilities(
                 uniBiTrigramsLookup,
                 quadriFivegramLookup,
                 testDataModel
             )
             if (probability < 0.0) {
-                probabilities.put(language, probability)
+                // For languages with logograms increase probability since their words (=logograms)
+                // consist only of a single char compared to other languages whose words consist
+                // of multiple chars
+                if (language in LANGUAGES_SUPPORTING_LOGOGRAMS) {
+                    // Multiply by value < 1.0 since a smaller probability is better
+                    probability *= 0.85
+                }
+                probabilities.set(language, probability)
             }
         }
         return probabilities
