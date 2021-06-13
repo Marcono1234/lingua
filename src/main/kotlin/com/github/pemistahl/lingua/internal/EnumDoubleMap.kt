@@ -84,22 +84,25 @@ internal class EnumDoubleMap<E : Enum<E>>(
         return copy
     }
 
-    fun sortedByNonZeroDescendingValue(): SortedMap<E, Double> {
-        val map = TreeMap<E, Double> { a, b ->
+    fun sortedByNonZeroDescendingValue(): Map<E, Double> {
+        val entries = mutableListOf<Entry<E>>()
+        values.forEachIndexed { index, value ->
+            if (value != 0.0) {
+                entries.add(Entry(keyIndexer.indexToKey(index), value))
+            }
+        }
+        entries.sortWith { a, b ->
             // Highest first
-            val diff = values[keyIndexer.keyToIndex(b)].compareTo(values[keyIndexer.keyToIndex(a)])
+            val diff = b.value.compareTo(a.value)
             when {
                 diff != 0 -> diff
                 // Else sort Language constants by declaration order
-                else -> a.compareTo(b)
+                else -> a.key.compareTo(b.key)
             }
         }
-        values.forEachIndexed { index, value ->
-            if (value != 0.0) {
-                map[keyIndexer.indexToKey(index)] = value
-            }
-        }
-        return map
+
+        // Preserves original iteration order
+        return entries.associate { it.key to it.value }
     }
 
     override fun toString(): String {

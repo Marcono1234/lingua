@@ -95,15 +95,12 @@ class LanguageDetector internal constructor(
         val confidenceValues = computeLanguageConfidenceValues(text)
 
         if (confidenceValues.isEmpty()) return UNKNOWN
-        if (confidenceValues.size == 1) return confidenceValues.firstKey()
 
-        val mostLikelyLanguage = confidenceValues.firstKey()
+        val mostLikelyLanguage = confidenceValues.keys.first()
+        if (confidenceValues.size == 1) return mostLikelyLanguage
+
         val mostLikelyLanguageProbability = confidenceValues.getValue(mostLikelyLanguage)
-
-        val secondMostLikelyLanguage = confidenceValues.filterNot {
-            it.key == mostLikelyLanguage
-        }.maxByOrNull { it.value }!!.key
-        val secondMostLikelyLanguageProbability = confidenceValues.getValue(secondMostLikelyLanguage)
+        val secondMostLikelyLanguageProbability = confidenceValues.values.elementAt(1)
 
         return when {
             mostLikelyLanguageProbability == secondMostLikelyLanguageProbability -> UNKNOWN
@@ -127,27 +124,27 @@ class LanguageDetector internal constructor(
      * each language not being part of the returned map is assumed to be 0.0.
      *
      * @param text The input text to detect the language for.
-     * @return A map of all possible languages, sorted by their confidence value in descending order.
+     * @return A map of all possible languages, ordered by their confidence value in descending order.
      */
-    fun computeLanguageConfidenceValues(text: String): SortedMap<Language, Double> {
+    fun computeLanguageConfidenceValues(text: String): Map<Language, Double> {
         val cleanedUpText = cleanUpInputText(text)
 
         if (cleanedUpText.isEmpty() || !cleanedUpText.codePoints().anyMatch(Character::isLetter)) {
-            return sortedMapOf()
+            return emptyMap()
         }
 
         val words = splitTextIntoWords(cleanedUpText)
         val languageDetectedByRules = detectLanguageWithRules(words)
 
         if (languageDetectedByRules != UNKNOWN) {
-            return sortedMapOf(languageDetectedByRules to 1.0)
+            return mapOf(languageDetectedByRules to 1.0)
         }
 
         val filteredLanguages = filterLanguagesByRules(words)
 
         if (filteredLanguages.size == 1) {
             val filteredLanguage = filteredLanguages.iterator().next()
-            return sortedMapOf(filteredLanguage to 1.0)
+            return mapOf(filteredLanguage to 1.0)
         }
 
         val ngramSizeRange = if (cleanedUpText.length >= 120) (3..3) else (1..5)
@@ -178,7 +175,7 @@ class LanguageDetector internal constructor(
         val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
         val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: EnumIntMap.newMap(languagesSubsetIndexer)
         val summedUpProbabilities = sumUpProbabilities(allProbabilities, unigramCounts, filteredLanguages)
-        val highestProbability = summedUpProbabilities.maxValueOrNull() ?: return sortedMapOf()
+        val highestProbability = summedUpProbabilities.maxValueOrNull() ?: return emptyMap()
         val confidenceValues = summedUpProbabilities.mapNonZeroValues { highestProbability / it }
         return confidenceValues.sortedByNonZeroDescendingValue()
     }
