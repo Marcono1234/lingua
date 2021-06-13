@@ -1,6 +1,6 @@
 ##### KAZAKH #####
 
->>> Accuracy on average: 91.83%
+>>> Accuracy on average: 91.93%
 
 >> Detection of 1000 single words (average length: 8 chars)
 Accuracy: 79.90%
@@ -11,7 +11,7 @@ Accuracy: 96.50%
 Erroneously classified as MONGOLIAN: 1.60%, RUSSIAN: 0.80%, UKRAINIAN: 0.30%, SERBIAN: 0.20%, MACEDONIAN: 0.20%, BULGARIAN: 0.20%, BELARUSIAN: 0.20%
 
 >> Detection of 1000 sentences (average length: 102 chars)
-Accuracy: 99.10%
-Erroneously classified as MONGOLIAN: 0.80%, ENGLISH: 0.10%
+Accuracy: 99.40%
+Erroneously classified as MONGOLIAN: 0.50%, ENGLISH: 0.10%
 
->> Exact values: 91.83333333333333 79.9 96.5 99.1
+>> Exact values: 91.93333333333334 79.9 96.5 99.4
