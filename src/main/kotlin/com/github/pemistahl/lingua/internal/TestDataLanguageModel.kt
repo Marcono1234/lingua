@@ -33,9 +33,12 @@ internal data class TestDataLanguageModel(val objectNgrams: Set<ObjectNgram>, va
             val ngrams = hashSetOf<ObjectNgram>()
             val primitiveNgrams = LongOpenHashSet()
 
-            sliceLoop@ for (i in 0..text.length - ngramLength) {
+            var i = 0
+            sliceLoop@ while (i <= text.length - ngramLength) {
                 for (sliceIndex in i until i + ngramLength) {
                     if (!Character.isLetter(text[sliceIndex])) {
+                        // Skip all potential ngrams which would include the non-letter
+                        i = sliceIndex + 1
                         continue@sliceLoop
                     }
                 }
@@ -45,6 +48,7 @@ internal data class TestDataLanguageModel(val objectNgrams: Set<ObjectNgram>, va
                     PrimitiveNgram.NONE.value -> ngrams.add(ObjectNgram(text.substring(i, i + ngramLength)))
                     else -> primitiveNgrams.add(primitiveNgram.value)
                 }
+                i++
             }
             return TestDataLanguageModel(ngrams, primitiveNgrams)
         }
