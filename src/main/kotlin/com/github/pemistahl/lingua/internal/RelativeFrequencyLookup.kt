@@ -455,7 +455,12 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
 
     private fun letterIndex(char: Int, baseIndex: Int): Int {
         val index = letterIndexMap[char].toUShort().toInt()
-        return if (index == NO_LETTER_INDEX) index else index - baseIndex
+        return if (index == NO_LETTER_INDEX) {
+            NO_LETTER_INDEX
+        } else {
+            val relativeIndex = index - baseIndex
+            return if (relativeIndex < 0) NO_LETTER_INDEX else relativeIndex
+        }
     }
     private fun unigramLetterIndex(char: Int) = letterIndex(char, unigramBaseIndex)
     private fun bigramLetterIndex(char: Int) = letterIndex(char, bigramBaseIndex)
@@ -849,7 +854,12 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
 
     private fun letterIndex(char: Int, baseIndex: Int): Int {
         val index = letterIndexMap[char].toUShort().toInt()
-        return if (index == NO_LETTER_INDEX) index else index - baseIndex
+        return if (index == NO_LETTER_INDEX) {
+            NO_LETTER_INDEX
+        } else {
+            val relativeIndex = index - baseIndex
+            return if (relativeIndex < 0) NO_LETTER_INDEX else relativeIndex
+        }
     }
     private fun quadrigramLetterIndex(char: Int) = letterIndex(char, quadrigramBaseIndex)
     private fun fivegramLetterIndex(char: Int) = letterIndex(char, fivegramBaseIndex)
