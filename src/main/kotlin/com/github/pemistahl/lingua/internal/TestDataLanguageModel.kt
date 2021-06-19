@@ -19,7 +19,12 @@ package com.github.pemistahl.lingua.internal
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import it.unimi.dsi.fastutil.longs.LongSet
 
-internal data class TestDataLanguageModel(val objectNgrams: Set<ObjectNgram>, val primitiveNgrams: LongSet) {
+internal data class TestDataLanguageModel(
+    /** Set of [ObjectNgram] values */
+    val objectNgrams: Set<String>,
+    /** Set of [PrimitiveNgram] values */
+    val primitiveNgrams: LongSet
+) {
     fun hasOnlyPrimitives(): Boolean {
         return objectNgrams.isEmpty()
     }
@@ -30,7 +35,7 @@ internal data class TestDataLanguageModel(val objectNgrams: Set<ObjectNgram>, va
                 "ngram length $ngramLength is not in range 1..5"
             }
 
-            val ngrams = hashSetOf<ObjectNgram>()
+            val ngrams = hashSetOf<String>()
             val primitiveNgrams = LongOpenHashSet()
 
             var i = 0
@@ -45,7 +50,7 @@ internal data class TestDataLanguageModel(val objectNgrams: Set<ObjectNgram>, va
 
                 val primitiveNgram = PrimitiveNgram.of(text, i, ngramLength)
                 when (primitiveNgram.value) {
-                    PrimitiveNgram.NONE.value -> ngrams.add(ObjectNgram(text.substring(i, i + ngramLength)))
+                    PrimitiveNgram.NONE.value -> ngrams.add(text.substring(i, i + ngramLength))
                     else -> primitiveNgrams.add(primitiveNgram.value)
                 }
                 i++

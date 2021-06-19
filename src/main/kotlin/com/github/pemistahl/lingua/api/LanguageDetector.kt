@@ -29,6 +29,7 @@ import com.github.pemistahl.lingua.internal.Constant.languagesWithCharsIndexer
 import com.github.pemistahl.lingua.internal.EnumDoubleMap
 import com.github.pemistahl.lingua.internal.EnumIntMap
 import com.github.pemistahl.lingua.internal.KeyIndexer
+import com.github.pemistahl.lingua.internal.ObjectNgram
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
@@ -450,7 +451,7 @@ class LanguageDetector internal constructor(
         var probabilitySum = 0.0
 
         ngramLoop@ for (ngram in testDataModel.objectNgrams) {
-            var current = ngram
+            var current = ObjectNgram(ngram)
             var currentPrimitive: PrimitiveNgram
             while (true) {
                 val probability = quadriFivegramLookup.getFrequency(current)

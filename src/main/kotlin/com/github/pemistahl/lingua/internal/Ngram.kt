@@ -79,11 +79,16 @@ internal value class PrimitiveNgram(val value: Long) {
 /**
  * Ngram encoded as [String]. Only used for ngrams which cannot be represented
  * as [PrimitiveNgram].
+ *
+ * This class is an _inline_ class, care must be taken to not accidentally
+ * use it in contexts where an [Any] is used, otherwise the `String`
+ * value would be wrapped in an `ObjectNgram` instance.
  */
-internal data class ObjectNgram(val value: String) {
+@JvmInline
+internal value class ObjectNgram(val value: String) {
     init {
-        require(value.length in 0..5) {
-            "length of ngram '$value' is not in range 0..5"
+        require(value.length in (PrimitiveNgram.MAX_NGRAM_LENGTH + 1)..5) {
+            "Unsupported ngram length"
         }
     }
 
