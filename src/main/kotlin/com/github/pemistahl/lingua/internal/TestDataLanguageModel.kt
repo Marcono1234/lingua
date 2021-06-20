@@ -39,11 +39,12 @@ internal data class TestDataLanguageModel(
             val primitiveNgrams = LongOpenHashSet()
 
             var i = 0
+            var nextLetterCheckIndex = 0
             sliceLoop@ while (i <= text.length - ngramLength) {
-                for (sliceIndex in i until i + ngramLength) {
-                    if (!Character.isLetter(text[sliceIndex])) {
+                while (nextLetterCheckIndex < i + ngramLength) {
+                    if (!Character.isLetter(text[nextLetterCheckIndex++])) {
                         // Skip all potential ngrams which would include the non-letter
-                        i = sliceIndex + 1
+                        i = nextLetterCheckIndex
                         continue@sliceLoop
                     }
                 }
