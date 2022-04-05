@@ -6,7 +6,9 @@ import com.github.pemistahl.lingua.internal.util.extension.readIntArray
 import com.github.pemistahl.lingua.internal.util.extension.readShort
 import it.unimi.dsi.fastutil.bytes.Byte2IntAVLTreeMap
 import it.unimi.dsi.fastutil.bytes.Byte2IntSortedMap
-import java.io.*
+import java.io.DataOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 
 class ImmutableByte2IntMap(
     private val keys: ByteArray,
@@ -29,16 +31,7 @@ class ImmutableByte2IntMap(
         }
 
         fun build(): ImmutableByte2IntMap {
-            val size = map.size
-            val keys = ByteArray(size)
-            val values = IntArray(size)
-
-            map.byte2IntEntrySet().forEachIndexed { index, entry ->
-                keys[index] = entry.byteKey
-                values[index] = entry.intValue
-            }
-
-            return ImmutableByte2IntMap(keys, values)
+            return ImmutableByte2IntMap(map.keys.toByteArray(), map.values.toIntArray())
         }
     }
 

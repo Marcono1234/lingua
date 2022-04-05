@@ -18,20 +18,8 @@ package com.github.pemistahl.lingua.internal
 
 import com.github.pemistahl.lingua.api.Language
 import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
-import com.squareup.moshi.JsonReader
-import it.unimi.dsi.fastutil.bytes.Byte2FloatOpenHashMap
-import it.unimi.dsi.fastutil.chars.Char2FloatOpenHashMap
-import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
-import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap
-import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2IntMap
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
-import it.unimi.dsi.fastutil.shorts.Short2FloatOpenHashMap
-import okio.buffer
-import okio.source
-import java.io.InputStream
-import java.util.*
-import kotlin.IllegalArgumentException
 
 
 internal data class JsonLanguageModel(val language: Language, val ngrams: Map<Fraction, String>)

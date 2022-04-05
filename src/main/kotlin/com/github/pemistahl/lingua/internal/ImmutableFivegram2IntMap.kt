@@ -3,6 +3,7 @@ package com.github.pemistahl.lingua.internal
 import com.github.pemistahl.lingua.internal.util.extension.readFivegramArray
 import com.github.pemistahl.lingua.internal.util.extension.readInt
 import com.github.pemistahl.lingua.internal.util.extension.readIntArray
+import com.github.pemistahl.lingua.internal.util.extension.readShortArray
 import it.unimi.dsi.fastutil.objects.Object2IntAVLTreeMap
 import it.unimi.dsi.fastutil.objects.Object2IntSortedMap
 import java.io.DataOutputStream
@@ -11,15 +12,23 @@ import java.io.OutputStream
 
 class ImmutableFivegram2IntMap(
     private val keys: Array<String>,
-    private val values: IntArray
+    /**
+     * For an index _i_ obtained based on [keys]:
+     * - if _i_ < [indValuesIndices]`.length`: Look up index from [indValuesIndices], then based on the result (treated
+     *   as unsigned short) look up value from [values]
+     * - else if `indValuesIndices.isEmpty()`: Look up value from `values[i]`
+     * - else: Look up value from `values[i - indValuesIndices.length + maxIndirectionIndices]`
+     */
+    private val indValuesIndices: ShortArray,
+    private val values: IntArray,
 ) {
     companion object {
         fun fromBinary(inputStream: InputStream): ImmutableFivegram2IntMap {
-            val length = inputStream.readInt()
+            val keys = inputStream.readFivegramArray(inputStream.readInt())
+            val indValuesIndices = inputStream.readShortArray(inputStream.readInt())
+            val values = inputStream.readIntArray(inputStream.readInt())
 
-            val keys = inputStream.readFivegramArray(length)
-            val values = inputStream.readIntArray(length)
-            return ImmutableFivegram2IntMap(keys, values)
+            return ImmutableFivegram2IntMap(keys, indValuesIndices, values)
         }
     }
 
@@ -31,22 +40,21 @@ class ImmutableFivegram2IntMap(
         }
 
         fun build(): ImmutableFivegram2IntMap {
-            val size = map.size
-            val keys = Array(size) {""}
-            val values = IntArray(size)
+            val keys = map.keys.toTypedArray()
 
-            map.object2IntEntrySet().forEachIndexed { index, entry ->
-                keys[index] = entry.key
-                values[index] = entry.intValue
+            return createValueArrays(map.values) { indValuesIndices, values ->
+                return@createValueArrays ImmutableFivegram2IntMap(keys, indValuesIndices, values)
             }
-
-            return ImmutableFivegram2IntMap(keys, values)
         }
     }
 
     fun get(key: String): Int {
         val index = keys.binarySearch(key)
-        return if (index >= 0) values[index] else 0
+        return if (index < 0) 0 else {
+            if (index < indValuesIndices.size) values[indValuesIndices[index].toUShort().toInt()]
+            else if (indValuesIndices.isEmpty()) values[index]
+            else values[index - indValuesIndices.size + maxIndirectionIndices]
+        }
     }
 
     fun writeBinary(outputStream: OutputStream) {
@@ -60,6 +68,11 @@ class ImmutableFivegram2IntMap(
             dataOutput.writeChar(it[3].code)
             dataOutput.writeChar(it[4].code)
         }
+
+        dataOutput.writeInt(indValuesIndices.size)
+        indValuesIndices.forEach {dataOutput.writeShort(it.toInt())}
+
+        dataOutput.writeInt(values.size)
         values.forEach(dataOutput::writeInt)
     }
 }

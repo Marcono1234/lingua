@@ -261,13 +261,13 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         letterIndexMap,
         unigramBaseIndex,
         ImmutableByte2IntMap(ByteArray(0), IntArray(0)),
-        ImmutableShort2IntMap(ShortArray(0), IntArray(0)),
+        ImmutableShort2IntMap(ShortArray(0), ShortArray(0), IntArray(0)),
         bigramBaseIndex,
-        ImmutableShort2IntMap(ShortArray(0), IntArray(0)),
-        ImmutableInt2IntMap(IntArray(0), IntArray(0)),
+        ImmutableShort2IntMap(ShortArray(0), ShortArray(0), IntArray(0)),
+        ImmutableInt2IntMap(IntArray(0), ShortArray(0), IntArray(0)),
         trigramBaseIndex,
-        ImmutableInt2IntMap(IntArray(0), IntArray(0)),
-        ImmutableLong2IntMap(LongArray(0), IntArray(0))
+        ImmutableInt2IntMap(IntArray(0), ShortArray(0), IntArray(0)),
+        ImmutableLong2IntMap(LongArray(0), ShortArray(0), IntArray(0))
     )
 
     private fun letterIndex(char: Int, baseIndex: Int): Int {
@@ -565,12 +565,12 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     private constructor(letterIndexMap: ShortArray, quadrigramBaseIndex: Int, fivegramBaseIndex: Int) : this(
         letterIndexMap,
         quadrigramBaseIndex,
-        ImmutableInt2IntMap(IntArray(0), IntArray(0)),
-        ImmutableLong2IntMap(LongArray(0), IntArray(0)),
+        ImmutableInt2IntMap(IntArray(0), ShortArray(0), IntArray(0)),
+        ImmutableLong2IntMap(LongArray(0), ShortArray(0), IntArray(0)),
         fivegramBaseIndex,
-        ImmutableInt2IntMap(IntArray(0), IntArray(0)),
-        ImmutableLong2IntMap(LongArray(0), IntArray(0)),
-        ImmutableFivegram2IntMap(emptyArray(), IntArray(0))
+        ImmutableInt2IntMap(IntArray(0), ShortArray(0), IntArray(0)),
+        ImmutableLong2IntMap(LongArray(0), ShortArray(0), IntArray(0)),
+        ImmutableFivegram2IntMap(emptyArray(), ShortArray(0), IntArray(0))
     )
 
     private fun letterIndex(char: Int, baseIndex: Int): Int {

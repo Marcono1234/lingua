@@ -2,6 +2,7 @@ package com.github.pemistahl.lingua.internal
 
 import com.github.pemistahl.lingua.internal.util.extension.readInt
 import com.github.pemistahl.lingua.internal.util.extension.readIntArray
+import com.github.pemistahl.lingua.internal.util.extension.readShort
 import com.github.pemistahl.lingua.internal.util.extension.readShortArray
 import it.unimi.dsi.fastutil.shorts.Short2IntAVLTreeMap
 import it.unimi.dsi.fastutil.shorts.Short2IntSortedMap
@@ -11,15 +12,32 @@ import java.io.OutputStream
 
 class ImmutableShort2IntMap(
     private val keys: ShortArray,
+    /**
+     * For an index _i_ obtained based on [keys]:
+     * - if [indValuesIndices]`.length > 0`: Look up index from [indValuesIndices], then based on the result (treated
+     *   as unsigned short) look up value from [values]
+     * - else: Look up value from `values[i]`
+     *
+     * (This is a deviation from the other maps because for a short based map all keys fit inside [indValuesIndices],
+     * so the question is only whether indirection reduces memory usage)
+     */
+    private val indValuesIndices: ShortArray,
     private val values: IntArray
 ) {
     companion object {
         fun fromBinary(inputStream: InputStream): ImmutableShort2IntMap {
-            val length = inputStream.readInt()
+            val keys = inputStream.readShortArray(inputStream.readInt())
+            // Don't need to check for overflow here; if the map contains the maximum of 65536 unique values,
+            // then indValuesIndices won't be used (i.e. it will be empty) because indirect lookup would require
+            // more memory than direct lookup
+            val indValuesIndices = inputStream.readShortArray(inputStream.readShort())
 
-            val keys = inputStream.readShortArray(length)
-            val values = inputStream.readIntArray(length)
-            return ImmutableShort2IntMap(keys, values)
+            var valuesLength = inputStream.readShort()
+            // Detect overflow when map contains UShort.MAX_VALUE + 1 values
+            if (keys.isNotEmpty() && valuesLength == 0) valuesLength = 65536
+            val values = inputStream.readIntArray(valuesLength)
+
+            return ImmutableShort2IntMap(keys, indValuesIndices, values)
         }
     }
 
@@ -30,22 +48,20 @@ class ImmutableShort2IntMap(
         }
 
         fun build(): ImmutableShort2IntMap {
-            val size = map.size
-            val keys = ShortArray(size)
-            val values = IntArray(size)
+            val keys = map.keys.toShortArray()
 
-            map.short2IntEntrySet().forEachIndexed { index, entry ->
-                keys[index] = entry.shortKey
-                values[index] = entry.intValue
+            return createValueArrays(map.values) { indValuesIndices, values ->
+                return@createValueArrays ImmutableShort2IntMap(keys, indValuesIndices, values)
             }
-
-            return ImmutableShort2IntMap(keys, values)
         }
     }
 
     fun get(key: Short): Int {
         val index = keys.binarySearch(key)
-        return if (index >= 0) values[index] else 0
+        return if (index < 0) 0 else {
+            if (indValuesIndices.isEmpty()) values[index]
+            else values[indValuesIndices[index].toUShort().toInt()]
+        }
     }
 
     fun writeBinary(outputStream: OutputStream) {
@@ -54,6 +70,11 @@ class ImmutableShort2IntMap(
         // Must write as int instead of short because otherwise max length of UShort.MAX_VALUE + 1 would overflow
         dataOutput.writeInt(keys.size)
         keys.forEach {dataOutput.writeShort(it.toInt())}
+
+        dataOutput.writeShort(indValuesIndices.size)
+        indValuesIndices.forEach {dataOutput.writeShort(it.toInt())}
+
+        dataOutput.writeShort(values.size)
         values.forEach(dataOutput::writeInt)
     }
 }
