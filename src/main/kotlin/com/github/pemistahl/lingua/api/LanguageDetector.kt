@@ -66,10 +66,12 @@ class LanguageDetector internal constructor(
     internal val numberOfLoadedLanguages: Int = languages.size
 ) {
     private val languagesWithUniqueCharacters = languages.filterNot { it.uniqueCharacters.isNullOrBlank() }.asSequence()
-    private val alphabetsSupportingExactlyOneLanguage = EnumMap(
-        Language.scriptsSupportingExactlyOneLanguage.filterValues {
+    private val alphabetsSupportingExactlyOneLanguage = Language.scriptsSupportingExactlyOneLanguage.filterValues {
         it in languages
-    })
+    }.let {
+        // EnumMap(Map) constructor can only be called if the given map is not empty
+        if (it.isEmpty()) emptyMap() else EnumMap(it)
+    }
     /** Indexer for maps containing only the constants of [languages] as key */
     private val languagesSubsetIndexer = KeyIndexer.fromEnumConstants(languages)
     /** Indexer for maps used as part of rule based word detection */
