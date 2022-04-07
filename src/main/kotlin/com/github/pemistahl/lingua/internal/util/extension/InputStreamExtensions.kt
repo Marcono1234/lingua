@@ -37,6 +37,13 @@ internal fun InputStream.readByteArray(length: Int): ByteArray {
 // TODO: Verify whether this really justifies increased memory usage; instead of DataInputStream could also use
 //       methods similar to readInt() above
 
+internal fun InputStream.readCharArray(length: Int): CharArray {
+    val byteArray = readByteArray(length * Short.SIZE_BYTES)
+    val array = CharArray(length)
+    ByteBuffer.wrap(byteArray).asCharBuffer().get(array)
+    return array
+}
+
 internal fun InputStream.readShortArray(length: Int): ShortArray {
     val byteArray = readByteArray(length * Short.SIZE_BYTES)
     val array = ShortArray(length)

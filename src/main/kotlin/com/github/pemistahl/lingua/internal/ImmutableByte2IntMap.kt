@@ -10,7 +10,7 @@ import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-class ImmutableByte2IntMap(
+class ImmutableByte2IntMap private constructor(
     private val keys: ByteArray,
     private val values: IntArray
 ) {
@@ -24,7 +24,9 @@ class ImmutableByte2IntMap(
         }
     }
 
-    class Builder(private val map: Byte2IntSortedMap = Byte2IntAVLTreeMap()) {
+    class Builder {
+        private val map: Byte2IntSortedMap = Byte2IntAVLTreeMap()
+
         fun add(key: Byte, value: Int) {
             val old = map.put(key, value)
             check(old == 0)

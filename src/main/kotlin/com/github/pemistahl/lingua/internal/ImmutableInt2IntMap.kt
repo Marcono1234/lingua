@@ -9,7 +9,7 @@ import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-class ImmutableInt2IntMap(
+class ImmutableInt2IntMap private constructor(
     private val keys: IntArray,
     /**
      * For an index _i_ obtained based on [keys]:
@@ -31,7 +31,9 @@ class ImmutableInt2IntMap(
         }
     }
 
-    class Builder(private val map: Int2IntSortedMap = Int2IntAVLTreeMap()) {
+    class Builder {
+        private val map: Int2IntSortedMap = Int2IntAVLTreeMap()
+
         fun add(key: Int, value: Int) {
             val old = map.put(key, value)
             check(old == 0)

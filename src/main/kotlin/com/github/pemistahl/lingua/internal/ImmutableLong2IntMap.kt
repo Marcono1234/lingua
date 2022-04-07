@@ -10,7 +10,7 @@ import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-class ImmutableLong2IntMap(
+class ImmutableLong2IntMap private constructor(
     private val keys: LongArray,
     /**
      * For an index _i_ obtained based on [keys]:
@@ -32,7 +32,9 @@ class ImmutableLong2IntMap(
         }
     }
 
-    class Builder(private val map: Long2IntSortedMap = Long2IntAVLTreeMap()) {
+    class Builder {
+        private val map: Long2IntSortedMap = Long2IntAVLTreeMap()
+
         fun add(key: Long, value: Int) {
             val old = map.put(key, value)
             check(old == 0)

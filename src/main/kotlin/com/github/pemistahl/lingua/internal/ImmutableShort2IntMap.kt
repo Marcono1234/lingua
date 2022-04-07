@@ -10,7 +10,7 @@ import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-class ImmutableShort2IntMap(
+class ImmutableShort2IntMap private constructor(
     private val keys: ShortArray,
     /**
      * For an index _i_ obtained based on [keys]:
@@ -41,7 +41,9 @@ class ImmutableShort2IntMap(
         }
     }
 
-    class Builder(private val map: Short2IntSortedMap = Short2IntAVLTreeMap()) {
+    class Builder {
+        private val map: Short2IntSortedMap = Short2IntAVLTreeMap()
+
         fun add(key: Short, value: Int) {
             val old = map.put(key, value)
             check(old == 0)

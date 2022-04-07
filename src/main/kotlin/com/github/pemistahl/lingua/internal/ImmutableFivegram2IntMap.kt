@@ -10,7 +10,16 @@ import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-class ImmutableFivegram2IntMap(
+/*
+ Note: Could in theory implement this with two separate key maps, _firstCharsKeys_ contains chars 1 - 4 encoded with
+ bitwise OR as long, _lastCharKeys_ contains char 5. This allows fast primitive array binary search in _firstCharsKeys_,
+ and probably also saves a bit of memory compared to using an `Array<String>`, which would have some overhead for every
+ `String` object.
+ However, only very few objects are stored in this map type (most ngrams can be encoded as primitive), therefore
+ the additional complexity is most likely not worth it.
+ */
+
+class ImmutableFivegram2IntMap private constructor(
     private val keys: Array<String>,
     /**
      * For an index _i_ obtained based on [keys]:
@@ -32,7 +41,9 @@ class ImmutableFivegram2IntMap(
         }
     }
 
-    class Builder(private val map: Object2IntSortedMap<String> = Object2IntAVLTreeMap()) {
+    class Builder {
+        private val map: Object2IntSortedMap<String> = Object2IntAVLTreeMap()
+
         fun add(key: String, value: Int) {
             check(key.length == 5)
             val old = map.put(key, value)
