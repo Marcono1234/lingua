@@ -166,16 +166,16 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     private val unigramsAsShort: ImmutableShort2IntMap,
     private val bigramBaseIndex: Int,
     private val bigramsAsShort: ImmutableShort2IntMap,
-    private val bigramsAsInt: ImmutableInt2IntMap,
+    private val bigramsAsInt: ImmutableInt2IntTrieMap,
     private val trigramBaseIndex: Int,
-    private val trigramsAsInt: ImmutableInt2IntMap,
+    private val trigramsAsInt: ImmutableInt2IntTrieMap,
     private val trigramsAsLong: ImmutableLong2IntMap,
     // Temporary builders; TODO: solve this in a cleaner way
     private val unigramsAsByteBuilder: ImmutableByte2IntMap.Builder = ImmutableByte2IntMap.Builder(),
     private val unigramsAsShortBuilder: ImmutableShort2IntMap.Builder = ImmutableShort2IntMap.Builder(),
     private val bigramsAsShortBuilder: ImmutableShort2IntMap.Builder = ImmutableShort2IntMap.Builder(),
-    private val bigramsAsIntBuilder: ImmutableInt2IntMap.Builder = ImmutableInt2IntMap.Builder(),
-    private val trigramsAsIntBuilder: ImmutableInt2IntMap.Builder = ImmutableInt2IntMap.Builder(),
+    private val bigramsAsIntBuilder: ImmutableInt2IntTrieMap.Builder = ImmutableInt2IntTrieMap.Builder(),
+    private val trigramsAsIntBuilder: ImmutableInt2IntTrieMap.Builder = ImmutableInt2IntTrieMap.Builder(),
     private val trigramsAsLongBuilder: ImmutableLong2IntMap.Builder = ImmutableLong2IntMap.Builder(),
 ) {
     companion object {
@@ -228,9 +228,9 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
                 val unigramsAsShort = ImmutableShort2IntMap.fromBinary(it)
 
                 val bigramsAsShort = ImmutableShort2IntMap.fromBinary(it)
-                val bigramsAsInt = ImmutableInt2IntMap.fromBinary(it)
+                val bigramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
 
-                val trigramsAsInt = ImmutableInt2IntMap.fromBinary(it)
+                val trigramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
                 val trigramsAsLong = ImmutableLong2IntMap.fromBinary(it)
 
                 // Should have reached end of data
@@ -264,9 +264,9 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         ImmutableShort2IntMap.Builder().build(),
         bigramBaseIndex,
         ImmutableShort2IntMap.Builder().build(),
-        ImmutableInt2IntMap.Builder().build(),
+        ImmutableInt2IntTrieMap.Builder().build(),
         trigramBaseIndex,
-        ImmutableInt2IntMap.Builder().build(),
+        ImmutableInt2IntTrieMap.Builder().build(),
         ImmutableLong2IntMap.Builder().build()
     )
 
@@ -487,16 +487,16 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
 internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     private val letterIndexMap: ShortArray,
     private val quadrigramBaseIndex: Int,
-    private val quadrigramsAsInt: ImmutableInt2IntMap,
+    private val quadrigramsAsInt: ImmutableInt2IntTrieMap,
     private val quadrigramsAsLong: ImmutableLong2IntMap,
     private val fivegramBaseIndex: Int,
-    private val fivegramsAsInt: ImmutableInt2IntMap,
+    private val fivegramsAsInt: ImmutableInt2IntTrieMap,
     private val fivegramsAsLong: ImmutableLong2IntMap,
     private val fivegramsAsObject: ImmutableFivegram2IntMap,
     // Temporary builders; TODO: solve this in a cleaner way
-    private val quadrigramsAsIntBuilder: ImmutableInt2IntMap.Builder = ImmutableInt2IntMap.Builder(),
+    private val quadrigramsAsIntBuilder: ImmutableInt2IntTrieMap.Builder = ImmutableInt2IntTrieMap.Builder(),
     private val quadrigramsAsLongBuilder: ImmutableLong2IntMap.Builder = ImmutableLong2IntMap.Builder(),
-    private val fivegramsAsIntBuilder: ImmutableInt2IntMap.Builder = ImmutableInt2IntMap.Builder(),
+    private val fivegramsAsIntBuilder: ImmutableInt2IntTrieMap.Builder = ImmutableInt2IntTrieMap.Builder(),
     private val fivegramsAsLongBuilder: ImmutableLong2IntMap.Builder = ImmutableLong2IntMap.Builder(),
     private val fivegramsAsObjectBuilder: ImmutableFivegram2IntMap.Builder = ImmutableFivegram2IntMap.Builder(),
 ) {
@@ -538,10 +538,10 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 val quadrigramBaseIndex = it.readUnsignedShort()
                 val fivegramBaseIndex = it.readUnsignedShort()
 
-                val quadrigramsAsInt = ImmutableInt2IntMap.fromBinary(it)
+                val quadrigramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
                 val quadrigramsAsLong = ImmutableLong2IntMap.fromBinary(it)
 
-                val fivegramsAsInt = ImmutableInt2IntMap.fromBinary(it)
+                val fivegramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
                 val fivegramsAsLong = ImmutableLong2IntMap.fromBinary(it)
                 val fivegramsAsObject = ImmutableFivegram2IntMap.fromBinary(it)
 
@@ -565,10 +565,10 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     private constructor(letterIndexMap: ShortArray, quadrigramBaseIndex: Int, fivegramBaseIndex: Int) : this(
         letterIndexMap,
         quadrigramBaseIndex,
-        ImmutableInt2IntMap.Builder().build(),
+        ImmutableInt2IntTrieMap.Builder().build(),
         ImmutableLong2IntMap.Builder().build(),
         fivegramBaseIndex,
-        ImmutableInt2IntMap.Builder().build(),
+        ImmutableInt2IntTrieMap.Builder().build(),
         ImmutableLong2IntMap.Builder().build(),
         ImmutableFivegram2IntMap.Builder().build()
     )
