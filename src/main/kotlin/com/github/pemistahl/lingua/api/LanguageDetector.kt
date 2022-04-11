@@ -62,6 +62,7 @@ class LanguageDetector internal constructor(
     internal val languages: EnumSet<Language>,
     internal val minimumRelativeDistance: Double,
     isEveryLanguageModelPreloaded: Boolean,
+    internal val withOnlyUniBiTri: Boolean,
     internal val numberOfLoadedLanguages: Int = languages.size
 ) {
     private val languagesWithUniqueCharacters = languages.filterNot { it.uniqueCharacters.isNullOrBlank() }.asSequence()
@@ -148,7 +149,7 @@ class LanguageDetector internal constructor(
             return mapOf(filteredLanguage to 1.0)
         }
 
-        val ngramSizeRange = if (cleanedUpText.length >= 120) (3..3) else (1..5)
+        val ngramSizeRange = if (cleanedUpText.length >= 120) (3..3) else (1..(if (withOnlyUniBiTri) 3 else 5))
         val allProbabilitiesAndUnigramCounts = runBlocking {
             ngramSizeRange.filter { i -> cleanedUpText.length >= i }.map { i ->
                 async(Dispatchers.Default) {
@@ -503,7 +504,9 @@ class LanguageDetector internal constructor(
                 async {
                     // Initialize values of Lazy objects
                     val modelHolder = languageModels[it]!!.value
-                    modelHolder.quadriFivegramLookup.value
+                    if (!withOnlyUniBiTri) {
+                        modelHolder.quadriFivegramLookup.value
+                    }
                 }
             }.awaitAll()
         }

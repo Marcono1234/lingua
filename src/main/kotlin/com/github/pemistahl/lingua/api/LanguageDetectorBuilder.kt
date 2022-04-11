@@ -24,12 +24,13 @@ import java.util.*
 class LanguageDetectorBuilder private constructor(
     internal val languages: List<Language>,
     internal var minimumRelativeDistance: Double = 0.0,
-    internal var isEveryLanguageModelPreloaded: Boolean = false
+    internal var isEveryLanguageModelPreloaded: Boolean = false,
+    internal var withOnlyUniBiTri: Boolean = false
 ) {
     /**
      * Creates and returns the configured instance of [LanguageDetector].
      */
-    fun build() = LanguageDetector(EnumSet.copyOf(languages), minimumRelativeDistance, isEveryLanguageModelPreloaded)
+    fun build() = LanguageDetector(EnumSet.copyOf(languages), minimumRelativeDistance, isEveryLanguageModelPreloaded, withOnlyUniBiTri)
 
     /**
      * Sets the desired value for the minimum relative distance measure.
@@ -71,6 +72,11 @@ class LanguageDetectorBuilder private constructor(
      */
     fun withPreloadedLanguageModels(): LanguageDetectorBuilder {
         this.isEveryLanguageModelPreloaded = true
+        return this
+    }
+
+    fun withOnlyUniBiTrigrams(): LanguageDetectorBuilder {
+        this.withOnlyUniBiTri = true
         return this
     }
 

@@ -1,0 +1,58 @@
+package com.github.pemistahl.lingua.internal
+
+import com.github.pemistahl.lingua.internal.util.extension.readByte
+import com.github.pemistahl.lingua.internal.util.extension.readByteArray
+import com.github.pemistahl.lingua.internal.util.extension.readIntArray
+import com.github.pemistahl.lingua.internal.util.extension.readShort
+import it.unimi.dsi.fastutil.bytes.Byte2IntAVLTreeMap
+import it.unimi.dsi.fastutil.bytes.Byte2IntSortedMap
+import java.io.*
+
+class ImmutableByte2IntMap(
+    private val keys: ByteArray,
+    private val values: IntArray
+) {
+    companion object {
+        fun fromBinary(inputStream: InputStream): ImmutableByte2IntMap {
+            val length = inputStream.readShort()
+
+            val keys = inputStream.readByteArray(length)
+            val values = inputStream.readIntArray(length)
+            return ImmutableByte2IntMap(keys, values)
+        }
+    }
+
+    class Builder(private val map: Byte2IntSortedMap = Byte2IntAVLTreeMap()) {
+        fun add(key: Byte, value: Int) {
+            val old = map.put(key, value)
+            check(old == 0)
+        }
+
+        fun build(): ImmutableByte2IntMap {
+            val size = map.size
+            val keys = ByteArray(size)
+            val values = IntArray(size)
+
+            map.byte2IntEntrySet().forEachIndexed { index, entry ->
+                keys[index] = entry.byteKey
+                values[index] = entry.intValue
+            }
+
+            return ImmutableByte2IntMap(keys, values)
+        }
+    }
+
+    fun get(key: Byte): Int {
+        val index = keys.binarySearch(key)
+        return if (index >= 0) values[index] else 0
+    }
+
+    fun writeBinary(outputStream: OutputStream) {
+        val dataOutput = DataOutputStream(outputStream)
+
+        // Must write as short instead of byte because otherwise max length of 256 would overflow
+        dataOutput.writeShort(keys.size)
+        outputStream.write(keys)
+        values.forEach(dataOutput::writeInt)
+    }
+}
