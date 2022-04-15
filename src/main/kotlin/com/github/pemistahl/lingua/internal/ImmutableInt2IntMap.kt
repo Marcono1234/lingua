@@ -1,8 +1,10 @@
 package com.github.pemistahl.lingua.internal
 
+import com.github.pemistahl.lingua.internal.util.extension.*
 import com.github.pemistahl.lingua.internal.util.extension.readInt
 import com.github.pemistahl.lingua.internal.util.extension.readIntArray
 import com.github.pemistahl.lingua.internal.util.extension.readShortArray
+import com.github.pemistahl.lingua.internal.util.extension.writeShortArray
 import it.unimi.dsi.fastutil.ints.Int2IntAVLTreeMap
 import it.unimi.dsi.fastutil.ints.Int2IntSortedMap
 import java.io.DataOutputStream
@@ -61,12 +63,12 @@ class ImmutableInt2IntMap private constructor(
         val dataOutput = DataOutputStream(outputStream)
 
         dataOutput.writeInt(keys.size)
-        keys.forEach(dataOutput::writeInt)
+        dataOutput.writeIntArray(keys)
 
         dataOutput.writeInt(indValuesIndices.size)
-        indValuesIndices.forEach {dataOutput.writeShort(it.toInt())}
+        dataOutput.writeShortArray(indValuesIndices)
 
         dataOutput.writeInt(values.size)
-        values.forEach(dataOutput::writeInt)
+        dataOutput.writeIntArray(values)
     }
 }

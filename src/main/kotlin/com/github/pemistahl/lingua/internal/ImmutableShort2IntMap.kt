@@ -1,5 +1,6 @@
 package com.github.pemistahl.lingua.internal
 
+import com.github.pemistahl.lingua.internal.util.extension.*
 import com.github.pemistahl.lingua.internal.util.extension.readInt
 import com.github.pemistahl.lingua.internal.util.extension.readIntArray
 import com.github.pemistahl.lingua.internal.util.extension.readShort
@@ -71,12 +72,12 @@ class ImmutableShort2IntMap private constructor(
 
         // Must write as int instead of short because otherwise max length of UShort.MAX_VALUE + 1 would overflow
         dataOutput.writeInt(keys.size)
-        keys.forEach {dataOutput.writeShort(it.toInt())}
+        dataOutput.writeShortArray(keys)
 
         dataOutput.writeShort(indValuesIndices.size)
-        indValuesIndices.forEach {dataOutput.writeShort(it.toInt())}
+        dataOutput.writeShortArray(indValuesIndices)
 
         dataOutput.writeShort(values.size)
-        values.forEach(dataOutput::writeInt)
+        dataOutput.writeIntArray(values)
     }
 }

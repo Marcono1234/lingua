@@ -34,7 +34,6 @@ import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.UniBiTrigramRelativeFrequencyLookup
-import com.github.pemistahl.lingua.internal.loadLetterIndexMap
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
 import kotlinx.coroutines.Dispatchers
@@ -62,7 +61,7 @@ class LanguageDetector internal constructor(
     internal val languages: EnumSet<Language>,
     internal val minimumRelativeDistance: Double,
     isEveryLanguageModelPreloaded: Boolean,
-    internal val withOnlyUniBiTri: Boolean,
+    private val withOnlyUniBiTri: Boolean,
     internal val numberOfLoadedLanguages: Int = languages.size
 ) {
     private val languagesWithUniqueCharacters = languages.filterNot { it.uniqueCharacters.isNullOrBlank() }.asSequence()
@@ -519,10 +518,11 @@ class LanguageDetector internal constructor(
         other !is LanguageDetector -> false
         languages != other.languages -> false
         minimumRelativeDistance != other.minimumRelativeDistance -> false
+        withOnlyUniBiTri != other.withOnlyUniBiTri -> false
         else -> true
     }
 
-    override fun hashCode() = 31 * languages.hashCode() + minimumRelativeDistance.hashCode()
+    override fun hashCode() = 31 * languages.hashCode() + minimumRelativeDistance.hashCode() + withOnlyUniBiTri.hashCode()
 
     internal data class LanguageModelHolder(
         val uniBiTrigramsLookup: UniBiTrigramRelativeFrequencyLookup,
@@ -532,16 +532,15 @@ class LanguageDetector internal constructor(
     )
 
     internal companion object {
-        internal var letterIndexMap = lazy { loadLetterIndexMap() }
         internal var languageModels: Map<Language, Lazy<LanguageModelHolder>> = EnumMap(Language.all().asSequence()
             .associateWith {
                 lazy {
                     LanguageModelHolder(
                         runBlocking(Dispatchers.IO) {
-                            UniBiTrigramRelativeFrequencyLookup.fromBinary(it, letterIndexMap.value)
+                            UniBiTrigramRelativeFrequencyLookup.fromBinary(it)
                         },
                         lazy { runBlocking(Dispatchers.IO) {
-                            QuadriFivegramRelativeFrequencyLookup.fromBinary(it, letterIndexMap.value)
+                            QuadriFivegramRelativeFrequencyLookup.fromBinary(it)
                         }}
                     )
                 }

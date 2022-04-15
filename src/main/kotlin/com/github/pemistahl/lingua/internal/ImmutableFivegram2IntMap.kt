@@ -1,5 +1,6 @@
 package com.github.pemistahl.lingua.internal
 
+import com.github.pemistahl.lingua.internal.util.extension.*
 import com.github.pemistahl.lingua.internal.util.extension.readFivegramArray
 import com.github.pemistahl.lingua.internal.util.extension.readInt
 import com.github.pemistahl.lingua.internal.util.extension.readIntArray
@@ -81,9 +82,9 @@ class ImmutableFivegram2IntMap private constructor(
         }
 
         dataOutput.writeInt(indValuesIndices.size)
-        indValuesIndices.forEach {dataOutput.writeShort(it.toInt())}
+        dataOutput.writeShortArray(indValuesIndices)
 
         dataOutput.writeInt(values.size)
-        values.forEach(dataOutput::writeInt)
+        dataOutput.writeIntArray(values)
     }
 }

@@ -225,20 +225,20 @@ class ImmutableInt2IntTrieMap private constructor(
         dataOutput.writeInt(size)
         dataOutput.writeByte(firstKeyLayer.size)
         dataOutput.write(firstKeyLayer)
-        firstKeyGlobalIndices.forEach(dataOutput::writeInt)
+        dataOutput.writeIntArray(firstKeyGlobalIndices)
 
         secondKeyLayers.forEachIndexed { index, secondKeyLayer ->
             dataOutput.writeByte(secondKeyLayer.size)
             dataOutput.write(secondKeyLayer)
-            keyRemainderLayerSearchData[index].forEach(dataOutput::writeInt)
+            dataOutput.writeIntArray(keyRemainderLayerSearchData[index])
         }
-        keyRemainderLayer.forEach { dataOutput.writeShort(it.toInt()) }
+        dataOutput.writeShortArray(keyRemainderLayer)
 
         dataOutput.writeInt(indValuesIndices.size)
-        indValuesIndices.forEach { dataOutput.writeShort(it.toInt()) }
+        dataOutput.writeShortArray(indValuesIndices)
 
         dataOutput.writeInt(values.size)
-        values.forEach(dataOutput::writeInt)
+        dataOutput.writeIntArray(values)
     }
 }
 

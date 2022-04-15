@@ -1,5 +1,6 @@
 package com.github.pemistahl.lingua.internal
 
+import com.github.pemistahl.lingua.internal.util.extension.*
 import com.github.pemistahl.lingua.internal.util.extension.readInt
 import com.github.pemistahl.lingua.internal.util.extension.readIntArray
 import com.github.pemistahl.lingua.internal.util.extension.readLongArray
@@ -62,12 +63,12 @@ class ImmutableLong2IntMap private constructor(
         val dataOutput = DataOutputStream(outputStream)
 
         dataOutput.writeInt(keys.size)
-        keys.forEach(dataOutput::writeLong)
+        dataOutput.writeLongArray(keys)
 
         dataOutput.writeInt(indValuesIndices.size)
-        indValuesIndices.forEach {dataOutput.writeShort(it.toInt())}
+        dataOutput.writeShortArray(indValuesIndices)
 
         dataOutput.writeInt(values.size)
-        values.forEach(dataOutput::writeInt)
+        dataOutput.writeIntArray(values)
     }
 }

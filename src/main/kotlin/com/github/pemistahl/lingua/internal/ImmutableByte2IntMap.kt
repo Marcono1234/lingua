@@ -1,6 +1,6 @@
 package com.github.pemistahl.lingua.internal
 
-import com.github.pemistahl.lingua.internal.util.extension.readByte
+import com.github.pemistahl.lingua.internal.util.extension.*
 import com.github.pemistahl.lingua.internal.util.extension.readByteArray
 import com.github.pemistahl.lingua.internal.util.extension.readIntArray
 import com.github.pemistahl.lingua.internal.util.extension.readShort
@@ -47,7 +47,7 @@ class ImmutableByte2IntMap private constructor(
 
         // Must write as short instead of byte because otherwise max length of 256 would overflow
         dataOutput.writeShort(keys.size)
-        outputStream.write(keys)
-        values.forEach(dataOutput::writeInt)
+        dataOutput.write(keys)
+        dataOutput.writeIntArray(values)
     }
 }

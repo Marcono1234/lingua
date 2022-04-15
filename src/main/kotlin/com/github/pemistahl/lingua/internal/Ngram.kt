@@ -31,9 +31,9 @@ internal value class PrimitiveNgram(val value: Long) {
     }
 
     operator fun component1() = getLength()
-    operator fun component2() = (value shr 8).toInt() and 0xFFFF
-    operator fun component3() = (value shr 24).toInt() and 0xFFFF
-    operator fun component4() = (value shr 40).toInt() and 0xFFFF
+    operator fun component2() = (value shr 8).toInt().toChar()
+    operator fun component3() = (value shr 24).toInt().toChar()
+    operator fun component4() = (value shr 40).toInt().toChar()
 
     /**
      * Returns the next lower order ngram or [PrimitiveNgram.NONE] if there is no
