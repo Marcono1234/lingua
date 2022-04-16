@@ -189,16 +189,18 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     /** For each char in [chars] contains the encoding offset for that char, see [createCharOffsetsData] */
     private val charOffsets: ShortArray,
     private val unigramsAsByte: ImmutableByte2IntMap,
-    private val unigramsAsShort: ImmutableShort2IntMap,
-    private val bigramsAsShort: ImmutableShort2IntMap,
+    private val unigramsAsShort: ImmutableShort2IntTrieMap,
+    private val bigramsAsShort: ImmutableShort2IntTrieMap,
     private val bigramsAsInt: ImmutableInt2IntTrieMap,
+    private val trigramsAsShort: ImmutableShort2IntTrieMap,
     private val trigramsAsInt: ImmutableInt2IntTrieMap,
     private val trigramsAsLong: ImmutableLong2IntMap,
     // Temporary builders; TODO: solve this in a cleaner way
     private val unigramsAsByteBuilder: ImmutableByte2IntMap.Builder = ImmutableByte2IntMap.Builder(),
-    private val unigramsAsShortBuilder: ImmutableShort2IntMap.Builder = ImmutableShort2IntMap.Builder(),
-    private val bigramsAsShortBuilder: ImmutableShort2IntMap.Builder = ImmutableShort2IntMap.Builder(),
+    private val unigramsAsShortBuilder: ImmutableShort2IntTrieMap.Builder = ImmutableShort2IntTrieMap.Builder(),
+    private val bigramsAsShortBuilder: ImmutableShort2IntTrieMap.Builder = ImmutableShort2IntTrieMap.Builder(),
     private val bigramsAsIntBuilder: ImmutableInt2IntTrieMap.Builder = ImmutableInt2IntTrieMap.Builder(),
+    private val trigramsAsShortBuilder: ImmutableShort2IntTrieMap.Builder = ImmutableShort2IntTrieMap.Builder(),
     private val trigramsAsIntBuilder: ImmutableInt2IntTrieMap.Builder = ImmutableInt2IntTrieMap.Builder(),
     private val trigramsAsLongBuilder: ImmutableLong2IntMap.Builder = ImmutableLong2IntMap.Builder(),
 ) {
@@ -237,11 +239,12 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
                 val charOffsets = it.readShortArray(charsCount)
 
                 val unigramsAsByte = ImmutableByte2IntMap.fromBinary(it)
-                val unigramsAsShort = ImmutableShort2IntMap.fromBinary(it)
+                val unigramsAsShort = ImmutableShort2IntTrieMap.fromBinary(it)
 
-                val bigramsAsShort = ImmutableShort2IntMap.fromBinary(it)
+                val bigramsAsShort = ImmutableShort2IntTrieMap.fromBinary(it)
                 val bigramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
 
+                val trigramsAsShort = ImmutableShort2IntTrieMap.fromBinary(it)
                 val trigramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
                 val trigramsAsLong = ImmutableLong2IntMap.fromBinary(it)
 
@@ -255,6 +258,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
                     unigramsAsShort,
                     bigramsAsShort,
                     bigramsAsInt,
+                    trigramsAsShort,
                     trigramsAsInt,
                     trigramsAsLong
                 )
@@ -269,9 +273,10 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         chars,
         charOffsets,
         ImmutableByte2IntMap.Builder().build(),
-        ImmutableShort2IntMap.Builder().build(),
-        ImmutableShort2IntMap.Builder().build(),
+        ImmutableShort2IntTrieMap.Builder().build(),
+        ImmutableShort2IntTrieMap.Builder().build(),
         ImmutableInt2IntTrieMap.Builder().build(),
+        ImmutableShort2IntTrieMap.Builder().build(),
         ImmutableInt2IntTrieMap.Builder().build(),
         ImmutableLong2IntMap.Builder().build()
     )
@@ -324,6 +329,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         char0: Char,
         char1: Char,
         char2: Char,
+        asShort: (encodedNgram: Short) -> R,
         asInt: (encodedNgram: Int) -> R,
         asLong: (encodedNgram: Long) -> R,
         notEncodable: () -> R,
@@ -332,8 +338,21 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         val charOffset1 = getCharOffset(char1).also { if (it == -1) return notEncodable() }
         val charOffset2 = getCharOffset(char2).also { if (it == -1) return notEncodable() }
 
-        // Int encoding: First two get 11 bits each, last gets 10 bits (2*11 + 10 = 32)
+        // Short encoding: First one gets 6 bits, last two get 5 bits (6 + 2*5 = 16)
         return if (
+            charOffset0 < (1 shl 6)
+            && charOffset1 < (1 shl 5)
+            && charOffset2 < (1 shl 5)
+        ) {
+            val encoded = (
+                charOffset0
+                or (charOffset1 shl 6)
+                or (charOffset2 shl 6 + 5)
+            ).toShort()
+            asShort(encoded)
+        }
+        // Int encoding: First two get 11 bits each, last gets 10 bits (2*11 + 10 = 32)
+        else if (
             charOffset0 < (1 shl 11)
             && charOffset1 < (1 shl 11)
             && charOffset2 < (1 shl 10)
@@ -355,10 +374,11 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     }
 
     private inline fun <R> String.useEncodedTrigram(
+        asShort: (encodedNgram: Short) -> R,
         asInt: (encodedNgram: Int) -> R,
         asLong: (encodedNgram: Long) -> R,
         notEncodable: () -> R,
-    ): R = useEncodedTrigram(this[0], this[1], this[2], asInt, asLong, notEncodable)
+    ): R = useEncodedTrigram(this[0], this[1], this[2], asShort, asInt, asLong, notEncodable)
 
     private fun putUnigramFrequency(unigram: String, encodedFrequency: Int) {
         if (encodedFrequency == 0) {
@@ -399,6 +419,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         }
 
         trigram.useEncodedTrigram(
+            { trigramsAsShortBuilder.add(it, encodedFrequency) },
             { trigramsAsIntBuilder.add(it, encodedFrequency) },
             { trigramsAsLongBuilder.add(it, encodedFrequency) },
             { throw AssertionError("Char offsets don't include chars of: $trigram") }
@@ -413,6 +434,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
             unigramsAsShortBuilder.build(),
             bigramsAsShortBuilder.build(),
             bigramsAsIntBuilder.build(),
+            trigramsAsShortBuilder.build(),
             trigramsAsIntBuilder.build(),
             trigramsAsLongBuilder.build()
         )
@@ -435,6 +457,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
             )
             3 -> useEncodedTrigram(
                 char0, char1, char2,
+                { trigramsAsShort.get(it) },
                 { trigramsAsInt.get(it) },
                 { trigramsAsLong.get(it) },
                 { 0 }
@@ -469,6 +492,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
             bigramsAsShort.writeBinary(dataOut)
             bigramsAsInt.writeBinary(dataOut)
 
+            trigramsAsShort.writeBinary(dataOut)
             trigramsAsInt.writeBinary(dataOut)
             trigramsAsLong.writeBinary(dataOut)
         }
@@ -483,12 +507,14 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     private val chars: CharArray,
     /** For each char in [chars] contains the encoding offset for that char, see [createCharOffsetsData] */
     private val charOffsets: ShortArray,
+    private val quadrigramsAsShort: ImmutableShort2IntTrieMap,
     private val quadrigramsAsInt: ImmutableInt2IntTrieMap,
     private val quadrigramsAsLong: ImmutableLong2IntMap,
     private val fivegramsAsInt: ImmutableInt2IntTrieMap,
     private val fivegramsAsLong: ImmutableLong2IntMap,
     private val fivegramsAsObject: ImmutableFivegram2IntMap,
     // Temporary builders; TODO: solve this in a cleaner way
+    private val quadrigramsAsShortBuilder: ImmutableShort2IntTrieMap.Builder = ImmutableShort2IntTrieMap.Builder(),
     private val quadrigramsAsIntBuilder: ImmutableInt2IntTrieMap.Builder = ImmutableInt2IntTrieMap.Builder(),
     private val quadrigramsAsLongBuilder: ImmutableLong2IntMap.Builder = ImmutableLong2IntMap.Builder(),
     private val fivegramsAsIntBuilder: ImmutableInt2IntTrieMap.Builder = ImmutableInt2IntTrieMap.Builder(),
@@ -527,6 +553,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 val chars = it.readCharArray(charsCount)
                 val charOffsets = it.readShortArray(charsCount)
 
+                val quadrigramsAsShort = ImmutableShort2IntTrieMap.fromBinary(it)
                 val quadrigramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
                 val quadrigramsAsLong = ImmutableLong2IntMap.fromBinary(it)
 
@@ -540,6 +567,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
                 return QuadriFivegramRelativeFrequencyLookup(
                     chars,
                     charOffsets,
+                    quadrigramsAsShort,
                     quadrigramsAsInt,
                     quadrigramsAsLong,
                     fivegramsAsInt,
@@ -556,6 +584,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     ) : this(
         chars,
         charOffsets,
+        ImmutableShort2IntTrieMap.Builder().build(),
         ImmutableInt2IntTrieMap.Builder().build(),
         ImmutableLong2IntMap.Builder().build(),
         ImmutableInt2IntTrieMap.Builder().build(),
@@ -566,6 +595,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     private fun getCharOffset(char: Char) = getCharOffset(chars, charOffsets, char)
 
     private inline fun <R> String.useEncodedQuadrigram(
+        asShort: (encodedNgram: Short) -> R,
         asInt: (encodedNgram: Int) -> R,
         asLong: (encodedNgram: Long) -> R,
         notEncodable: () -> R,
@@ -580,6 +610,20 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         val charOffset3 = getCharOffset(char3).also { if (it == -1) return notEncodable() }
 
         return if (
+            charOffset0 <= 15
+            && charOffset1 <= 15
+            && charOffset2 <= 15
+            && charOffset3 <= 15
+        ) {
+            val encoded = (
+                charOffset0
+                or (charOffset1 shl 4)
+                or (charOffset2 shl 8)
+                or (charOffset3 shl 12)
+            ).toShort()
+            asShort(encoded)
+        }
+        else if (
             charOffset0 <= 255
             && charOffset1 <= 255
             && charOffset2 <= 255
@@ -615,9 +659,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         val charOffset3 = getCharOffset(this[3]).also { if (it == -1) return notEncodable() }
         val charOffset4 = getCharOffset(this[4]).also { if (it == -1) return notEncodable() }
 
-        /*
-         * Int encoding: First two get 7 bits each, last three get 6 bits (2*7 + 3*6 = 32)
-         */
+        // Int encoding: First two get 7 bits each, last three get 6 bits (2*7 + 3*6 = 32)
         return if (
             charOffset0 < (1 shl 7)
             && charOffset1 < (1 shl 7)
@@ -634,9 +676,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
             )
             asInt(encoded)
         }
-        /*
-         * Long encoding: First four get 13 bits each, last gets 12 bits (4*13 + 12 = 64)
-         */
+        // Long encoding: First four get 13 bits each, last gets 12 bits (4*13 + 12 = 64)
         else if (
             charOffset0 < (1 shl 13)
             && charOffset1 < (1 shl 13)
@@ -667,6 +707,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         }
 
         quadrigram.useEncodedQuadrigram(
+            { quadrigramsAsShortBuilder.add(it, encodedFrequency) },
             { quadrigramsAsIntBuilder.add(it, encodedFrequency) },
             { quadrigramsAsLongBuilder.add(it, encodedFrequency) },
             { throw AssertionError("Char offsets don't include chars of: $quadrigram") }
@@ -693,6 +734,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         return QuadriFivegramRelativeFrequencyLookup(
             chars,
             charOffsets,
+            quadrigramsAsShortBuilder.build(),
             quadrigramsAsIntBuilder.build(),
             quadrigramsAsLongBuilder.build(),
             fivegramsAsIntBuilder.build(),
@@ -706,6 +748,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
 
         return decodeFrequency(when (ngramStr.length) {
             4 -> ngramStr.useEncodedQuadrigram(
+                { quadrigramsAsShort.get(it) },
                 { quadrigramsAsInt.get(it) },
                 { quadrigramsAsLong.get(it) },
                 { 0 }
@@ -740,6 +783,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
             dataOut.writeCharArray(chars)
             dataOut.writeShortArray(charOffsets)
 
+            quadrigramsAsShort.writeBinary(dataOut)
             quadrigramsAsInt.writeBinary(dataOut)
             quadrigramsAsLong.writeBinary(dataOut)
 
