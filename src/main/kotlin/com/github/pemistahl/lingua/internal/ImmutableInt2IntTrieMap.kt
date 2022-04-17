@@ -191,12 +191,12 @@ class ImmutableInt2IntTrieMap private constructor(
 
     fun get(key: Int): Int {
         val firstKey = key.toByte()
-        val firstKeyIndex = Arrays.binarySearch(firstKeyLayer, firstKey)
+        val firstKeyIndex = firstKeyLayer.binarySearch(firstKey)
         if (firstKeyIndex < 0) return 0
 
         val secondKey = key.shr(8).toByte()
         val secondKeyLayer = secondKeyLayers[firstKeyIndex]
-        val secondKeyIndex = Arrays.binarySearch(secondKeyLayer, secondKey)
+        val secondKeyIndex = secondKeyLayer.binarySearch(secondKey)
         if (secondKeyIndex < 0) return 0
 
         // Determine where to search within keyRemainderLayer
@@ -210,7 +210,7 @@ class ImmutableInt2IntTrieMap private constructor(
 
         val keyRemainder = key.shr(16).toShort()
 
-        val index = Arrays.binarySearch(keyRemainderLayer, remainderSearchStartIndex, remainderSearchStartIndex + remainderSearchSize, keyRemainder)
+        val index = keyRemainderLayer.binarySearch(keyRemainder, remainderSearchStartIndex, remainderSearchStartIndex + remainderSearchSize)
 
         return if (index < 0) 0 else {
             if (index < indValuesIndices.size) values[indValuesIndices[index].toUShort().toInt()]
