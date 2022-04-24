@@ -1,3 +1,7 @@
+Performance optimizations considered and implemented for this fork are documented in [Performance optimizations.md](./Performance%20optimizations.md).
+
+---
+
 ![lingua](images/logo.png) 
 
 <br>
