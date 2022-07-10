@@ -16,6 +16,10 @@
 
 package com.github.pemistahl.lingua.api
 
+import java.util.EnumSet
+import java.util.concurrent.Executor
+import java.util.concurrent.ForkJoinPool
+
 /**
  * Configures and creates an instance of [LanguageDetector].
  */
@@ -23,16 +27,18 @@ class LanguageDetectorBuilder private constructor(
     internal val languages: List<Language>,
     internal var minimumRelativeDistance: Double = 0.0,
     internal var isEveryLanguageModelPreloaded: Boolean = false,
-    internal var isLowAccuracyModeEnabled: Boolean = false
+    internal var isLowAccuracyModeEnabled: Boolean = false,
+    private var executor: Executor = ForkJoinPool.commonPool(),
 ) {
     /**
      * Creates and returns the configured instance of [LanguageDetector].
      */
     fun build() = LanguageDetector(
-        languages.toMutableSet(),
+        EnumSet.copyOf(languages),
         minimumRelativeDistance,
         isEveryLanguageModelPreloaded,
-        isLowAccuracyModeEnabled
+        isLowAccuracyModeEnabled,
+        executor,
     )
 
     /**
@@ -96,6 +102,16 @@ class LanguageDetectorBuilder private constructor(
         return this
     }
 
+    /**
+     * Specifies the [Executor] to use for language model loading and for language
+     * detection. By default [ForkJoinPool.commonPool] is used.
+     */
+    @Suppress("unused") // public API
+    fun withExecutor(executor: Executor): LanguageDetectorBuilder {
+        this.executor = executor
+        return this
+    }
+
     companion object {
         /**
          * Creates and returns an instance of LanguageDetectorBuilder
@@ -149,7 +165,7 @@ class LanguageDetectorBuilder private constructor(
         @JvmStatic
         fun fromAllLanguagesWithout(vararg languages: Language): LanguageDetectorBuilder {
             val languagesToLoad = Language.values().toMutableList()
-            languagesToLoad.removeAll(arrayOf(Language.UNKNOWN, *languages))
+            languagesToLoad.removeAll(setOf(Language.UNKNOWN, *languages))
             require(languagesToLoad.size >= 2) { MISSING_LANGUAGE_MESSAGE }
             return LanguageDetectorBuilder(languagesToLoad)
         }
@@ -176,6 +192,7 @@ class LanguageDetectorBuilder private constructor(
          * @param isoCodes The ISO 639-1 codes to use.
          * @throws [IllegalArgumentException] if less than two iso codes are specified.
          */
+        @Suppress("FunctionName") // public API
         @JvmStatic
         fun fromIsoCodes639_1(vararg isoCodes: IsoCode639_1): LanguageDetectorBuilder {
             val isoCodesToLoad = isoCodes.toMutableSet()
@@ -192,6 +209,7 @@ class LanguageDetectorBuilder private constructor(
          * @param isoCodes The ISO 639-3 codes to use.
          * @throws [IllegalArgumentException] if less than two iso codes are specified.
          */
+        @Suppress("FunctionName", "unused") // public API
         @JvmStatic
         fun fromIsoCodes639_3(vararg isoCodes: IsoCode639_3): LanguageDetectorBuilder {
             val isoCodesToLoad = isoCodes.toMutableSet()

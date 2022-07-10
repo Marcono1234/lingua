@@ -19,47 +19,86 @@ package com.github.pemistahl.lingua.api
 import com.github.pemistahl.lingua.api.Language.CHINESE
 import com.github.pemistahl.lingua.api.Language.JAPANESE
 import com.github.pemistahl.lingua.api.Language.UNKNOWN
-import com.github.pemistahl.lingua.internal.Alphabet
 import com.github.pemistahl.lingua.internal.Constant.CHARS_TO_LANGUAGES_MAPPING
+import com.github.pemistahl.lingua.internal.Constant.LANGUAGES_SUPPORTING_LOGOGRAMS
 import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
-import com.github.pemistahl.lingua.internal.Constant.NO_LETTER
 import com.github.pemistahl.lingua.internal.Constant.NUMBERS
 import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
-import com.github.pemistahl.lingua.internal.Constant.isJapaneseAlphabet
-import com.github.pemistahl.lingua.internal.Ngram
+import com.github.pemistahl.lingua.internal.Constant.isJapaneseScript
+import com.github.pemistahl.lingua.internal.Constant.languagesWithCharsIndexer
+import com.github.pemistahl.lingua.internal.ObjectNgram
+import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
-import com.github.pemistahl.lingua.internal.TrainingDataLanguageModel
+import com.github.pemistahl.lingua.internal.model.QuadriFivegramRelativeFrequencyLookup
+import com.github.pemistahl.lingua.internal.model.UniBiTrigramRelativeFrequencyLookup
+import com.github.pemistahl.lingua.internal.util.EnumDoubleMap
+import com.github.pemistahl.lingua.internal.util.EnumIntMap
+import com.github.pemistahl.lingua.internal.util.KeyIndexer
+import com.github.pemistahl.lingua.internal.util.ResettableLazy
+import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.enumMapOf
-import com.github.pemistahl.lingua.internal.util.extension.incrementCounter
+import com.github.pemistahl.lingua.internal.util.extension.filter
+import com.github.pemistahl.lingua.internal.util.extension.intersect
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
-import it.unimi.dsi.fastutil.objects.Object2FloatMap
-import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
 import java.util.EnumMap
+import java.util.EnumSet
 import java.util.SortedMap
 import java.util.TreeMap
 import java.util.concurrent.Callable
-import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.Executor
+import java.util.concurrent.Future
+import java.util.concurrent.FutureTask
+import java.util.function.LongConsumer
 import kotlin.math.ln
+
+private const val FULL_WORD_VALUE = 1.0
+/**
+ * Word value for a logogram.
+ *
+ * At least compared to English it appears for languages with logograms, such as Chinese,
+ * more words (=logograms) are needed to express the same thing, therefore don't count a
+ * logogram as [full word][FULL_WORD_VALUE]
+ */
+private const val LOGOGRAM_WORD_VALUE = 0.7
 
 /**
  * Detects the language of given input text.
  */
 class LanguageDetector internal constructor(
-    internal val languages: MutableSet<Language>,
+    internal val languages: EnumSet<Language>,
     internal val minimumRelativeDistance: Double,
     isEveryLanguageModelPreloaded: Boolean,
     internal val isLowAccuracyModeEnabled: Boolean,
+    private val executor: Executor,
     internal val numberOfLoadedLanguages: Int = languages.size,
 ) {
     private val languagesWithUniqueCharacters = languages.filterNot { it.uniqueCharacters.isNullOrBlank() }.asSequence()
-    private val oneLanguageAlphabets = Alphabet.allSupportingExactlyOneLanguage().filterValues {
-        it in languages
-    }
+    private val alphabetsSupportingExactlyOneLanguage = enumMapOf(
+        Language.scriptsSupportingExactlyOneLanguage.filterValues {
+            it in languages
+        }
+    )
+    /** Indexer for maps containing only the constants of [languages] as key */
+    private val languagesSubsetIndexer = KeyIndexer.fromEnumConstants(languages)
+    /** Indexer for maps used as part of rule based word detection */
+    private val wordLanguagesSubsetIndexer = KeyIndexer.fromEnumConstants(
+        languagesWithUniqueCharacters
+            .plus(alphabetsSupportingExactlyOneLanguage.values)
+            // Japanese and Chinese have custom detection
+            .plus(listOf(UNKNOWN, JAPANESE, CHINESE))
+            .toSet()
+    )
 
     init {
         if (isEveryLanguageModelPreloaded) {
             preloadLanguageModels()
         }
+    }
+
+    private fun <E> submitTasks(tasks: List<Callable<E>>): List<E> {
+        val futures = tasks.map { FutureTask(it) }
+        futures.forEach(executor::execute)
+        return futures.map(Future<E>::get)
     }
 
     /**
@@ -103,30 +142,30 @@ class LanguageDetector internal constructor(
      * @param text The input text to detect the language for.
      * @return A map of all possible languages, sorted by their confidence value in descending order.
      */
+    @Suppress("unused") // public API
     fun computeLanguageConfidenceValues(text: String): SortedMap<Language, Double> {
-        val values = TreeMap<Language, Double>()
         val cleanedUpText = cleanUpInputText(text)
 
-        if (cleanedUpText.isEmpty() || NO_LETTER.matches(cleanedUpText)) return values
+        if (cleanedUpText.isEmpty() || !cleanedUpText.codePoints().anyMatch(Character::isLetter)) {
+            return TreeMap()
+        }
 
         val words = splitTextIntoWords(cleanedUpText)
         val languageDetectedByRules = detectLanguageWithRules(words)
 
         if (languageDetectedByRules != UNKNOWN) {
-            values[languageDetectedByRules] = 1.0
-            return values
+            return sortedMapOf(languageDetectedByRules to 1.0)
         }
 
         val filteredLanguages = filterLanguagesByRules(words)
 
         if (filteredLanguages.size == 1) {
             val filteredLanguage = filteredLanguages.iterator().next()
-            values[filteredLanguage] = 1.0
-            return values
+            return sortedMapOf(filteredLanguage to 1.0)
         }
 
         if (isLowAccuracyModeEnabled && cleanedUpText.length < 3) {
-            return values
+            return TreeMap()
         }
 
         val ngramSizeRange = if (cleanedUpText.length >= HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH ||
@@ -136,37 +175,36 @@ class LanguageDetector internal constructor(
         } else {
             (1..5)
         }
-        val tasks = ngramSizeRange.filter { i -> cleanedUpText.length >= i }.map { i ->
-            Callable {
-                val testDataModel = TestDataLanguageModel.fromText(cleanedUpText, ngramLength = i)
-                val probabilities = computeLanguageProbabilities(testDataModel, filteredLanguages)
+        val allProbabilitiesAndUnigramCounts = submitTasks(
+            ngramSizeRange.filter { i -> cleanedUpText.length >= i }.map { i ->
+                Callable {
+                    val testDataModel = TestDataLanguageModel.fromText(cleanedUpText, ngramLength = i)
+                    val probabilities = computeLanguageProbabilities(testDataModel, filteredLanguages)
 
-                val unigramCounts = if (i == 1) {
-                    val languages = probabilities.keys
-                    val unigramFilteredLanguages =
-                        if (languages.isNotEmpty()) filteredLanguages.asSequence()
-                            .filter { languages.contains(it) }
-                            .toSet()
-                        else filteredLanguages
-                    countUnigramsOfInputText(testDataModel, unigramFilteredLanguages)
-                } else {
-                    null
+                    val unigramCounts = if (i == 1) {
+                        val languages = probabilities.getNonZeroKeys()
+
+                        val unigramFilteredLanguages =
+                            if (languages.isNotEmpty()) filteredLanguages.asSequence()
+                                .filter { languages.contains(it) }
+                                .toSet()
+                            else filteredLanguages
+                        countUnigramsOfInputText(testDataModel, unigramFilteredLanguages)
+                    } else {
+                        null
+                    }
+
+                    Pair(probabilities, unigramCounts)
                 }
-
-                Pair(probabilities, unigramCounts)
             }
-        }
+        )
 
-        val allProbabilitiesAndUnigramCounts = ForkJoinPool.commonPool().invokeAll(tasks).map { it.get() }
         val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
-        val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: emptyMap()
+        val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: EnumIntMap.newMap(languagesSubsetIndexer)
         val summedUpProbabilities = sumUpProbabilities(allProbabilities, unigramCounts, filteredLanguages)
-        val highestProbability = summedUpProbabilities.maxByOrNull { it.value }?.value ?: return sortedMapOf()
-        val confidenceValues = summedUpProbabilities.mapValues { (highestProbability / it.value).toDouble() }
-        val sortedByConfidenceValue = compareByDescending<Language> { language -> confidenceValues[language] }
-        val sortedByConfidenceValueThenByLanguage = sortedByConfidenceValue.thenBy { language -> language }
-
-        return confidenceValues.toSortedMap(sortedByConfidenceValueThenByLanguage)
+        val highestProbability = summedUpProbabilities.maxValueOrNull() ?: return TreeMap()
+        val confidenceValues = summedUpProbabilities.mapNonZeroValues { highestProbability / it }
+        return confidenceValues.sortedByNonZeroDescendingValue()
     }
 
     /**
@@ -177,70 +215,42 @@ class LanguageDetector internal constructor(
      * an application server. By calling this method prior to undeploying the
      * web application, the language models are removed and memory is freed.
      * This prevents exceptions such as [OutOfMemoryError] when the web application
-     * is redeployed multiple times, even though they should not be thrown due to
-     * the internal use of [ForkJoinPool.commonPool] for loading language models
-     * in parallel.
+     * is redeployed multiple times.
      */
-    @Deprecated("since 1.2.0, will be removed in 1.3.0", ReplaceWith("unloadLanguageModels()"))
-    fun destroy() {
-        unloadLanguageModels()
-    }
-
-    /**
-     * Unloads all language models loaded by this [LanguageDetector] instance
-     * and frees associated resources.
-     *
-     * This will be useful if the library is used within a web application inside
-     * an application server. By calling this method prior to undeploying the
-     * web application, the language models are removed and memory is freed.
-     * This prevents exceptions such as [OutOfMemoryError] when the web application
-     * is redeployed multiple times, even though they should not be thrown due to
-     * the internal use of [ForkJoinPool.commonPool] for loading language models
-     * in parallel.
-     */
+    @Suppress("unused") // public API
     fun unloadLanguageModels() {
-        synchronized(trigramLanguageModels) {
-            languages.forEach(trigramLanguageModels::remove)
-        }
-        if (!isLowAccuracyModeEnabled) {
-            synchronized(unigramLanguageModels) {
-                languages.forEach(unigramLanguageModels::remove)
-            }
-            synchronized(bigramLanguageModels) {
-                languages.forEach(bigramLanguageModels::remove)
-            }
-            synchronized(quadrigramLanguageModels) {
-                languages.forEach(quadrigramLanguageModels::remove)
-            }
-            synchronized(fivegramLanguageModels) {
-                languages.forEach(fivegramLanguageModels::remove)
-            }
+        languages.forEach {
+            languageModels[it]!!.reset()
         }
     }
 
-    internal fun cleanUpInputText(text: String): String {
+    private fun cleanUpInputText(text: String): String {
         return text.trim().lowercase()
             .replace(PUNCTUATION, "")
             .replace(NUMBERS, "")
             .replace(MULTIPLE_WHITESPACE, " ")
     }
 
-    internal fun splitTextIntoWords(text: String): List<String> {
+    /** Splits text at spaces and between logograms */
+    private fun splitTextIntoWords(text: String): List<String> {
         val words = mutableListOf<String>()
         var nextWordStart = 0
         for (i in text.indices) {
             val char = text[i]
 
             if (char == ' ') {
+                // If equal, skip consecutive whitespaces
                 if (nextWordStart != i) {
                     words.add(text.substring(nextWordStart, i))
                 }
                 nextWordStart = i + 1
             } else if (char.isLogogram()) {
                 if (nextWordStart != i) {
+                    // Add previous word excluding trailing logogram
                     words.add(text.substring(nextWordStart, i))
                 }
 
+                // Add logogram on its own
                 words.add(text[i].toString())
                 nextWordStart = i + 1
             }
@@ -252,238 +262,310 @@ class LanguageDetector internal constructor(
         return words
     }
 
-    internal fun countUnigramsOfInputText(
+    private fun UniBiTrigramRelativeFrequencyLookup.getFrequency(ngram: PrimitiveNgram): Double {
+        val (length, char0, char1, char2) = ngram
+        return getFrequency(length, char0, char1, char2)
+    }
+
+    private fun countUnigramsOfInputText(
         unigramLanguageModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>
-    ): Map<Language, Int> {
-        val unigramCounts = mutableMapOf<Language, Int>()
+    ): EnumIntMap<Language> {
+        val unigramCounts = EnumIntMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
-            for (unigram in unigramLanguageModel.ngrams) {
-                val probability = lookUpNgramProbability(language, unigram)
-                if (probability > 0) {
-                    unigramCounts.incrementCounter(language)
+            val lookup = languageModels[language]!!.value().uniBiTrigramsLookup
+
+            // Only have to check primitiveNgrams since unigrams are always encoded as primitive
+            unigramLanguageModel.primitiveNgrams.forEach(
+                LongConsumer {
+                    val probability = lookup.getFrequency(PrimitiveNgram(it))
+                    if (probability > 0) {
+                        unigramCounts.increment(language)
+                    }
                 }
-            }
+            )
         }
         return unigramCounts
     }
 
-    internal fun sumUpProbabilities(
-        probabilities: List<Map<Language, Float>>,
-        unigramCountsOfInputText: Map<Language, Int>,
+    private fun sumUpProbabilities(
+        probabilities: List<EnumDoubleMap<Language>>,
+        unigramCountsOfInputText: EnumIntMap<Language>,
         filteredLanguages: Set<Language>
-    ): Map<Language, Float> {
-        val summedUpProbabilities = mutableMapOf<Language, Float>()
+    ): EnumDoubleMap<Language> {
+        val summedUpProbabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
-            var sum = 0F
+            var sum = 0.0
             for (probabilityMap in probabilities) {
-                sum += probabilityMap[language] ?: 0F
+                sum += probabilityMap.getOrZero(language)
             }
-            summedUpProbabilities[language] = sum
+            summedUpProbabilities.set(language, sum)
 
-            if (unigramCountsOfInputText.containsKey(language)) {
-                summedUpProbabilities[language] = summedUpProbabilities.getValue(language) /
-                    unigramCountsOfInputText.getValue(language)
+            unigramCountsOfInputText.ifNonZero(language) { unigramCount ->
+                summedUpProbabilities.set(language, summedUpProbabilities.getOrZero(language) / unigramCount)
             }
         }
-        return summedUpProbabilities.filter { it.value != 0F }
+        return summedUpProbabilities
     }
 
-    internal fun detectLanguageWithRules(words: List<String>): Language {
-        val totalLanguageCounts = mutableMapOf<Language, Int>()
+    private fun detectLanguageWithRules(words: List<String>): Language {
+        // Using Double because logograms are not counted as full word
+        var adjustedWordCount = 0.0
+        val totalLanguageCounts = EnumDoubleMap.newMap(wordLanguagesSubsetIndexer)
 
         for (word in words) {
-            val wordLanguageCounts = mutableMapOf<Language, Int>()
+            val wordLanguageCounts = EnumIntMap.newMap(wordLanguagesSubsetIndexer)
 
             for (character in word) {
-                var isMatch = false
-                for ((alphabet, language) in oneLanguageAlphabets) {
-                    if (alphabet.matches(character)) {
-                        wordLanguageCounts.incrementCounter(language)
-                        isMatch = true
-                        break
-                    }
-                }
-                if (!isMatch) {
+                val script = Character.UnicodeScript.of(character.code)
+
+                val alphabetLanguage = alphabetsSupportingExactlyOneLanguage[script]
+                if (alphabetLanguage != null) {
+                    wordLanguageCounts.increment(alphabetLanguage)
+                } else {
                     when {
-                        Alphabet.HAN.matches(character) -> wordLanguageCounts.incrementCounter(CHINESE)
-                        isJapaneseAlphabet(character) -> wordLanguageCounts.incrementCounter(JAPANESE)
-                        Alphabet.LATIN.matches(character) ||
-                            Alphabet.CYRILLIC.matches(character) ||
-                            Alphabet.DEVANAGARI.matches(character) ->
+                        script == Character.UnicodeScript.HAN -> wordLanguageCounts.increment(CHINESE)
+                        isJapaneseScript(script) -> wordLanguageCounts.increment(JAPANESE)
+                        script == Character.UnicodeScript.LATIN ||
+                            script == Character.UnicodeScript.CYRILLIC ||
+                            script == Character.UnicodeScript.DEVANAGARI ->
                             languagesWithUniqueCharacters.filter {
                                 it.uniqueCharacters?.contains(character) ?: false
                             }.forEach {
-                                wordLanguageCounts.incrementCounter(it)
+                                wordLanguageCounts.increment(it)
                             }
                     }
                 }
             }
 
-            if (wordLanguageCounts.isEmpty()) {
-                totalLanguageCounts.incrementCounter(UNKNOWN)
-            } else if (wordLanguageCounts.size == 1) {
-                val language = wordLanguageCounts.keys.first()
+            var wordValue = FULL_WORD_VALUE
+            val languageCounts = wordLanguageCounts.countNonZeroValues()
+
+            if (languageCounts == 0) {
+                totalLanguageCounts.increment(UNKNOWN, wordValue)
+            } else if (languageCounts == 1) {
+                val language = wordLanguageCounts.firstNonZero()!!
                 if (language in languages) {
-                    totalLanguageCounts.incrementCounter(language)
+                    if (word.isLogogram()) {
+                        wordValue = LOGOGRAM_WORD_VALUE
+                    }
+                    totalLanguageCounts.increment(language, wordValue)
                 } else {
-                    totalLanguageCounts.incrementCounter(UNKNOWN)
+                    totalLanguageCounts.increment(UNKNOWN, wordValue)
                 }
             } else {
-                val sortedWordLanguageCounts = wordLanguageCounts.toList().sortedByDescending { it.second }
-                val (mostFrequentLanguage, firstCharCount) = sortedWordLanguageCounts[0]
-                val (_, secondCharCount) = sortedWordLanguageCounts[1]
+                val sortedWordLanguageCounts = wordLanguageCounts.descendingIterator()
+                val mostFrequent = sortedWordLanguageCounts.next()
+                val mostFrequentLanguage = mostFrequent.key
+                val firstCharCount = mostFrequent.value
+                val secondCharCount = sortedWordLanguageCounts.next().value
 
                 if (firstCharCount > secondCharCount && mostFrequentLanguage in languages) {
-                    totalLanguageCounts.incrementCounter(mostFrequentLanguage)
+                    totalLanguageCounts.increment(mostFrequentLanguage, wordValue)
                 } else {
-                    totalLanguageCounts.incrementCounter(UNKNOWN)
+                    totalLanguageCounts.increment(UNKNOWN, wordValue)
                 }
             }
+
+            adjustedWordCount += wordValue
         }
 
-        val unknownLanguageCount = totalLanguageCounts[UNKNOWN] ?: 0
-        if (unknownLanguageCount < (0.5 * words.size)) {
-            totalLanguageCounts.remove(UNKNOWN)
+        val unknownLanguageCount = totalLanguageCounts.getOrZero(UNKNOWN)
+        if (unknownLanguageCount < (0.4 * adjustedWordCount)) {
+            totalLanguageCounts.set(UNKNOWN, 0.0)
         }
 
-        if (totalLanguageCounts.isEmpty()) {
+        val languagesCount = totalLanguageCounts.countNonZeroValues()
+        if (languagesCount == 0) {
             return UNKNOWN
         }
-        if (totalLanguageCounts.size == 1) {
-            return totalLanguageCounts.keys.first()
+        if (languagesCount == 1) {
+            return totalLanguageCounts.firstNonZero()!!
         }
-        if (totalLanguageCounts.size == 2 &&
-            totalLanguageCounts.containsKey(CHINESE) &&
-            totalLanguageCounts.containsKey(JAPANESE)
+        if (languagesCount == 2 &&
+            totalLanguageCounts.hasNonZeroValue(CHINESE) &&
+            totalLanguageCounts.hasNonZeroValue(JAPANESE)
         ) {
             return JAPANESE
         }
-        val sortedTotalLanguageCounts = totalLanguageCounts.toList().sortedByDescending { it.second }
-        val (mostFrequentLanguage, firstCharCount) = sortedTotalLanguageCounts[0]
-        val (_, secondCharCount) = sortedTotalLanguageCounts[1]
+        val sortedTotalLanguageCounts = totalLanguageCounts.descendingIterator()
+        val mostFrequent = sortedTotalLanguageCounts.next()
+        val mostFrequentLanguage = mostFrequent.key
+        val firstWordCount = mostFrequent.value
+        val secondWordCount = sortedTotalLanguageCounts.next().value
 
-        return when (firstCharCount) {
-            secondCharCount -> UNKNOWN
+        return when {
+            // If word counts are too close to each other return UNKNOWN
+            secondWordCount / firstWordCount > 0.8 -> UNKNOWN
             else -> mostFrequentLanguage
         }
     }
 
-    internal fun filterLanguagesByRules(words: List<String>): Set<Language> {
-        val detectedAlphabets = mutableMapOf<Alphabet, Int>()
+    private fun filterLanguagesByRules(words: List<String>): Set<Language> {
+        // Using Double because logograms are not counted as full word
+        var adjustedWordCount = 0.0
+        val detectedAlphabets = EnumDoubleMap.newMap(Language.allScriptsIndexer)
 
         for (word in words) {
-            for (alphabet in Alphabet.values()) {
-                if (alphabet.matches(word)) {
-                    detectedAlphabets.incrementCounter(alphabet)
+            var wordValue = FULL_WORD_VALUE
+            for (unicodeScript in Language.allScripts) {
+                if (word.all { Character.UnicodeScript.of(it.code) == unicodeScript }) {
+                    if (word.isLogogram()) {
+                        wordValue = LOGOGRAM_WORD_VALUE
+                    }
+                    detectedAlphabets.increment(unicodeScript, wordValue)
                     break
                 }
             }
+            adjustedWordCount += wordValue
         }
 
-        if (detectedAlphabets.isEmpty()) {
+        if (detectedAlphabets.hasOnlyZeroValues()) {
             return languages
         }
 
-        if (detectedAlphabets.size > 1) {
-            val distinctAlphabets = mutableSetOf<Int>()
-            for (count in detectedAlphabets.values) {
-                distinctAlphabets.add(count)
-            }
-            if (distinctAlphabets.size == 1) {
-                return languages
+        val alphabetsIterator = detectedAlphabets.descendingIterator()
+        val mostFrequentAlphabet = alphabetsIterator.next()
+        val mostFrequentAlphabets = EnumSet.of(mostFrequentAlphabet.key)
+        val mostFrequentAlphabetCount = mostFrequentAlphabet.value
+
+        // Add all alphabets which are close to the most frequent one
+        while (alphabetsIterator.hasNext()) {
+            val nextMostFrequent = alphabetsIterator.next()
+            if (nextMostFrequent.value / mostFrequentAlphabetCount >= 0.8) {
+                mostFrequentAlphabets.add(nextMostFrequent.key)
+            } else {
+                break
             }
         }
 
-        val mostFrequentAlphabet = detectedAlphabets.entries.maxByOrNull { it.value }?.key
-        val filteredLanguages = languages.asSequence().filter { it.alphabets.contains(mostFrequentAlphabet) }.toSet()
-        val languageCounts = mutableMapOf<Language, Int>()
+        val filteredLanguages = languages.filter {
+            it.unicodeScripts.any { script -> mostFrequentAlphabets.contains(script) }
+        }
+        val languageCounts = EnumIntMap.newMap(languagesWithCharsIndexer)
 
         for ((characters, languages) in CHARS_TO_LANGUAGES_MAPPING) {
             val relevantLanguages = languages.intersect(filteredLanguages)
 
             for (word in words) {
-                for (character in characters) {
-                    if (word.contains(character)) {
-                        for (language in relevantLanguages) {
-                            languageCounts.incrementCounter(language)
-                        }
+                if (word.containsAnyOf(characters)) {
+                    for (language in relevantLanguages) {
+                        languageCounts.increment(language)
                     }
                 }
             }
         }
 
-        val languagesSubset = languageCounts.filterValues { it >= words.size / 2.0 }.keys
+        val languagesSubset = languageCounts.keysWithValueLargerEqualThan(adjustedWordCount / 2.0)
 
-        return languagesSubset.ifEmpty {
-            filteredLanguages
+        return if (languagesSubset.isNotEmpty()) {
+            filteredLanguages.filter { it in languagesSubset }.toSet()
+        } else {
+            filteredLanguages.toSet()
         }
     }
 
-    internal fun computeLanguageProbabilities(
+    private fun computeLanguageProbabilities(
         testDataModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>
-    ): Map<Language, Float> {
-        val probabilities = mutableMapOf<Language, Float>()
+    ): EnumDoubleMap<Language> {
+        val probabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
-            probabilities[language] = computeSumOfNgramProbabilities(language, testDataModel.ngrams)
-        }
-        return probabilities.filter { it.value < 0.0 }
-    }
+            val modelHolder = languageModels[language]!!.value()
+            val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
+            val quadriFivegramLookup = when {
+                // When model only contains primitives don't have to load quadriFivegramLookup
+                testDataModel.hasOnlyPrimitives() -> QuadriFivegramRelativeFrequencyLookup.empty
+                else -> modelHolder.quadriFivegramLookup.value
+            }
 
-    internal fun computeSumOfNgramProbabilities(
-        language: Language,
-        ngrams: Set<Ngram>
-    ): Float {
-        var probabilitiesSum = 0F
-
-        for (ngram in ngrams) {
-            for (elem in ngram.rangeOfLowerOrderNgrams()) {
-                val probability = lookUpNgramProbability(language, elem)
-                if (probability > 0) {
-                    probabilitiesSum += ln(probability)
-                    break
+            var probability = computeSumOfNgramProbabilities(
+                uniBiTrigramsLookup,
+                quadriFivegramLookup,
+                testDataModel
+            )
+            if (probability < 0.0) {
+                // For languages with logograms increase probability since their words (=logograms)
+                // consist only of a single char compared to other languages whose words consist
+                // of multiple chars
+                if (language in LANGUAGES_SUPPORTING_LOGOGRAMS) {
+                    // Multiply by value < 1.0 since a smaller probability is better
+                    probability *= 0.85
                 }
+                probabilities.set(language, probability)
             }
         }
-        return probabilitiesSum
+        return probabilities
     }
 
-    internal fun lookUpNgramProbability(
-        language: Language,
-        ngram: Ngram
-    ): Float {
-        val ngramLength = ngram.value.length
-        val languageModels = when (ngramLength) {
-            5 -> fivegramLanguageModels
-            4 -> quadrigramLanguageModels
-            3 -> trigramLanguageModels
-            2 -> bigramLanguageModels
-            1 -> unigramLanguageModels
-            0 -> throw IllegalArgumentException("Zerogram detected")
-            else -> throw IllegalArgumentException("unsupported ngram length detected: ${ngram.value.length}")
+    private fun computeSumOfNgramProbabilities(
+        uniBiTrigramsLookup: UniBiTrigramRelativeFrequencyLookup,
+        quadriFivegramLookup: QuadriFivegramRelativeFrequencyLookup,
+        testDataModel: TestDataLanguageModel
+    ): Double {
+        var probabilitySum = 0.0
+
+        ngramLoop@ for (ngram in testDataModel.objectNgrams) {
+            var current = ObjectNgram(ngram)
+            var currentPrimitive: PrimitiveNgram
+            while (true) {
+                val probability = quadriFivegramLookup.getFrequency(current.value)
+                if (probability > 0) {
+                    probabilitySum += ln(probability)
+                    continue@ngramLoop
+                }
+
+                val newCurrent = current.getLowerOrderNgram()
+                if (newCurrent == null) {
+                    currentPrimitive = current.getLowerOrderPrimitiveNgram()
+                    break
+                } else {
+                    current = newCurrent
+                }
+            }
+
+            do {
+                val probability = uniBiTrigramsLookup.getFrequency(currentPrimitive)
+                if (probability > 0) {
+                    probabilitySum += ln(probability)
+                    break
+                }
+
+                currentPrimitive = currentPrimitive.getLowerOrderNgram()
+            } while (currentPrimitive.value != PrimitiveNgram.NONE.value)
         }
 
-        val model = loadLanguageModels(languageModels, language, ngramLength)
+        // Must explicitly specify LongConsumer type, otherwise Kotlin picks the wrong overload
+        testDataModel.primitiveNgrams.forEach(
+            LongConsumer {
+                var current = PrimitiveNgram(it)
+                do {
+                    val probability = uniBiTrigramsLookup.getFrequency(current)
+                    if (probability > 0) {
+                        probabilitySum += ln(probability)
+                        break
+                    }
 
-        return model.getFloat(ngram.value)
+                    current = current.getLowerOrderNgram()
+                } while (current.value != PrimitiveNgram.NONE.value)
+            }
+        )
+
+        return probabilitySum
     }
 
     private fun preloadLanguageModels() {
-        val tasks = mutableListOf<Callable<Object2FloatMap<String>>>()
-
-        for (language in languages) {
-            tasks.add(Callable { loadLanguageModels(trigramLanguageModels, language, 3) })
-
-            if (!isLowAccuracyModeEnabled) {
-                tasks.add(Callable { loadLanguageModels(unigramLanguageModels, language, 1) })
-                tasks.add(Callable { loadLanguageModels(bigramLanguageModels, language, 2) })
-                tasks.add(Callable { loadLanguageModels(quadrigramLanguageModels, language, 4) })
-                tasks.add(Callable { loadLanguageModels(fivegramLanguageModels, language, 5) })
+        submitTasks(
+            languages.map {
+                Callable {
+                    // Initialize values of Lazy objects
+                    val modelHolder = languageModels[it]!!.value()
+                    if (!isLowAccuracyModeEnabled) {
+                        modelHolder.quadriFivegramLookup.value
+                    }
+                }
             }
-        }
-
-        ForkJoinPool.commonPool().invokeAll(tasks).forEach { it.get() }
+        )
     }
 
     override fun equals(other: Any?) = when {
@@ -492,43 +574,37 @@ class LanguageDetector internal constructor(
         languages != other.languages -> false
         minimumRelativeDistance != other.minimumRelativeDistance -> false
         isLowAccuracyModeEnabled != other.isLowAccuracyModeEnabled -> false
+        executor != other.executor -> false
         else -> true
     }
 
     override fun hashCode() =
-        31 * languages.hashCode() + minimumRelativeDistance.hashCode() + isLowAccuracyModeEnabled.hashCode()
+        31 * languages.hashCode() + minimumRelativeDistance.hashCode() + isLowAccuracyModeEnabled.hashCode() +
+            executor.hashCode()
+
+    internal data class LanguageModelHolder(
+        val uniBiTrigramsLookup: UniBiTrigramRelativeFrequencyLookup,
+        // Lookup for quadrigrams and fivegrams is lazy since it won't be used when
+        // large texts are analyzed
+        val quadriFivegramLookup: Lazy<QuadriFivegramRelativeFrequencyLookup>
+    )
 
     internal companion object {
         private const val HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH = 120
 
-        internal val unigramLanguageModels = enumMapOf<Language, Object2FloatMap<String>>()
-        internal val bigramLanguageModels = enumMapOf<Language, Object2FloatMap<String>>()
-        internal val trigramLanguageModels = enumMapOf<Language, Object2FloatMap<String>>()
-        internal val quadrigramLanguageModels = enumMapOf<Language, Object2FloatMap<String>>()
-        internal val fivegramLanguageModels = enumMapOf<Language, Object2FloatMap<String>>()
-
-        private fun loadLanguageModels(
-            languageModels: EnumMap<Language, Object2FloatMap<String>>,
-            language: Language,
-            ngramLength: Int
-        ): Object2FloatMap<String> {
-            synchronized(languageModels) {
-                if (languageModels.containsKey(language)) {
-                    return languageModels.getValue(language)
+        internal var languageModels: Map<Language, ResettableLazy<LanguageModelHolder>> = EnumMap(
+            Language.all().asSequence()
+                .associateWith {
+                    val languageCode = it.isoCode639_1.toString()
+                    ResettableLazy {
+                        LanguageModelHolder(
+                            UniBiTrigramRelativeFrequencyLookup.fromBinary(languageCode),
+                            lazy {
+                                QuadriFivegramRelativeFrequencyLookup.fromBinary(languageCode)
+                            }
+                        )
+                    }
                 }
-            }
-            val model = loadLanguageModel(language, ngramLength)
-            synchronized(languageModels) {
-                languageModels.putIfAbsent(language, model)
-                return languageModels.getValue(language)
-            }
-        }
-
-        private fun loadLanguageModel(language: Language, ngramLength: Int): Object2FloatMap<String> {
-            val fileName = "${Ngram.getNgramNameByLength(ngramLength)}s.json"
-            val filePath = "/language-models/${language.isoCode639_1}/$fileName"
-            val inputStream = Language::class.java.getResourceAsStream(filePath) ?: return Object2FloatOpenHashMap()
-            return inputStream.use(TrainingDataLanguageModel::fromJson)
-        }
+        )
     }
 }

@@ -14,6 +14,6 @@ Erroneously classified as LATIN: 1.30% | 1.40%, PORTUGUESE: 0.30% | 0.40%, ENGLI
 
 >> Detection of 1000 sentences (average length: 97 chars)
 Accuracy: 98.70% | 99.20%
-Erroneously classified as LATIN: 0.10% | 0.20%, TSWANA: 0.10% | 0.10%, TSONGA: 0.10% | 0.10%, YORUBA: 0.10% | 0.10%, SOTHO: 0.00% | 0.10%, ROMANIAN: 0.10% | 0.10%, NYNORSK: 0.20% | 0.10%, TAGALOG: 0.10% | 0.00%, LITHUANIAN: 0.10% | 0.00%, MALAY: 0.10% | 0.00%, ESPERANTO: 0.10% | 0.00%, FRENCH: 0.10% | 0.00%, GERMAN: 0.10% | 0.00%
+Erroneously classified as LATIN: 0.10% | 0.20%, TSWANA: 0.10% | 0.10%, TSONGA: 0.10% | 0.10%, YORUBA: 0.10% | 0.10%, SOTHO: 0.00% | 0.10%, ROMANIAN: 0.20% | 0.10%, NYNORSK: 0.20% | 0.10%, TAGALOG: 0.10% | 0.00%, LITHUANIAN: 0.10% | 0.00%, MALAY: 0.10% | 0.00%, ESPERANTO: 0.10% | 0.00%, GERMAN: 0.10% | 0.00%
 
 >> Exact values: 82.13333333333333 60.6 87.1 98.7 91.06666666666666 78.2 95.8 99.2

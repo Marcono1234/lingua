@@ -1,0 +1,8 @@
+[versions]
+kotlinPlugin = "1.6.21"
+kotlin = "1.6.21"
+
+[libraries]
+fastutil = { module = "it.unimi.dsi:fastutil", version = "8.5.8" }
+
+# TODO: Maybe add all versions here

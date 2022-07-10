@@ -51,7 +51,7 @@ version = linguaVersion
 description = linguaDescription
 
 plugins {
-    kotlin("jvm") version "1.6.21"
+    kotlin("jvm") version libs.versions.kotlinPlugin.get()
     id("org.jlleitschuh.gradle.ktlint") version "10.3.0"
     id("com.adarshr.test-logger") version "3.2.0"
     id("com.asarkar.gradle.build-time-tracker") version "3.0.1"
@@ -205,7 +205,7 @@ tasks.register<Test>("accuracyReport") {
         detectors.forEach { detector ->
             languages.forEach { language ->
                 includeTestsMatching(
-                    "$linguaGroupId.$linguaArtifactId.report" +
+                    "com.github.pemistahl.lingua.report" +
                         ".${detector.toLowerCase(Locale.ROOT)}.${language}DetectionAccuracyReport"
                 )
             }
@@ -352,11 +352,25 @@ tasks.register<JavaExec>("runLinguaOnConsole") {
     classpath = sourceSets["main"].runtimeClasspath
 }
 
+val lingua by configurations.creating {
+    // Prevent projects depending on lingua from seeing and using this configuration
+    isCanBeConsumed = false
+    isVisible = false
+    isTransitive = false
+}
+
+val modelOutputDir_ = buildDir.resolve("generated").resolve("language-models")
+val createLanguageModels by tasks.registering(GenerateLanguageModelsTask::class) {
+    linguaArtifact.set(lingua.singleFile)
+    modelOutputDir.set(modelOutputDir_)
+}
+sourceSets.main.get().output.dir(mutableMapOf<String, Any>("builtBy" to createLanguageModels), modelOutputDir_)
+
 dependencies {
+    lingua("com.github.pemistahl:lingua:1.2.1")
+
     implementation(kotlin("stdlib"))
-    implementation("com.squareup.moshi:moshi:1.13.0")
-    implementation("com.squareup.moshi:moshi-kotlin:1.13.0")
-    implementation("it.unimi.dsi:fastutil:8.5.8")
+    implementation(libs.fastutil)
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.8.2")
     testImplementation("org.assertj:assertj-core:3.22.0")
@@ -441,4 +455,9 @@ signing {
 
 repositories {
     mavenCentral()
+}
+
+// TODO: Signing is temporarily disabled
+tasks.withType<Sign>() {
+    enabled = false
 }

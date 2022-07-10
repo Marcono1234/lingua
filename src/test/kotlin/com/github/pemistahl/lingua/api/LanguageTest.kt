@@ -85,20 +85,19 @@ import com.github.pemistahl.lingua.api.Language.TSONGA
 import com.github.pemistahl.lingua.api.Language.TSWANA
 import com.github.pemistahl.lingua.api.Language.TURKISH
 import com.github.pemistahl.lingua.api.Language.UKRAINIAN
-import com.github.pemistahl.lingua.api.Language.UNKNOWN
 import com.github.pemistahl.lingua.api.Language.URDU
 import com.github.pemistahl.lingua.api.Language.VIETNAMESE
 import com.github.pemistahl.lingua.api.Language.WELSH
 import com.github.pemistahl.lingua.api.Language.XHOSA
 import com.github.pemistahl.lingua.api.Language.YORUBA
 import com.github.pemistahl.lingua.api.Language.ZULU
-import com.github.pemistahl.lingua.internal.Alphabet
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.MethodSource
+import java.lang.Character.UnicodeScript
 
 class LanguageTest {
 
@@ -167,11 +166,11 @@ class LanguageTest {
     @ParameterizedTest
     @MethodSource("filteredLanguagesProvider")
     internal fun `assert that languages support correct alphabets`(
-        alphabet: Alphabet,
+        alphabet: UnicodeScript,
         expectedLanguages: List<Language>
     ) {
         assertThat(
-            Language.values().filter { it.alphabets.contains(alphabet) }
+            Language.values().filter { it.unicodeScripts.contains(alphabet) }
         ).`as`(
             "alphabet '$alphabet'"
         ).containsExactlyElementsOf(
@@ -261,11 +260,11 @@ class LanguageTest {
     }
 
     private fun filteredLanguagesProvider() = listOf(
-        arguments(Alphabet.ARABIC, listOf(ARABIC, PERSIAN, URDU)),
-        arguments(Alphabet.ARMENIAN, listOf(ARMENIAN)),
-        arguments(Alphabet.BENGALI, listOf(BENGALI)),
+        arguments(UnicodeScript.ARABIC, listOf(ARABIC, PERSIAN, URDU)),
+        arguments(UnicodeScript.ARMENIAN, listOf(ARMENIAN)),
+        arguments(UnicodeScript.BENGALI, listOf(BENGALI)),
         arguments(
-            Alphabet.CYRILLIC,
+            UnicodeScript.CYRILLIC,
             listOf(
                 BELARUSIAN,
                 BULGARIAN,
@@ -277,18 +276,18 @@ class LanguageTest {
                 UKRAINIAN
             )
         ),
-        arguments(Alphabet.DEVANAGARI, listOf(HINDI, MARATHI)),
-        arguments(Alphabet.GEORGIAN, listOf(GEORGIAN)),
-        arguments(Alphabet.GREEK, listOf(GREEK)),
-        arguments(Alphabet.GUJARATI, listOf(GUJARATI)),
-        arguments(Alphabet.GURMUKHI, listOf(PUNJABI)),
-        arguments(Alphabet.HAN, listOf(CHINESE, JAPANESE)),
-        arguments(Alphabet.HANGUL, listOf(KOREAN)),
-        arguments(Alphabet.HEBREW, listOf(HEBREW)),
-        arguments(Alphabet.HIRAGANA, listOf(JAPANESE)),
-        arguments(Alphabet.KATAKANA, listOf(JAPANESE)),
+        arguments(UnicodeScript.DEVANAGARI, listOf(HINDI, MARATHI)),
+        arguments(UnicodeScript.GEORGIAN, listOf(GEORGIAN)),
+        arguments(UnicodeScript.GREEK, listOf(GREEK)),
+        arguments(UnicodeScript.GUJARATI, listOf(GUJARATI)),
+        arguments(UnicodeScript.GURMUKHI, listOf(PUNJABI)),
+        arguments(UnicodeScript.HAN, listOf(CHINESE, JAPANESE)),
+        arguments(UnicodeScript.HANGUL, listOf(KOREAN)),
+        arguments(UnicodeScript.HEBREW, listOf(HEBREW)),
+        arguments(UnicodeScript.HIRAGANA, listOf(JAPANESE)),
+        arguments(UnicodeScript.KATAKANA, listOf(JAPANESE)),
         arguments(
-            Alphabet.LATIN,
+            UnicodeScript.LATIN,
             listOf(
                 AFRIKAANS, ALBANIAN, AZERBAIJANI, BASQUE, BOKMAL, BOSNIAN, CATALAN, CROATIAN,
                 CZECH, DANISH, DUTCH, ENGLISH, ESPERANTO, ESTONIAN, FINNISH, FRENCH, GANDA,
@@ -299,9 +298,8 @@ class LanguageTest {
                 WELSH, XHOSA, YORUBA, ZULU
             )
         ),
-        arguments(Alphabet.TAMIL, listOf(TAMIL)),
-        arguments(Alphabet.TELUGU, listOf(TELUGU)),
-        arguments(Alphabet.THAI, listOf(THAI)),
-        arguments(Alphabet.NONE, listOf(UNKNOWN))
+        arguments(UnicodeScript.TAMIL, listOf(TAMIL)),
+        arguments(UnicodeScript.TELUGU, listOf(TELUGU)),
+        arguments(UnicodeScript.THAI, listOf(THAI)),
     )
 }

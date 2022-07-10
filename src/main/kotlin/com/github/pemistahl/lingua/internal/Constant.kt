@@ -60,6 +60,7 @@ import com.github.pemistahl.lingua.api.Language.TURKISH
 import com.github.pemistahl.lingua.api.Language.UKRAINIAN
 import com.github.pemistahl.lingua.api.Language.VIETNAMESE
 import com.github.pemistahl.lingua.api.Language.YORUBA
+import com.github.pemistahl.lingua.internal.util.KeyIndexer
 import com.github.pemistahl.lingua.internal.util.extension.enumSetOf
 
 internal object Constant {
@@ -127,8 +128,10 @@ internal object Constant {
         )
     )
 
-    fun isJapaneseAlphabet(char: Char): Boolean {
-        val script = Character.UnicodeScript.of(char.code)
+    /** Indexer for all Languages which are the values of [CHARS_TO_LANGUAGES_MAPPING] */
+    val languagesWithCharsIndexer = KeyIndexer.fromEnumConstants(CHARS_TO_LANGUAGES_MAPPING.flatMap { it.value })
+
+    fun isJapaneseScript(script: Character.UnicodeScript): Boolean {
         return script == Character.UnicodeScript.HIRAGANA ||
             script == Character.UnicodeScript.KATAKANA ||
             script == Character.UnicodeScript.HAN
@@ -136,7 +139,6 @@ internal object Constant {
 
     val LANGUAGES_SUPPORTING_LOGOGRAMS = enumSetOf(CHINESE, JAPANESE, KOREAN)
     val MULTIPLE_WHITESPACE = Regex("\\s+")
-    val NO_LETTER = Regex("^[^\\p{L}]+$")
     val NUMBERS = Regex("\\p{N}")
     val PUNCTUATION = Regex("\\p{P}")
 }

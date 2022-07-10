@@ -16,24 +16,47 @@
 
 package com.github.pemistahl.lingua.internal
 
-internal data class TestDataLanguageModel(val ngrams: Set<Ngram>) {
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet
+import it.unimi.dsi.fastutil.longs.LongSet
+
+internal data class TestDataLanguageModel(
+    /** Set of [ObjectNgram] values */
+    val objectNgrams: Set<String>,
+    /** Set of [PrimitiveNgram] values */
+    val primitiveNgrams: LongSet
+) {
+    fun hasOnlyPrimitives(): Boolean {
+        return objectNgrams.isEmpty()
+    }
 
     companion object {
-        private val LETTER_REGEX = Regex("\\p{L}+")
-
         fun fromText(text: String, ngramLength: Int): TestDataLanguageModel {
             require(ngramLength in 1..5) {
                 "ngram length $ngramLength is not in range 1..5"
             }
-            val ngrams = hashSetOf<Ngram>()
-            for (i in 0..text.length - ngramLength) {
-                val textSlice = text.substring(i, i + ngramLength)
-                if (LETTER_REGEX.matches(textSlice)) {
-                    val ngram = Ngram(textSlice)
-                    ngrams.add(ngram)
+
+            val ngrams = hashSetOf<String>()
+            val primitiveNgrams = LongOpenHashSet()
+
+            var i = 0
+            var nextLetterCheckIndex = 0
+            sliceLoop@ while (i <= text.length - ngramLength) {
+                while (nextLetterCheckIndex < i + ngramLength) {
+                    if (!Character.isLetter(text[nextLetterCheckIndex++])) {
+                        // Skip all potential ngrams which would include the non-letter
+                        i = nextLetterCheckIndex
+                        continue@sliceLoop
+                    }
                 }
+
+                val primitiveNgram = PrimitiveNgram.of(text, i, ngramLength)
+                when (primitiveNgram.value) {
+                    PrimitiveNgram.NONE.value -> ngrams.add(text.substring(i, i + ngramLength))
+                    else -> primitiveNgrams.add(primitiveNgram.value)
+                }
+                i++
             }
-            return TestDataLanguageModel(ngrams)
+            return TestDataLanguageModel(ngrams, primitiveNgrams)
         }
     }
 }

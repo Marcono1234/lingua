@@ -19,17 +19,28 @@ package com.github.pemistahl.lingua.internal.util.extension
 import java.util.EnumMap
 import java.util.EnumSet
 
-internal inline fun <reified K : Enum<K>, V> enumMapOf(vararg pairs: Pair<K, V>): EnumMap<K, V> = when (pairs.size) {
+internal inline fun <reified K : Enum<K>, V> enumMapOf(map: Map<K, V>): EnumMap<K, V> = when (map.size) {
     0 -> EnumMap(K::class.java)
-    else -> EnumMap(pairs.toMap())
+    else -> EnumMap(map)
 }
 
-internal inline fun <reified E : Enum<E>> enumSetOf(vararg elements: E): EnumSet<E> = when (elements.size) {
-    0 -> EnumSet.noneOf(E::class.java)
-    1 -> EnumSet.of(elements[0])
-    2 -> EnumSet.of(elements[0], elements[1])
-    3 -> EnumSet.of(elements[0], elements[1], elements[2])
-    4 -> EnumSet.of(elements[0], elements[1], elements[2], elements[3])
-    5 -> EnumSet.of(elements[0], elements[1], elements[2], elements[3], elements[4])
-    else -> EnumSet.of(elements[0], *elements.drop(1).toTypedArray())
+internal inline fun <reified E : Enum<E>> enumSetOf(first: E, vararg others: E): EnumSet<E> {
+    return if (others.isNotEmpty()) EnumSet.of(first, *others) else EnumSet.of(first)
+}
+
+internal inline fun <E : Enum<E>> EnumSet<E>.filter(predicate: (E) -> Boolean): EnumSet<E> {
+    val result = this.clone()
+    result.clear()
+    for (element in this) {
+        if (predicate(element)) {
+            result.add(element)
+        }
+    }
+    return result
+}
+
+internal fun <E : Enum<E>> EnumSet<E>.intersect(other: Set<E>): EnumSet<E> {
+    val result = this.clone()
+    result.retainAll(other)
+    return result
 }

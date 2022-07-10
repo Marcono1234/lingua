@@ -16,28 +16,15 @@
 
 package test;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledOnOs;
-import org.junit.jupiter.api.io.TempDir;
-
 import com.github.pemistahl.lingua.api.Language;
 import com.github.pemistahl.lingua.api.LanguageDetector;
 import com.github.pemistahl.lingua.api.LanguageDetectorBuilder;
-import com.github.pemistahl.lingua.api.io.LanguageModelFilesWriter;
-
-import static java.util.stream.Collectors.toList;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.condition.OS.WINDOWS;
+import org.junit.jupiter.api.Test;
 
 import static com.github.pemistahl.lingua.api.Language.ENGLISH;
 import static com.github.pemistahl.lingua.api.Language.FRENCH;
 import static com.github.pemistahl.lingua.api.Language.SPANISH;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests basic Lingua functionality. The main purpose of this test is to verify that the
@@ -50,25 +37,5 @@ class LinguaTest {
         LanguageDetector detector = LanguageDetectorBuilder.fromLanguages(ENGLISH, FRENCH, SPANISH).build();
         Language detectedLanguage = detector.detectLanguageOf("languages are awesome");
         assertEquals(ENGLISH, detectedLanguage);
-    }
-
-    @Test
-    @DisabledOnOs(WINDOWS) // TempDir cannot be deleted on Windows
-    void testLanguageModelFilesWriter(@TempDir Path outputDirectoryPath) throws Exception {
-        Path inputFilePath = Files.createTempFile(null, null);
-
-        LanguageModelFilesWriter.createAndWriteLanguageModelFiles(
-            inputFilePath,
-            StandardCharsets.UTF_8,
-            outputDirectoryPath,
-            ENGLISH,
-            "\\p{L}&&\\p{IsLatin}"
-        );
-
-        List<Path> filesList = Files.list(outputDirectoryPath).collect(toList());
-
-        assertEquals(5, filesList.size());
-
-        inputFilePath.toFile().delete();
     }
 }

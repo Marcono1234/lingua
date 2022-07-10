@@ -1,4 +1,8 @@
-![lingua](images/logo.png) 
+Performance optimizations considered and implemented for this fork are documented in [Performance optimizations.md](./Performance%20optimizations.md).
+
+---
+
+![lingua](images/logo.png)
 
 <br>
 
@@ -13,6 +17,9 @@
 [![Download][lingua version badge]][lingua download url]
 
 ---
+
+// TODO: Doc differences and fork info; e.g. .io API package being removed
+
 ### Quick Info
 * this library tries to solve language detection of very short words and phrases, even shorter than tweets
 * makes use of both statistical and rule-based approaches
@@ -25,38 +32,38 @@
 ---
 
 ## 1. What does this library do?
-Its task is simple: It tells you which language some provided textual data is written in. 
-This is very useful as a preprocessing step for linguistic data in natural language 
-processing applications such as text classification and spell checking. 
-Other use cases, for instance, might include routing e-mails to the right geographically 
+Its task is simple: It tells you which language some provided textual data is written in.
+This is very useful as a preprocessing step for linguistic data in natural language
+processing applications such as text classification and spell checking.
+Other use cases, for instance, might include routing e-mails to the right geographically
 located customer service department, based on the e-mails' languages.
 
 ## 2. Why does this library exist?
-Language detection is often done as part of large machine learning frameworks or natural 
-language processing applications. In cases where you don't need the full-fledged 
-functionality of those systems or don't want to learn the ropes of those, 
-a small flexible library comes in handy. 
+Language detection is often done as part of large machine learning frameworks or natural
+language processing applications. In cases where you don't need the full-fledged
+functionality of those systems or don't want to learn the ropes of those,
+a small flexible library comes in handy.
 
-So far, three other comprehensive open source libraries working on the JVM for this task 
-are [Apache Tika], [Apache OpenNLP] and [Optimaize Language Detector]. 
+So far, three other comprehensive open source libraries working on the JVM for this task
+are [Apache Tika], [Apache OpenNLP] and [Optimaize Language Detector].
 Unfortunately, especially the latter has three major drawbacks:
- 
-1. Detection only works with quite lengthy text fragments. 
+
+1. Detection only works with quite lengthy text fragments.
 For very short text snippets such as Twitter messages, it doesn't provide adequate results.
 2. The more languages take part in the decision process, the less accurate are the detection results.
-3. Configuration of the library is quite cumbersome and requires some knowledge about the statistical 
+3. Configuration of the library is quite cumbersome and requires some knowledge about the statistical
 methods that are used internally.
 
-*Lingua* aims at eliminating these problems. It nearly doesn't need any configuration and 
-yields pretty accurate results on both long and short text, even on single words and phrases. 
-It draws on both rule-based and statistical methods but does not use any dictionaries of words. 
-It does not need a connection to any external API or service either. 
-Once the library has been downloaded, it can be used completely offline. 
+*Lingua* aims at eliminating these problems. It nearly doesn't need any configuration and
+yields pretty accurate results on both long and short text, even on single words and phrases.
+It draws on both rule-based and statistical methods but does not use any dictionaries of words.
+It does not need a connection to any external API or service either.
+Once the library has been downloaded, it can be used completely offline.
 
 ## 3. Which languages are supported?
 
-Compared to other language detection libraries, *Lingua's* focus is on *quality over quantity*, that is, 
-getting detection right for a small set of languages first before adding new ones. 
+Compared to other language detection libraries, *Lingua's* focus is on *quality over quantity*, that is,
+getting detection right for a small set of languages first before adding new ones.
 Currently, the following 75 languages are supported:
 
 - A
@@ -157,29 +164,29 @@ Currently, the following 75 languages are supported:
 - Y
   - Yoruba
 - Z
-  - Zulu   
+  - Zulu
 
 ## 4. How good is it?
 
-*Lingua* is able to report accuracy statistics for some bundled test data available for each supported language. 
+*Lingua* is able to report accuracy statistics for some bundled test data available for each supported language.
 The test data for each language is split into three parts:
 1. a list of single words with a minimum length of 5 characters
 2. a list of word pairs with a minimum length of 10 characters
 3. a list of complete grammatical sentences of various lengths
 
-Both the language models and the test data have been created from separate documents of the [Wortschatz corpora] 
-offered by Leipzig University, Germany. Data crawled from various news websites have been used for training, 
-each corpus comprising one million sentences. For testing, corpora made of arbitrarily chosen websites have been used, 
-each comprising ten thousand sentences. From each test corpus, a random unsorted subset of 1000 single words, 
+Both the language models and the test data have been created from separate documents of the [Wortschatz corpora]
+offered by Leipzig University, Germany. Data crawled from various news websites have been used for training,
+each corpus comprising one million sentences. For testing, corpora made of arbitrarily chosen websites have been used,
+each comprising ten thousand sentences. From each test corpus, a random unsorted subset of 1000 single words,
 1000 word pairs and 1000 sentences has been extracted, respectively.
 
-Given the generated test data, I have compared the detection results of *Lingua*, *Apache Tika*, *Apache OpenNLP* and 
-*Optimaize Language Detector* using parameterized JUnit tests running over the data of *Lingua's* supported 75 languages. 
+Given the generated test data, I have compared the detection results of *Lingua*, *Apache Tika*, *Apache OpenNLP* and
+*Optimaize Language Detector* using parameterized JUnit tests running over the data of *Lingua's* supported 75 languages.
 Languages that are not supported by the other libraries are simply ignored for those during the detection process.
 
-Each of the following sections contains two plots. The bar plot shows the detailed accuracy results for each supported 
-language. The box plot illustrates the distributions of the accuracy values for each classifier. The boxes themselves 
-represent the areas which the middle 50 % of data lie within. Within the colored boxes, the horizontal lines mark the 
+Each of the following sections contains two plots. The bar plot shows the detailed accuracy results for each supported
+language. The box plot illustrates the distributions of the accuracy values for each classifier. The boxes themselves
+represent the areas which the middle 50 % of data lie within. Within the colored boxes, the horizontal lines mark the
 median of the distributions.
 
 ### 4.1 Single word detection
@@ -2085,44 +2092,44 @@ including mean, median and standard deviation.
 
 ## 5. Why is it better than other libraries?
 
-Every language detector uses a probabilistic [n-gram](https://en.wikipedia.org/wiki/N-gram) model trained on the 
-character distribution in some training corpus. Most libraries only use n-grams of size 3 (trigrams) which is 
-satisfactory for detecting the language of longer text fragments consisting of multiple sentences. For short 
-phrases or single words, however, trigrams are not enough. The shorter the input text is, the less n-grams are 
-available. The probabilities estimated from such few n-grams are not reliable. This is why *Lingua* makes use 
-of n-grams of sizes 1 up to 5 which results in much more accurate prediction of the correct language.  
+Every language detector uses a probabilistic [n-gram](https://en.wikipedia.org/wiki/N-gram) model trained on the
+character distribution in some training corpus. Most libraries only use n-grams of size 3 (trigrams) which is
+satisfactory for detecting the language of longer text fragments consisting of multiple sentences. For short
+phrases or single words, however, trigrams are not enough. The shorter the input text is, the less n-grams are
+available. The probabilities estimated from such few n-grams are not reliable. This is why *Lingua* makes use
+of n-grams of sizes 1 up to 5 which results in much more accurate prediction of the correct language.
 
-A second important difference is that *Lingua* does not only use such a statistical model, but also a rule-based 
-engine. This engine first determines the alphabet of the input text and searches for characters which are unique 
-in one or more languages. If exactly one language can be reliably chosen this way, the statistical model is not 
-necessary anymore. In any case, the rule-based engine filters out languages that do not satisfy the conditions 
-of the input text. Only then, in a second step, the probabilistic n-gram model is taken into consideration. 
+A second important difference is that *Lingua* does not only use such a statistical model, but also a rule-based
+engine. This engine first determines the alphabet of the input text and searches for characters which are unique
+in one or more languages. If exactly one language can be reliably chosen this way, the statistical model is not
+necessary anymore. In any case, the rule-based engine filters out languages that do not satisfy the conditions
+of the input text. Only then, in a second step, the probabilistic n-gram model is taken into consideration.
 This makes sense because loading less language models means less memory consumption and better runtime performance.
 
-In general, it is always a good idea to restrict the set of languages to be considered in the classification process 
-using the respective [api methods](#library-use-programmatic). If you know beforehand that certain languages are 
-never to occur in an input text, do not let those take part in the classifcation process. The filtering mechanism 
+In general, it is always a good idea to restrict the set of languages to be considered in the classification process
+using the respective [api methods](#library-use-programmatic). If you know beforehand that certain languages are
+never to occur in an input text, do not let those take part in the classifcation process. The filtering mechanism
 of the rule-based engine is quite good, however, filtering based on your own knowledge of the input text is always preferable.
 
 ## 6. Test report and plot generation
 
-If you want to reproduce the accuracy results above, you can generate the test reports yourself for all four classifiers 
+If you want to reproduce the accuracy results above, you can generate the test reports yourself for all four classifiers
 and all languages by doing:
 
     ./gradlew accuracyReport
-    
-You can also restrict the classifiers and languages to generate reports for by passing arguments to the Gradle task. 
+
+You can also restrict the classifiers and languages to generate reports for by passing arguments to the Gradle task.
 The following task generates reports for *Lingua* and the languages English and German only:
 
     ./gradlew accuracyReport -Pdetectors=Lingua -Planguages=English,German
 
-By default, only a single CPU core is used for report generation. If you have a multi-core CPU in your machine, 
-you can fork as many processes as you have CPU cores. This speeds up report generation significantly. 
+By default, only a single CPU core is used for report generation. If you have a multi-core CPU in your machine,
+you can fork as many processes as you have CPU cores. This speeds up report generation significantly.
 However, be aware that forking more than one process can consume a lot of RAM. You do it like this:
 
     ./gradlew accuracyReport -PcpuCores=2
 
-For each detector and language, a test report file is then written into [`/accuracy-reports`][accuracy reports url], 
+For each detector and language, a test report file is then written into [`/accuracy-reports`][accuracy reports url],
 to be found next to the `src` directory. As an example, here is the current output of the *Lingua* German report:
 
 ```
@@ -2145,12 +2152,12 @@ Accuracy: 99.20% | 99.70%
 Erroneously classified as DUTCH: 0.00% | 0.20%, LATIN: 0.20% | 0.10%, NYNORSK: 0.10% | 0.00%, SPANISH: 0.10% | 0.00%, DANISH: 0.10% | 0.00%, SOTHO: 0.20% | 0.00%, ZULU: 0.10% | 0.00%
 ```
 
-The plots have been created with Python and the libraries Pandas, Matplotlib and Seaborn. 
-If you have a global Python 3 installation and the `python3` command available on your command line, 
+The plots have been created with Python and the libraries Pandas, Matplotlib and Seaborn.
+If you have a global Python 3 installation and the `python3` command available on your command line,
 you can redraw the plots after modifying the test reports by executing the following Gradle task:
 
     ./gradlew drawAccuracyPlots
-    
+
 The detailed statistics table that contains all accuracy values can be written with:
 
     ./gradlew writeAccuracyTable
@@ -2191,9 +2198,9 @@ cd lingua
 Several jar archives can be created from the project.
 1. `./gradlew jar` assembles `lingua-1.2.1.jar` containing the compiled sources only.
 2. `./gradlew sourcesJar` assembles `lingua-1.2.1-sources.jar` containing the plain source code.
-3. `./gradlew jarWithDependencies` assembles `lingua-1.2.1-with-dependencies.jar` containing the 
-compiled sources and all external dependencies needed at runtime. This jar file can be included 
-in projects without dependency management systems. It can also be used to 
+3. `./gradlew jarWithDependencies` assembles `lingua-1.2.1-with-dependencies.jar` containing the
+compiled sources and all external dependencies needed at runtime. This jar file can be included
+in projects without dependency management systems. It can also be used to
 run *Lingua* in standalone mode (see below).
 
 ## 9. How to use?
@@ -2228,11 +2235,11 @@ final Language detectedLanguage = detector.detectLanguageOf("languages are aweso
 
 #### 9.1.2 Minimum relative distance
 
-By default, *Lingua* returns the most likely language for a given input text. However, there are 
-certain words that are spelled the same in more than one language. The word *prologue*, for instance, 
-is both a valid English and French word. *Lingua* would output either English or French which might 
-be wrong in the given context. For cases like that, it is possible to specify a minimum relative 
-distance that the logarithmized and summed up probabilities for each possible language have to satisfy. 
+By default, *Lingua* returns the most likely language for a given input text. However, there are
+certain words that are spelled the same in more than one language. The word *prologue*, for instance,
+is both a valid English and French word. *Lingua* would output either English or French which might
+be wrong in the given context. For cases like that, it is possible to specify a minimum relative
+distance that the logarithmized and summed up probabilities for each possible language have to satisfy.
 It can be stated in the following way:
 
 ```kotlin
@@ -2242,11 +2249,11 @@ val detector = LanguageDetectorBuilder
     .build()
 ```
 
-Be aware that the distance between the language probabilities is dependent on the length of the input text. 
-The longer the input text, the larger the distance between the languages. So if you want to classify very 
-short text phrases, do not set the minimum relative distance too high. Otherwise you will get most results 
-returned as `Language.UNKNOWN` which is the return value for cases where language detection is not reliably 
-possible. 
+Be aware that the distance between the language probabilities is dependent on the length of the input text.
+The longer the input text, the larger the distance between the languages. So if you want to classify very
+short text phrases, do not set the minimum relative distance too high. Otherwise you will get most results
+returned as `Language.UNKNOWN` which is the return value for cases where language detection is not reliably
+possible.
 
 #### 9.1.3 Confidence values
 
@@ -2260,9 +2267,9 @@ val detector = LanguageDetectorBuilder.fromLanguages(GERMAN, ENGLISH, FRENCH, SP
 val confidenceValues = detector.computeLanguageConfidenceValues(text = "Coding is fun.")
 
 // {
-//   ENGLISH=1.0, 
-//   GERMAN=0.8665738136456169, 
-//   FRENCH=0.8249537317466078, 
+//   ENGLISH=1.0,
+//   GERMAN=0.8665738136456169,
+//   FRENCH=0.8249537317466078,
 //   SPANISH=0.7792362923625288
 // }
 ```
@@ -2283,9 +2290,9 @@ returned map is assumed to be 0.0.
 
 #### 9.1.4 Eager loading versus lazy loading
 
-By default, *Lingua* uses lazy-loading to load only those language models on demand which are 
-considered relevant by the rule-based filter engine. For web services, for instance, it is 
-rather beneficial to preload all language models into memory to avoid unexpected latency while 
+By default, *Lingua* uses lazy-loading to load only those language models on demand which are
+considered relevant by the rule-based filter engine. For web services, for instance, it is
+rather beneficial to preload all language models into memory to avoid unexpected latency while
 waiting for the service response. If you want to enable the eager-loading mode, you can do it
 like this:
 
@@ -2310,7 +2317,7 @@ LanguageDetectorBuilder.fromAllLanguages().withLowAccuracyMode().build()
 
 The downside of this approach is that detection accuracy for short texts consisting of less
 than 120 characters will drop significantly. However, detection accuracy for texts which are
-longer than 120 characters will remain mostly unaffected. 
+longer than 120 characters will remain mostly unaffected.
 
 An alternative for a smaller memory footprint and faster performance is to reduce the set
 of languages when building the language detector. In most cases, it is not advisable to
@@ -2326,8 +2333,8 @@ cases if you exclude certain languages from the decision process or just explici
 
 ```kotlin
 // include all languages available in the library
-// WARNING: in the worst case this produces high memory 
-//          consumption of approximately 3.5GB 
+// WARNING: in the worst case this produces high memory
+//          consumption of approximately 3.5GB TODO: Update
 //          and slow runtime performance
 //          (in high accuracy mode)
 LanguageDetectorBuilder.fromAllLanguages()
@@ -2354,17 +2361,17 @@ LanguageDetectorBuilder.fromIsoCodes639_3(IsoCode639_3.ENG, IsoCode639_3.DEU)
 #### 9.1.7 How to manage memory consumption within application server deployments
 
 Internally, *Lingua* efficiently uses all cores of your CPU in order to speed up loading the language
-models and language detection itself. For this purpose, an internal 
-[ForkJoinPool](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ForkJoinPool.html) 
-is used. If the library is used within an application server, the consumed memory will not be freed 
+models and language detection itself. For this purpose, an internal
+[ForkJoinPool](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ForkJoinPool.html)
+is used. If the library is used within an application server, the consumed memory will not be freed
 automatically when the application is undeployed.
 
 If you want to free all of *Lingua's* resources, you will have to do this manually by calling
-`detector.unloadLanguageModels()` during the undeployment. This will clear all loaded language models 
+`detector.unloadLanguageModels()` during the undeployment. This will clear all loaded language models
 from memory but the thread pool will keep running.
 
 ### 9.2 <a name="library-use-standalone"></a> Standalone mode <sup>[Top ▲](#table-of-contents)</sup>
-If you want to try out *Lingua* before you decide whether to use it or not, you can run it in a REPL 
+If you want to try out *Lingua* before you decide whether to use it or not, you can run it in a REPL
 and immediately see its detection results.
 1. With Gradle: `./gradlew runLinguaOnConsole --console=plain`
 2. Without Gradle: `java -jar lingua-1.2.1-with-dependencies.jar`
