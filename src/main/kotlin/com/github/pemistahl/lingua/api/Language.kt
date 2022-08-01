@@ -179,101 +179,120 @@ enum class Language(
     val isoCode639_1: IsoCode639_1,
     val isoCode639_3: IsoCode639_3,
     internal val unicodeScripts: Set<UnicodeScript>,
+    /** Same as [unicodeScripts], except stored as Array */
+    internal val unicodeScriptsArray: Array<UnicodeScript>,
     internal val uniqueCharacters: String?
 ) {
-    AFRIKAANS(AF, AFR, enumSetOf(UnicodeScript.LATIN), null),
-    ALBANIAN(SQ, SQI, enumSetOf(UnicodeScript.LATIN), null),
-    ARABIC(AR, ARA, enumSetOf(UnicodeScript.ARABIC), null),
-    ARMENIAN(HY, HYE, enumSetOf(UnicodeScript.ARMENIAN), null),
+    AFRIKAANS(AF, AFR, enumSetOf(UnicodeScript.LATIN)),
+    ALBANIAN(SQ, SQI, enumSetOf(UnicodeScript.LATIN)),
+    ARABIC(AR, ARA, enumSetOf(UnicodeScript.ARABIC)),
+    ARMENIAN(HY, HYE, enumSetOf(UnicodeScript.ARMENIAN)),
     AZERBAIJANI(AZ, AZE, enumSetOf(UnicodeScript.LATIN), "Əə"),
-    BASQUE(EU, EUS, enumSetOf(UnicodeScript.LATIN), null),
-    BELARUSIAN(BE, BEL, enumSetOf(UnicodeScript.CYRILLIC), null),
-    BENGALI(BN, BEN, enumSetOf(UnicodeScript.BENGALI), null),
-    BOKMAL(NB, NOB, enumSetOf(UnicodeScript.LATIN), null),
-    BOSNIAN(BS, BOS, enumSetOf(UnicodeScript.LATIN), null),
-    BULGARIAN(BG, BUL, enumSetOf(UnicodeScript.CYRILLIC), null),
+    BASQUE(EU, EUS, enumSetOf(UnicodeScript.LATIN)),
+    BELARUSIAN(BE, BEL, enumSetOf(UnicodeScript.CYRILLIC)),
+    BENGALI(BN, BEN, enumSetOf(UnicodeScript.BENGALI)),
+    BOKMAL(NB, NOB, enumSetOf(UnicodeScript.LATIN)),
+    BOSNIAN(BS, BOS, enumSetOf(UnicodeScript.LATIN)),
+    BULGARIAN(BG, BUL, enumSetOf(UnicodeScript.CYRILLIC)),
     CATALAN(CA, CAT, enumSetOf(UnicodeScript.LATIN), "Ïï"),
-    CHINESE(ZH, ZHO, enumSetOf(UnicodeScript.HAN), null),
-    CROATIAN(HR, HRV, enumSetOf(UnicodeScript.LATIN), null),
+    CHINESE(ZH, ZHO, enumSetOf(UnicodeScript.HAN)),
+    CROATIAN(HR, HRV, enumSetOf(UnicodeScript.LATIN)),
     CZECH(CS, CES, enumSetOf(UnicodeScript.LATIN), "ĚěŘřŮů"),
-    DANISH(DA, DAN, enumSetOf(UnicodeScript.LATIN), null),
-    DUTCH(NL, NLD, enumSetOf(UnicodeScript.LATIN), null),
-    ENGLISH(EN, ENG, enumSetOf(UnicodeScript.LATIN), null),
+    DANISH(DA, DAN, enumSetOf(UnicodeScript.LATIN)),
+    DUTCH(NL, NLD, enumSetOf(UnicodeScript.LATIN)),
+    ENGLISH(EN, ENG, enumSetOf(UnicodeScript.LATIN)),
     ESPERANTO(EO, EPO, enumSetOf(UnicodeScript.LATIN), "ĈĉĜĝĤĥĴĵŜŝŬŭ"),
-    ESTONIAN(ET, EST, enumSetOf(UnicodeScript.LATIN), null),
-    FINNISH(FI, FIN, enumSetOf(UnicodeScript.LATIN), null),
-    FRENCH(FR, FRA, enumSetOf(UnicodeScript.LATIN), null),
-    GANDA(LG, LUG, enumSetOf(UnicodeScript.LATIN), null),
-    GEORGIAN(KA, KAT, enumSetOf(UnicodeScript.GEORGIAN), null),
+    ESTONIAN(ET, EST, enumSetOf(UnicodeScript.LATIN)),
+    FINNISH(FI, FIN, enumSetOf(UnicodeScript.LATIN)),
+    FRENCH(FR, FRA, enumSetOf(UnicodeScript.LATIN)),
+    GANDA(LG, LUG, enumSetOf(UnicodeScript.LATIN)),
+    GEORGIAN(KA, KAT, enumSetOf(UnicodeScript.GEORGIAN)),
     GERMAN(DE, DEU, enumSetOf(UnicodeScript.LATIN), "ß"),
-    GREEK(EL, ELL, enumSetOf(UnicodeScript.GREEK), null),
-    GUJARATI(GU, GUJ, enumSetOf(UnicodeScript.GUJARATI), null),
-    HEBREW(HE, HEB, enumSetOf(UnicodeScript.HEBREW), null),
-    HINDI(HI, HIN, enumSetOf(UnicodeScript.DEVANAGARI), null),
+    GREEK(EL, ELL, enumSetOf(UnicodeScript.GREEK)),
+    GUJARATI(GU, GUJ, enumSetOf(UnicodeScript.GUJARATI)),
+    HEBREW(HE, HEB, enumSetOf(UnicodeScript.HEBREW)),
+    HINDI(HI, HIN, enumSetOf(UnicodeScript.DEVANAGARI)),
     HUNGARIAN(HU, HUN, enumSetOf(UnicodeScript.LATIN), "ŐőŰű"),
-    ICELANDIC(IS, ISL, enumSetOf(UnicodeScript.LATIN), null),
-    INDONESIAN(ID, IND, enumSetOf(UnicodeScript.LATIN), null),
-    IRISH(GA, GLE, enumSetOf(UnicodeScript.LATIN), null),
-    ITALIAN(IT, ITA, enumSetOf(UnicodeScript.LATIN), null),
-    JAPANESE(JA, JPN, enumSetOf(UnicodeScript.HIRAGANA, UnicodeScript.KATAKANA, UnicodeScript.HAN), null),
+    ICELANDIC(IS, ISL, enumSetOf(UnicodeScript.LATIN)),
+    INDONESIAN(ID, IND, enumSetOf(UnicodeScript.LATIN)),
+    IRISH(GA, GLE, enumSetOf(UnicodeScript.LATIN)),
+    ITALIAN(IT, ITA, enumSetOf(UnicodeScript.LATIN)),
+    JAPANESE(JA, JPN, enumSetOf(UnicodeScript.HIRAGANA, UnicodeScript.KATAKANA, UnicodeScript.HAN)),
     KAZAKH(KK, KAZ, enumSetOf(UnicodeScript.CYRILLIC), "ӘәҒғҚқҢңҰұ"),
-    KOREAN(KO, KOR, enumSetOf(UnicodeScript.HANGUL), null),
-    LATIN(LA, LAT, enumSetOf(UnicodeScript.LATIN), null),
+    KOREAN(KO, KOR, enumSetOf(UnicodeScript.HANGUL)),
+    LATIN(LA, LAT, enumSetOf(UnicodeScript.LATIN)),
     LATVIAN(LV, LAV, enumSetOf(UnicodeScript.LATIN), "ĢģĶķĻļŅņ"),
     LITHUANIAN(LT, LIT, enumSetOf(UnicodeScript.LATIN), "ĖėĮįŲų"),
     MACEDONIAN(MK, MKD, enumSetOf(UnicodeScript.CYRILLIC), "ЃѓЅѕЌќЏџ"),
-    MALAY(MS, MSA, enumSetOf(UnicodeScript.LATIN), null),
-    MAORI(MI, MRI, enumSetOf(UnicodeScript.LATIN), null),
+    MALAY(MS, MSA, enumSetOf(UnicodeScript.LATIN)),
+    MAORI(MI, MRI, enumSetOf(UnicodeScript.LATIN)),
     MARATHI(MR, MAR, enumSetOf(UnicodeScript.DEVANAGARI), "ळ"),
     MONGOLIAN(MN, MON, enumSetOf(UnicodeScript.CYRILLIC), "ӨөҮү"),
-    NYNORSK(NN, NNO, enumSetOf(UnicodeScript.LATIN), null),
-    PERSIAN(FA, FAS, enumSetOf(UnicodeScript.ARABIC), null),
+    NYNORSK(NN, NNO, enumSetOf(UnicodeScript.LATIN)),
+    PERSIAN(FA, FAS, enumSetOf(UnicodeScript.ARABIC)),
     POLISH(PL, POL, enumSetOf(UnicodeScript.LATIN), "ŁłŃńŚśŹź"),
-    PORTUGUESE(PT, POR, enumSetOf(UnicodeScript.LATIN), null),
-    PUNJABI(PA, PAN, enumSetOf(UnicodeScript.GURMUKHI), null),
+    PORTUGUESE(PT, POR, enumSetOf(UnicodeScript.LATIN)),
+    PUNJABI(PA, PAN, enumSetOf(UnicodeScript.GURMUKHI)),
     ROMANIAN(RO, RON, enumSetOf(UnicodeScript.LATIN), "Țţ"),
-    RUSSIAN(RU, RUS, enumSetOf(UnicodeScript.CYRILLIC), null),
+    RUSSIAN(RU, RUS, enumSetOf(UnicodeScript.CYRILLIC)),
     SERBIAN(SR, SRP, enumSetOf(UnicodeScript.CYRILLIC), "ЂђЋћ"),
-    SHONA(SN, SNA, enumSetOf(UnicodeScript.LATIN), null),
+    SHONA(SN, SNA, enumSetOf(UnicodeScript.LATIN)),
     SLOVAK(SK, SLK, enumSetOf(UnicodeScript.LATIN), "ĹĺĽľŔŕ"),
-    SLOVENE(SL, SLV, enumSetOf(UnicodeScript.LATIN), null),
-    SOMALI(SO, SOM, enumSetOf(UnicodeScript.LATIN), null),
-    SOTHO(ST, SOT, enumSetOf(UnicodeScript.LATIN), null),
+    SLOVENE(SL, SLV, enumSetOf(UnicodeScript.LATIN)),
+    SOMALI(SO, SOM, enumSetOf(UnicodeScript.LATIN)),
+    SOTHO(ST, SOT, enumSetOf(UnicodeScript.LATIN)),
     SPANISH(ES, SPA, enumSetOf(UnicodeScript.LATIN), "¿¡"),
-    SWAHILI(SW, SWA, enumSetOf(UnicodeScript.LATIN), null),
-    SWEDISH(SV, SWE, enumSetOf(UnicodeScript.LATIN), null),
-    TAGALOG(TL, TGL, enumSetOf(UnicodeScript.LATIN), null),
-    TAMIL(TA, TAM, enumSetOf(UnicodeScript.TAMIL), null),
-    TELUGU(TE, TEL, enumSetOf(UnicodeScript.TELUGU), null),
-    THAI(TH, THA, enumSetOf(UnicodeScript.THAI), null),
-    TSONGA(TS, TSO, enumSetOf(UnicodeScript.LATIN), null),
-    TSWANA(TN, TSN, enumSetOf(UnicodeScript.LATIN), null),
-    TURKISH(TR, TUR, enumSetOf(UnicodeScript.LATIN), null),
+    SWAHILI(SW, SWA, enumSetOf(UnicodeScript.LATIN)),
+    SWEDISH(SV, SWE, enumSetOf(UnicodeScript.LATIN)),
+    TAGALOG(TL, TGL, enumSetOf(UnicodeScript.LATIN)),
+    TAMIL(TA, TAM, enumSetOf(UnicodeScript.TAMIL)),
+    TELUGU(TE, TEL, enumSetOf(UnicodeScript.TELUGU)),
+    THAI(TH, THA, enumSetOf(UnicodeScript.THAI)),
+    TSONGA(TS, TSO, enumSetOf(UnicodeScript.LATIN)),
+    TSWANA(TN, TSN, enumSetOf(UnicodeScript.LATIN)),
+    TURKISH(TR, TUR, enumSetOf(UnicodeScript.LATIN)),
     UKRAINIAN(UK, UKR, enumSetOf(UnicodeScript.CYRILLIC), "ҐґЄєЇї"),
-    URDU(UR, URD, enumSetOf(UnicodeScript.ARABIC), null),
+    URDU(UR, URD, enumSetOf(UnicodeScript.ARABIC)),
     VIETNAMESE(
         VI,
         VIE,
         enumSetOf(UnicodeScript.LATIN),
         "ẰằẦầẲẳẨẩẴẵẪẫẮắẤấẠạẶặẬậỀềẺẻỂểẼẽỄễẾếỆệỈỉĨĩỊịƠơỒồỜờỎỏỔổỞởỖỗỠỡỐốỚớỘộỢợƯưỪừỦủỬửŨũỮữỨứỤụỰựỲỳỶỷỸỹỴỵ"
     ),
-    WELSH(CY, CYM, enumSetOf(UnicodeScript.LATIN), null),
-    XHOSA(XH, XHO, enumSetOf(UnicodeScript.LATIN), null),
+    WELSH(CY, CYM, enumSetOf(UnicodeScript.LATIN)),
+    XHOSA(XH, XHO, enumSetOf(UnicodeScript.LATIN)),
     // TODO for YORUBA: "E̩e̩Ẹ́ẹ́É̩é̩Ẹ̀ẹ̀È̩è̩Ẹ̄ẹ̄Ē̩ē̩ŌōO̩o̩Ọ́ọ́Ó̩ó̩Ọ̀ọ̀Ò̩ò̩Ọ̄ọ̄Ō̩ō̩ṢṣS̩s̩"
     YORUBA(YO, YOR, enumSetOf(UnicodeScript.LATIN), "Ṣṣ"),
-    ZULU(ZU, ZUL, enumSetOf(UnicodeScript.LATIN), null),
+    ZULU(ZU, ZUL, enumSetOf(UnicodeScript.LATIN)),
 
     /**
      * The imaginary unknown language.
      *
      * This value is returned if no language can be detected reliably.
      */
-    UNKNOWN(IsoCode639_1.NONE, IsoCode639_3.NONE, emptySet(), null);
+    UNKNOWN(IsoCode639_1.NONE, IsoCode639_3.NONE, emptySet());
+
+    private constructor (
+        isoCode639_1: IsoCode639_1,
+        isoCode639_3: IsoCode639_3,
+        unicodeScripts: Set<UnicodeScript>,
+        uniqueCharacters: String
+    ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), uniqueCharacters) {
+    }
+
+    private constructor (
+        isoCode639_1: IsoCode639_1,
+        isoCode639_3: IsoCode639_3,
+        unicodeScripts: Set<UnicodeScript>
+    ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), null) {
+    }
 
     companion object {
-        internal val allScripts: Set<UnicodeScript> =
+        private val allScriptsSet: Set<UnicodeScript> =
             EnumSet.copyOf(values().asSequence().flatMap(Language::unicodeScripts).toSet())
-        internal val allScriptsIndexer = KeyIndexer.fromEnumConstants(allScripts)
+        // Is stored as Array to reduce object creation during iteration
+        internal val allScripts = allScriptsSet.toTypedArray()
+        internal val allScriptsIndexer = KeyIndexer.fromEnumConstants(allScriptsSet)
 
         internal val scriptsSupportingExactlyOneLanguage: Map<UnicodeScript, Language>
         init {

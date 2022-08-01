@@ -55,7 +55,7 @@ internal class ImmutableLong2IntMap private constructor(
     fun get(key: Long): Int {
         val index = keys.binarySearch(key)
         return if (index < 0) 0 else {
-            if (index < indValuesIndices.size) values[indValuesIndices[index].toUShort().toInt()]
+            if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
             else if (indValuesIndices.isEmpty()) values[index]
             else values[index - indValuesIndices.size + maxIndirectionIndices]
         }

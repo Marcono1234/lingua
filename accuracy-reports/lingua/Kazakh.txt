@@ -14,6 +14,6 @@ Erroneously classified as MONGOLIAN: 1.70% | 1.60%, RUSSIAN: 1.60% | 0.80%, UKRA
 
 >> Detection of 1000 sentences (average length: 102 chars)
 Accuracy: 99.10% | 99.40%
-Erroneously classified as MONGOLIAN: 0.50% | 0.50%, ENGLISH: 0.10% | 0.10%, BELARUSIAN: 0.20% | 0.00%, RUSSIAN: 0.10% | 0.00%
+Erroneously classified as MONGOLIAN: 0.50% | 0.50%, ENGLISH: 0.00% | 0.10%, CATALAN: 0.10% | 0.00%, BELARUSIAN: 0.20% | 0.00%, RUSSIAN: 0.10% | 0.00%
 
 >> Exact values: 90.09999999999998 78.3 92.9 99.1 91.93333333333334 79.9 96.5 99.4

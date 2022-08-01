@@ -1,12 +1,12 @@
 package com.github.pemistahl.lingua.internal.util
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleAVLTreeMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleLinkedOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
 import java.util.Collections
 import java.util.EnumSet
 import java.util.SortedMap
 import java.util.StringJoiner
-import java.util.TreeMap
 
 private const val NO_INDEX = -1
 
@@ -89,7 +89,7 @@ internal class EnumDoubleMap<E : Enum<E>>(
     }
 
     fun sortedByNonZeroDescendingValue(): SortedMap<E, Double> {
-        val map = TreeMap<E, Double> { a, b ->
+        val map = Object2DoubleAVLTreeMap<E> { a, b ->
             // Highest first
             val diff = getOrZero(b).compareTo(getOrZero(a))
             when {
@@ -100,7 +100,7 @@ internal class EnumDoubleMap<E : Enum<E>>(
         }
         values.forEachIndexed { index, value ->
             if (value != 0.0) {
-                map[keyIndexer.indexToKey(index)] = value
+                map.put(keyIndexer.indexToKey(index), value)
             }
         }
 
@@ -138,9 +138,10 @@ internal class EnumDoubleMap<E : Enum<E>>(
             // First try finding constant with same value behind last result
             for (index in nextIndex until values.size) {
                 val value = values[index]
-                if (value == lastMax && value > maxValue) {
+                if (value == lastMax && value > 0.0) {
                     maxIndex = index
                     maxValue = value
+                    break
                 }
             }
 

@@ -18,7 +18,7 @@ package com.github.pemistahl.lingua.internal
 
 /**
  * Ngram encoded as primitive [Long]. Ngrams which cannot be encoded as
- * primitive are represented as [ObjectNgram].
+ * primitive are represented as String and can be processed as [ReusableObjectNgram].
  *
  * This class is an _inline_ class, care must be taken to not accidentally
  * use it in contexts where an [Any] is used, otherwise the primitive
@@ -41,7 +41,7 @@ internal value class PrimitiveNgram(val value: Long) {
      */
     fun getLowerOrderNgram(): PrimitiveNgram {
         return when (getLength()) {
-            1 -> NONE
+            1 -> PrimitiveNgram(NONE)
             // Overwrite length and copy over only chars
             2 -> PrimitiveNgram(1L or (value and 0xFFFF_00))
             3 -> PrimitiveNgram(2L or (value and 0xFFFF_FFFF_00))
@@ -52,9 +52,10 @@ internal value class PrimitiveNgram(val value: Long) {
     companion object {
         /** Maximum ngram length supported by [PrimitiveNgram] */
         const val MAX_NGRAM_LENGTH = 3
-        val NONE = PrimitiveNgram(0)
+        const val NONE = 0L
 
-        fun of(string: String, startIndex: Int, length: Int): PrimitiveNgram {
+        @JvmStatic
+        fun of(string: CharSequence, startIndex: Int, length: Int): PrimitiveNgram {
             return when (length) {
                 1 -> PrimitiveNgram(
                     1L
@@ -73,47 +74,72 @@ internal value class PrimitiveNgram(val value: Long) {
                 )
                 // For now don't support larger ngrams, otherwise would complicate
                 // encoding since there would not be 16bits per char
-                else -> NONE
+                else -> PrimitiveNgram(NONE)
             }
+        }
+
+        @JvmStatic
+        fun of(char0: Char, char1: Char, char2: Char): PrimitiveNgram {
+            return PrimitiveNgram(
+                3L
+                    or (char0.code.toLong() shl 8)
+                    or (char1.code.toLong() shl 24)
+                    or (char2.code.toLong() shl 40)
+            )
         }
     }
 }
 
-/**
- * Ngram encoded as [String]. Only used for ngrams which cannot be represented
- * as [PrimitiveNgram].
- *
- * This class is an _inline_ class, care must be taken to not accidentally
- * use it in contexts where an [Any] is used, otherwise the `String`
- * value would be wrapped in an `ObjectNgram` instance.
- */
 @JvmInline
-internal value class ObjectNgram(val value: String) {
-    init {
-        require(value.length in (PrimitiveNgram.MAX_NGRAM_LENGTH + 1)..5) {
-            "Unsupported ngram length"
+internal value class ReusableObjectNgram(
+    /** First element is the length encoded as Char, other elements are the chars */
+    val value: CharArray = CharArray(1 + 5)
+) {
+    fun setNgram(ngram: CharSequence) {
+        val length = ngram.length
+        assert(length > PrimitiveNgram.MAX_NGRAM_LENGTH)
+        value[0] = length.toChar()
+        for (i in 0 until length) {
+            value[i + 1] = ngram[i]
         }
     }
 
-    override fun toString() = value
+    fun length() = value[0].code
+
+    operator fun component1() = length()
+    operator fun component2() = value[1]
+    operator fun component3() = value[2]
+    operator fun component4() = value[3]
+    operator fun component5() = value[4]
+    operator fun component6() = value[5]
 
     /**
-     * Returns the next lower order ngram or `null` if the next lower
-     * order ngrams are encoded as primitive and can be obtained from
+     * Tries to update this ngram to the next lower order ngram. Returns `true` if successful.
+     * Otherwise, the next lower order ngrams are encoded as primitive and can be obtained from
      * [getLowerOrderPrimitiveNgram].
      */
-    fun getLowerOrderNgram(): ObjectNgram? {
+    fun toLowerOrderNgram(): Boolean {
+        val length = length()
         // Switch to PrimitiveNgram if possible
-        return if (value.length <= PrimitiveNgram.MAX_NGRAM_LENGTH + 1) null
-        else ObjectNgram(value.substring(0, value.length - 1))
+        if (length <= PrimitiveNgram.MAX_NGRAM_LENGTH + 1) {
+            return false
+        } else {
+            value[0] = (length - 1).toChar()
+            return true
+        }
     }
 
     /**
      * Returns the next lower order ngram.
      *
-     * Must only be called if [getLowerOrderNgram] returned `null`.
+     * Must only be called if [toLowerOrderNgram] returned `false`.
      */
     fun getLowerOrderPrimitiveNgram(): PrimitiveNgram {
-        return PrimitiveNgram.of(value, 0, value.length - 1)
+        assert(length() == PrimitiveNgram.MAX_NGRAM_LENGTH + 1 && PrimitiveNgram.MAX_NGRAM_LENGTH == 3)
+        return PrimitiveNgram.of(value[1], value[2], value[3])
+    }
+
+    override fun toString(): String {
+        return String(value, 1, length())
     }
 }

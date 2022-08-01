@@ -24,9 +24,11 @@ internal interface KeyIndexer<K> {
         const val NO_INDEX = -1
         private fun <E> Collection<E>.asSet() = (this as? Set) ?: this.toSet()
 
+        @JvmStatic
         fun <E : Enum<E>> fromEnumConstants(constants: Collection<E>) = fromEnumConstants(constants.asSet())
 
         /** Creates an indexer for a subset of all enum constants. */
+        @JvmStatic
         fun <E : Enum<E>> fromEnumConstants(constants: Set<E>): KeyIndexer<E> {
             val enumClass = constants.first().declaringClass
             val allConstants = enumClass.enumConstants
@@ -57,6 +59,7 @@ internal interface KeyIndexer<K> {
 
         inline fun <reified E : Enum<E>> forAllEnumConstants() = forAllEnumConstants(E::class.java)
 
+        @JvmStatic
         fun <E : Enum<E>> forAllEnumConstants(enumClass: Class<E>): KeyIndexer<E> {
             val enumConstants = enumClass.enumConstants
             return object : KeyIndexer<E> {

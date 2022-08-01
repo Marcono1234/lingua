@@ -22,12 +22,11 @@ import com.github.pemistahl.lingua.api.Language.UNKNOWN
 import com.github.pemistahl.lingua.internal.Constant.CHARS_TO_LANGUAGES_MAPPING
 import com.github.pemistahl.lingua.internal.Constant.LANGUAGES_SUPPORTING_LOGOGRAMS
 import com.github.pemistahl.lingua.internal.Constant.MULTIPLE_WHITESPACE
-import com.github.pemistahl.lingua.internal.Constant.NUMBERS
-import com.github.pemistahl.lingua.internal.Constant.PUNCTUATION
+import com.github.pemistahl.lingua.internal.Constant.NUMBERS_AND_PUNCTUATION
 import com.github.pemistahl.lingua.internal.Constant.isJapaneseScript
 import com.github.pemistahl.lingua.internal.Constant.languagesWithCharsIndexer
-import com.github.pemistahl.lingua.internal.ObjectNgram
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
+import com.github.pemistahl.lingua.internal.ReusableObjectNgram
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.model.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.model.UniBiTrigramRelativeFrequencyLookup
@@ -35,20 +34,20 @@ import com.github.pemistahl.lingua.internal.util.EnumDoubleMap
 import com.github.pemistahl.lingua.internal.util.EnumIntMap
 import com.github.pemistahl.lingua.internal.util.KeyIndexer
 import com.github.pemistahl.lingua.internal.util.ResettableLazy
+import com.github.pemistahl.lingua.internal.util.WordList
 import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.enumMapOf
 import com.github.pemistahl.lingua.internal.util.extension.filter
 import com.github.pemistahl.lingua.internal.util.extension.intersect
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
+import com.github.pemistahl.lingua.internal.util.replaceAll
 import java.util.EnumMap
 import java.util.EnumSet
 import java.util.SortedMap
 import java.util.TreeMap
 import java.util.concurrent.Callable
 import java.util.concurrent.Executor
-import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
-import java.util.function.LongConsumer
 import kotlin.math.ln
 
 private const val FULL_WORD_VALUE = 1.0
@@ -72,7 +71,9 @@ class LanguageDetector internal constructor(
     private val executor: Executor,
     internal val numberOfLoadedLanguages: Int = languages.size,
 ) {
-    private val languagesWithUniqueCharacters = languages.filterNot { it.uniqueCharacters.isNullOrBlank() }.asSequence()
+    // Stored as Array to reduce object creation during iteration
+    private val languagesWithUniqueCharacters = languages.filterNot { it.uniqueCharacters.isNullOrBlank() }
+        .toTypedArray()
     private val alphabetsSupportingExactlyOneLanguage = enumMapOf(
         Language.scriptsSupportingExactlyOneLanguage.filterValues {
             it in languages
@@ -95,10 +96,38 @@ class LanguageDetector internal constructor(
         }
     }
 
-    private fun <E> submitTasks(tasks: List<Callable<E>>): List<E> {
+    // TODO: Might be inefficient because it blocks the current thread instead of having it participate in the
+    //       work; maybe rewrite to use CompletableFuture, might then also allow nested task submission (?)
+    private fun <E> executeTasks(tasks: List<Callable<E>>): List<E> {
         val futures = tasks.map { FutureTask(it) }
         futures.forEach(executor::execute)
-        return futures.map(Future<E>::get)
+
+        val results = ArrayList<E>(tasks.size)
+        var exception: Throwable? = null
+        futures.forEach {
+            try {
+                if (exception == null) {
+                    results.add(it.get())
+                }
+                // Else, only collect other exceptions (if they are available already) in case they contain root case,
+                // such ExceptionInInitializerError; discard result of Future
+                else if (it.isDone) {
+                    it.get()
+                } else {
+                    it.cancel(true)
+                }
+            } catch (e: Throwable) {
+                if (exception == null) {
+                    exception = e
+                } else {
+                    exception!!.addSuppressed(e)
+                }
+            }
+        }
+        if (exception != null) {
+            throw exception!!
+        }
+        return results
     }
 
     /**
@@ -150,14 +179,14 @@ class LanguageDetector internal constructor(
             return TreeMap()
         }
 
-        val words = splitTextIntoWords(cleanedUpText)
-        val languageDetectedByRules = detectLanguageWithRules(words)
+        val wordList = WordList.build(text)
+        val languageDetectedByRules = detectLanguageWithRules(wordList)
 
         if (languageDetectedByRules != UNKNOWN) {
             return sortedMapOf(languageDetectedByRules to 1.0)
         }
 
-        val filteredLanguages = filterLanguagesByRules(words)
+        val filteredLanguages = filterLanguagesByRules(wordList)
 
         if (filteredLanguages.size == 1) {
             val filteredLanguage = filteredLanguages.iterator().next()
@@ -168,20 +197,26 @@ class LanguageDetector internal constructor(
             return TreeMap()
         }
 
-        val ngramSizeRange = if (cleanedUpText.length >= HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH ||
-            isLowAccuracyModeEnabled
-        ) {
+        val isLongText = cleanedUpText.length >= HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH
+        val ngramSizeRange = if (isLongText || isLowAccuracyModeEnabled) {
             (3..3)
         } else {
             (1..5)
         }
-        val allProbabilitiesAndUnigramCounts = submitTasks(
-            ngramSizeRange.filter { i -> cleanedUpText.length >= i }.map { i ->
-                Callable {
-                    val testDataModel = TestDataLanguageModel.fromText(cleanedUpText, ngramLength = i)
-                    val probabilities = computeLanguageProbabilities(testDataModel, filteredLanguages)
+        // Important: Either run this here concurrently or computeLanguageProbabilities, but not both
+        // Otherwise this might cause deadlock where tasks here wait on tasks in computeLanguageProbabilities,
+        // but tasks in computeLanguageProbabilities cannot be picked up because all workers are busy waiting
+        // on computeLanguageProbabilities result
+        // TODO: Might not be efficient enough when only detecting few languages; then would always wait
+        //       for results for these few languages, while other workers are idle
+        val runMultiThreadedPerNgramLength = !isLongText && ngramSizeRange.count() > 1
+        val allProbabilitiesAndUnigramCounts = ngramSizeRange.filter { i -> cleanedUpText.length >= i }
+            .let { ngramLengths ->
+                fun computeProbabilities(ngramLength: Int): Pair<EnumDoubleMap<Language>, EnumIntMap<Language>?> {
+                    val testDataModel = TestDataLanguageModel.fromText(cleanedUpText, ngramLength)
+                    val probabilities = computeLanguageProbabilities(testDataModel, filteredLanguages, isLongText)
 
-                    val unigramCounts = if (i == 1) {
+                    val unigramCounts = if (ngramLength == 1) {
                         val languages = probabilities.getNonZeroKeys()
 
                         val unigramFilteredLanguages =
@@ -194,10 +229,19 @@ class LanguageDetector internal constructor(
                         null
                     }
 
-                    Pair(probabilities, unigramCounts)
+                    return Pair(probabilities, unigramCounts)
+                }
+
+                return@let if (runMultiThreadedPerNgramLength) {
+                    executeTasks(
+                        ngramLengths.map { ngramLength ->
+                            Callable { computeProbabilities(ngramLength) }
+                        }
+                    )
+                } else {
+                    ngramLengths.map(::computeProbabilities)
                 }
             }
-        )
 
         val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
         val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: EnumIntMap.newMap(languagesSubsetIndexer)
@@ -224,42 +268,13 @@ class LanguageDetector internal constructor(
         }
     }
 
-    private fun cleanUpInputText(text: String): String {
+    private fun cleanUpInputText(text: String): CharSequence {
         return text.trim().lowercase()
-            .replace(PUNCTUATION, "")
-            .replace(NUMBERS, "")
-            .replace(MULTIPLE_WHITESPACE, " ")
-    }
-
-    /** Splits text at spaces and between logograms */
-    private fun splitTextIntoWords(text: String): List<String> {
-        val words = mutableListOf<String>()
-        var nextWordStart = 0
-        for (i in text.indices) {
-            val char = text[i]
-
-            if (char == ' ') {
-                // If equal, skip consecutive whitespaces
-                if (nextWordStart != i) {
-                    words.add(text.substring(nextWordStart, i))
-                }
-                nextWordStart = i + 1
-            } else if (char.isLogogram()) {
-                if (nextWordStart != i) {
-                    // Add previous word excluding trailing logogram
-                    words.add(text.substring(nextWordStart, i))
-                }
-
-                // Add logogram on its own
-                words.add(text[i].toString())
-                nextWordStart = i + 1
-            }
-        }
-
-        if (nextWordStart != text.length) {
-            words.add(text.substring(nextWordStart, text.length))
-        }
-        return words
+            .replaceAll(listOf(
+                NUMBERS_AND_PUNCTUATION to "",
+                // TODO: Maybe can remove this and change word splitting to consider any whitespace
+                MULTIPLE_WHITESPACE to " "
+            ))
     }
 
     private fun UniBiTrigramRelativeFrequencyLookup.getFrequency(ngram: PrimitiveNgram): Double {
@@ -276,14 +291,12 @@ class LanguageDetector internal constructor(
             val lookup = languageModels[language]!!.value().uniBiTrigramsLookup
 
             // Only have to check primitiveNgrams since unigrams are always encoded as primitive
-            unigramLanguageModel.primitiveNgrams.forEach(
-                LongConsumer {
-                    val probability = lookup.getFrequency(PrimitiveNgram(it))
-                    if (probability > 0) {
-                        unigramCounts.increment(language)
-                    }
+            unigramLanguageModel.primitiveNgrams.forEach {
+                val probability = lookup.getFrequency(PrimitiveNgram(it))
+                if (probability > 0) {
+                    unigramCounts.increment(language)
                 }
-            )
+            }
         }
         return unigramCounts
     }
@@ -308,13 +321,15 @@ class LanguageDetector internal constructor(
         return summedUpProbabilities
     }
 
-    private fun detectLanguageWithRules(words: List<String>): Language {
+    private fun detectLanguageWithRules(wordList: WordList): Language {
         // Using Double because logograms are not counted as full word
         var adjustedWordCount = 0.0
         val totalLanguageCounts = EnumDoubleMap.newMap(wordLanguagesSubsetIndexer)
+        val wordLanguageCounts = EnumIntMap.newMap(wordLanguagesSubsetIndexer)
 
-        for (word in words) {
-            val wordLanguageCounts = EnumIntMap.newMap(wordLanguagesSubsetIndexer)
+        wordList.forEach { word ->
+            // Reuse same map to avoid creating new objects
+            wordLanguageCounts.clear()
 
             for (character in word) {
                 val script = Character.UnicodeScript.of(character.code)
@@ -328,11 +343,14 @@ class LanguageDetector internal constructor(
                         isJapaneseScript(script) -> wordLanguageCounts.increment(JAPANESE)
                         script == Character.UnicodeScript.LATIN ||
                             script == Character.UnicodeScript.CYRILLIC ||
-                            script == Character.UnicodeScript.DEVANAGARI ->
-                            languagesWithUniqueCharacters.filter {
-                                it.uniqueCharacters?.contains(character) ?: false
-                            }.forEach {
-                                wordLanguageCounts.increment(it)
+                            script == Character.UnicodeScript.DEVANAGARI -> {
+                                // Note: Don't use any `filter` or `forEach` here because it might end up creating
+                                // a lot of objects
+                                for (language in languagesWithUniqueCharacters) {
+                                    if (language.uniqueCharacters?.contains(character) == true) {
+                                        wordLanguageCounts.increment(language)
+                                    }
+                                }
                             }
                     }
                 }
@@ -401,12 +419,12 @@ class LanguageDetector internal constructor(
         }
     }
 
-    private fun filterLanguagesByRules(words: List<String>): Set<Language> {
+    private fun filterLanguagesByRules(wordList: WordList): Set<Language> {
         // Using Double because logograms are not counted as full word
         var adjustedWordCount = 0.0
         val detectedAlphabets = EnumDoubleMap.newMap(Language.allScriptsIndexer)
 
-        for (word in words) {
+        wordList.forEach { word ->
             var wordValue = FULL_WORD_VALUE
             for (unicodeScript in Language.allScripts) {
                 if (word.all { Character.UnicodeScript.of(it.code) == unicodeScript }) {
@@ -440,14 +458,15 @@ class LanguageDetector internal constructor(
         }
 
         val filteredLanguages = languages.filter {
-            it.unicodeScripts.any { script -> mostFrequentAlphabets.contains(script) }
+            it.unicodeScriptsArray.any { script -> mostFrequentAlphabets.contains(script) }
         }
         val languageCounts = EnumIntMap.newMap(languagesWithCharsIndexer)
 
         for ((characters, languages) in CHARS_TO_LANGUAGES_MAPPING) {
-            val relevantLanguages = languages.intersect(filteredLanguages)
+            // Uses array to reduce object creation during iteration
+            val relevantLanguages = languages.intersect(filteredLanguages).toTypedArray()
 
-            for (word in words) {
+            wordList.forEach { word ->
                 if (word.containsAnyOf(characters)) {
                     for (language in relevantLanguages) {
                         languageCounts.increment(language)
@@ -459,18 +478,21 @@ class LanguageDetector internal constructor(
         val languagesSubset = languageCounts.keysWithValueLargerEqualThan(adjustedWordCount / 2.0)
 
         return if (languagesSubset.isNotEmpty()) {
-            filteredLanguages.filter { it in languagesSubset }.toSet()
+            filteredLanguages.intersect(languagesSubset)
         } else {
-            filteredLanguages.toSet()
+            filteredLanguages
         }
     }
 
     private fun computeLanguageProbabilities(
         testDataModel: TestDataLanguageModel,
-        filteredLanguages: Set<Language>
+        filteredLanguages: Set<Language>,
+        runMultiThreaded: Boolean,
     ): EnumDoubleMap<Language> {
         val probabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
-        for (language in filteredLanguages) {
+
+        // TODO: Once Kotlin supports it, convert these to local inline functions?
+        fun computeProbability(language: Language): Double {
             val modelHolder = languageModels[language]!!.value()
             val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
             val quadriFivegramLookup = when {
@@ -479,11 +501,14 @@ class LanguageDetector internal constructor(
                 else -> modelHolder.quadriFivegramLookup.value
             }
 
-            var probability = computeSumOfNgramProbabilities(
+            return computeSumOfNgramProbabilities(
                 uniBiTrigramsLookup,
                 quadriFivegramLookup,
                 testDataModel
             )
+        }
+        fun handleProbability(language: Language, p: Double) {
+            var probability = p
             if (probability < 0.0) {
                 // For languages with logograms increase probability since their words (=logograms)
                 // consist only of a single char compared to other languages whose words consist
@@ -495,6 +520,21 @@ class LanguageDetector internal constructor(
                 probabilities.set(language, probability)
             }
         }
+
+        if (runMultiThreaded) {
+            executeTasks(
+                filteredLanguages.map { language ->
+                    Callable {
+                        language to computeProbability(language)
+                    }
+                }
+            ).forEach { handleProbability(it.first, it.second) }
+        } else {
+            filteredLanguages.forEach { language ->
+                handleProbability(language, computeProbability(language))
+            }
+        }
+
         return probabilities
     }
 
@@ -504,23 +544,33 @@ class LanguageDetector internal constructor(
         testDataModel: TestDataLanguageModel
     ): Double {
         var probabilitySum = 0.0
+        // Reuse same object to avoid creating new objects for sub-ngrams
+        val objectNgram = ReusableObjectNgram()
 
         ngramLoop@ for (ngram in testDataModel.objectNgrams) {
-            var current = ObjectNgram(ngram)
+            // Reuse same object to reduce memory allocations for substring creation
+            objectNgram.setNgram(ngram)
+
             var currentPrimitive: PrimitiveNgram
             while (true) {
-                val probability = quadriFivegramLookup.getFrequency(current.value)
+                val (length, char0, char1, char2, char3, char4) = objectNgram
+                val probability = quadriFivegramLookup.getFrequency(
+                    length,
+                    char0, char1, char2, char3, char4
+                ) {
+                    assert(ngram.length == 5)
+                    // Return the original ngram String (assuming it is a fivegram)
+                    ngram
+                }
+
                 if (probability > 0) {
                     probabilitySum += ln(probability)
                     continue@ngramLoop
                 }
 
-                val newCurrent = current.getLowerOrderNgram()
-                if (newCurrent == null) {
-                    currentPrimitive = current.getLowerOrderPrimitiveNgram()
+                if (!objectNgram.toLowerOrderNgram()) {
+                    currentPrimitive = objectNgram.getLowerOrderPrimitiveNgram()
                     break
-                } else {
-                    current = newCurrent
                 }
             }
 
@@ -532,30 +582,27 @@ class LanguageDetector internal constructor(
                 }
 
                 currentPrimitive = currentPrimitive.getLowerOrderNgram()
-            } while (currentPrimitive.value != PrimitiveNgram.NONE.value)
+            } while (currentPrimitive.value != PrimitiveNgram.NONE)
         }
 
-        // Must explicitly specify LongConsumer type, otherwise Kotlin picks the wrong overload
-        testDataModel.primitiveNgrams.forEach(
-            LongConsumer {
-                var current = PrimitiveNgram(it)
-                do {
-                    val probability = uniBiTrigramsLookup.getFrequency(current)
-                    if (probability > 0) {
-                        probabilitySum += ln(probability)
-                        break
-                    }
+        testDataModel.primitiveNgrams.forEach {
+            var current = PrimitiveNgram(it)
+            do {
+                val probability = uniBiTrigramsLookup.getFrequency(current)
+                if (probability > 0) {
+                    probabilitySum += ln(probability)
+                    break
+                }
 
-                    current = current.getLowerOrderNgram()
-                } while (current.value != PrimitiveNgram.NONE.value)
-            }
-        )
+                current = current.getLowerOrderNgram()
+            } while (current.value != PrimitiveNgram.NONE)
+        }
 
         return probabilitySum
     }
 
     private fun preloadLanguageModels() {
-        submitTasks(
+        executeTasks(
             languages.map {
                 Callable {
                     // Initialize values of Lazy objects

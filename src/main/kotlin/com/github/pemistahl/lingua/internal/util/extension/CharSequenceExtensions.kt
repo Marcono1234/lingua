@@ -16,10 +16,18 @@
 
 package com.github.pemistahl.lingua.internal.util.extension
 
-internal fun String.containsAnyOf(characters: String): Boolean {
-    return characters.any { this.contains(it) }
+internal fun CharSequence.containsAnyOf(characters: String): Boolean {
+    // Check each char of `this` (instead of reverse, checking `characters`) to only iterate over `this` once
+    // Don't use `any { ... }` to only evaluate `length` once
+    val length = this.length
+    for (i in 0 until length) {
+        if (characters.indexOf(get(i)) != -1) {
+            return true
+        }
+    }
+    return false
 }
 
-internal fun String.isLogogram(): Boolean {
+internal fun CharSequence.isLogogram(): Boolean {
     return length == 1 && this[0].isLogogram()
 }

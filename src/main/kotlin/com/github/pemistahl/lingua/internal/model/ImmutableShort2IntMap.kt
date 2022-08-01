@@ -27,6 +27,7 @@ internal class ImmutableShort2IntMap private constructor(
     private val values: IntArray
 ) {
     companion object {
+        @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableShort2IntMap {
             val keys = inputStream.readShortArray(inputStream.readInt())
             // Don't need to check for overflow here; if the map contains the maximum of 65536 unique values,
@@ -64,7 +65,7 @@ internal class ImmutableShort2IntMap private constructor(
         val index = keys.binarySearch(key)
         return if (index < 0) 0 else {
             if (indValuesIndices.isEmpty()) values[index]
-            else values[indValuesIndices[index].toUShort().toInt()]
+            else values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
         }
     }
 

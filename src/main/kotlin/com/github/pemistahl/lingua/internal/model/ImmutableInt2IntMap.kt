@@ -24,6 +24,7 @@ internal class ImmutableInt2IntMap private constructor(
     private val values: IntArray
 ) {
     companion object {
+        @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableInt2IntMap {
             val keys = inputStream.readIntArray(inputStream.readInt())
             val indValuesIndices = inputStream.readShortArray(inputStream.readInt())
@@ -53,7 +54,7 @@ internal class ImmutableInt2IntMap private constructor(
     fun get(key: Int): Int {
         val index = keys.binarySearch(key)
         return if (index < 0) 0 else {
-            if (index < indValuesIndices.size) values[indValuesIndices[index].toUShort().toInt()]
+            if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
             else if (indValuesIndices.isEmpty()) values[index]
             else values[index - indValuesIndices.size + maxIndirectionIndices]
         }

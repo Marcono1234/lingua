@@ -2,7 +2,7 @@
 
 Legend: 'low accuracy mode | high accuracy mode'
 
->>> Accuracy on average: 95.53% | 96.97%
+>>> Accuracy on average: 95.57% | 97.00%
 
 >> Detection of 1000 single words (average length: 8 chars)
 Accuracy: 89.40% | 92.80%
@@ -13,7 +13,7 @@ Accuracy: 97.70% | 98.70%
 Erroneously classified as RUSSIAN: 0.30% | 0.40%, UKRAINIAN: 0.60% | 0.40%, MACEDONIAN: 0.30% | 0.20%, SERBIAN: 0.50% | 0.10%, BULGARIAN: 0.50% | 0.10%, KAZAKH: 0.00% | 0.10%, BELARUSIAN: 0.10% | 0.00%
 
 >> Detection of 1000 sentences (average length: 103 chars)
-Accuracy: 99.50% | 99.40%
-Erroneously classified as RUSSIAN: 0.00% | 0.10%, ENGLISH: 0.10% | 0.10%, FINNISH: 0.00% | 0.10%, WELSH: 0.10% | 0.10%, SOMALI: 0.10% | 0.10%, MACEDONIAN: 0.00% | 0.10%, UKRAINIAN: 0.10% | 0.00%, CATALAN: 0.10% | 0.00%
+Accuracy: 99.60% | 99.50%
+Erroneously classified as RUSSIAN: 0.00% | 0.10%, SOTHO: 0.10% | 0.10%, ENGLISH: 0.10% | 0.10%, FINNISH: 0.00% | 0.10%, MACEDONIAN: 0.00% | 0.10%, UKRAINIAN: 0.10% | 0.00%, CATALAN: 0.10% | 0.00%
 
->> Exact values: 95.53333333333335 89.4 97.7 99.5 96.96666666666665 92.80000000000001 98.7 99.4
+>> Exact values: 95.56666666666668 89.4 97.7 99.6 97.0 92.80000000000001 98.7 99.5

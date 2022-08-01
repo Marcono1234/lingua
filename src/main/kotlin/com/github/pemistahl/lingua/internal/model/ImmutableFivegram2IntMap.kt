@@ -34,6 +34,7 @@ internal class ImmutableFivegram2IntMap private constructor(
     private val values: IntArray,
 ) {
     companion object {
+        @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableFivegram2IntMap {
             val keys = inputStream.readFivegramArray(inputStream.readInt())
             val indValuesIndices = inputStream.readShortArray(inputStream.readInt())
@@ -64,7 +65,7 @@ internal class ImmutableFivegram2IntMap private constructor(
     fun get(key: String): Int {
         val index = keys.binarySearch(key)
         return if (index < 0) 0 else {
-            if (index < indValuesIndices.size) values[indValuesIndices[index].toUShort().toInt()]
+            if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
             else if (indValuesIndices.isEmpty()) values[index]
             else values[index - indValuesIndices.size + maxIndirectionIndices]
         }

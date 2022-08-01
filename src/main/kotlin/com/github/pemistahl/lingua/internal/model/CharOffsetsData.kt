@@ -23,6 +23,7 @@ internal class CharOffsetsData(
     private val charOffsets: ShortArray,
 ) {
     companion object {
+        @JvmStatic
         fun createCharOffsetsData(vararg ngrams: Object2IntMap<String>): CharOffsetsData {
             val charCounts = Char2IntOpenHashMap()
             ngrams.asSequence().flatMap(Object2IntMap<String>::keys)
@@ -46,6 +47,7 @@ internal class CharOffsetsData(
             return CharOffsetsData(chars, charOffsets)
         }
 
+        @JvmStatic
         fun fromBinary(dataIn: DataInputStream): CharOffsetsData {
             val charsCount = dataIn.readUnsignedShort()
             val chars = dataIn.readCharArray(charsCount)
@@ -60,13 +62,11 @@ internal class CharOffsetsData(
         check(chars.size <= 65535)
     }
 
-    private fun getCharOffset(chars: CharArray, charOffsets: ShortArray, char: Char): Int {
+    private fun getCharOffset(char: Char): Int {
         val charIndex = chars.binarySearch(char)
         if (charIndex < 0) return -1
-        return charOffsets[charIndex].toUShort().toInt()
+        return charOffsets[charIndex].toInt().and(0xFFFF) // UShort
     }
-
-    private fun getCharOffset(char: Char) = getCharOffset(chars, charOffsets, char)
 
     inline fun <R> useEncodedUnigram(
         char0: Char,
@@ -154,15 +154,14 @@ internal class CharOffsetsData(
     ): R = useEncodedTrigram(trigram[0], trigram[1], trigram[2], asInt, asLong, notEncodable)
 
     inline fun <R> useEncodedQuadrigram(
-        quadrigram: String,
+        char0: Char,
+        char1: Char,
+        char2: Char,
+        char3: Char,
         asInt: (encodedNgram: Int) -> R,
         asLong: (encodedNgram: Long) -> R,
         notEncodable: () -> R,
     ): R {
-        val char0 = quadrigram[0]
-        val char1 = quadrigram[1]
-        val char2 = quadrigram[2]
-        val char3 = quadrigram[3]
         val charOffset0 = getCharOffset(char0).also { if (it == -1) return notEncodable() }
         val charOffset1 = getCharOffset(char1).also { if (it == -1) return notEncodable() }
         val charOffset2 = getCharOffset(char2).also { if (it == -1) return notEncodable() }
@@ -192,18 +191,37 @@ internal class CharOffsetsData(
         }
     }
 
+    inline fun <R> useEncodedQuadrigram(
+        quadrigram: String,
+        asInt: (encodedNgram: Int) -> R,
+        asLong: (encodedNgram: Long) -> R,
+        notEncodable: () -> R,
+    ): R {
+        return useEncodedQuadrigram(
+            quadrigram[0], quadrigram[1], quadrigram[2], quadrigram[3],
+            asInt,
+            asLong,
+            notEncodable
+        )
+    }
+
     inline fun <R> useEncodedFivegram(
-        fivegram: String,
+        char0: Char,
+        char1: Char,
+        char2: Char,
+        char3: Char,
+        char4: Char,
+        fivegramAsString: () -> String,
         asInt: (encodedNgram: Int) -> R,
         asLong: (encodedNgram: Long) -> R,
         asObject: (encodedNgram: String) -> R,
         notEncodable: () -> R,
     ): R {
-        val charOffset0 = getCharOffset(fivegram[0]).also { if (it == -1) return notEncodable() }
-        val charOffset1 = getCharOffset(fivegram[1]).also { if (it == -1) return notEncodable() }
-        val charOffset2 = getCharOffset(fivegram[2]).also { if (it == -1) return notEncodable() }
-        val charOffset3 = getCharOffset(fivegram[3]).also { if (it == -1) return notEncodable() }
-        val charOffset4 = getCharOffset(fivegram[4]).also { if (it == -1) return notEncodable() }
+        val charOffset0 = getCharOffset(char0).also { if (it == -1) return notEncodable() }
+        val charOffset1 = getCharOffset(char1).also { if (it == -1) return notEncodable() }
+        val charOffset2 = getCharOffset(char2).also { if (it == -1) return notEncodable() }
+        val charOffset3 = getCharOffset(char3).also { if (it == -1) return notEncodable() }
+        val charOffset4 = getCharOffset(char4).also { if (it == -1) return notEncodable() }
 
         /*
          * Int encoding: First two get 7 bits each, last three get 6 bits (2*7 + 3*6 = 32)
@@ -244,8 +262,25 @@ internal class CharOffsetsData(
             asLong(encoded)
         } else {
             // Fall back to using ngram object
-            asObject(fivegram)
+            asObject(fivegramAsString())
         }
+    }
+
+    inline fun <R> useEncodedFivegram(
+        fivegram: String,
+        asInt: (encodedNgram: Int) -> R,
+        asLong: (encodedNgram: Long) -> R,
+        asObject: (encodedNgram: String) -> R,
+        notEncodable: () -> R,
+    ): R {
+        return useEncodedFivegram(
+            fivegram[0], fivegram[1], fivegram[2], fivegram[3], fivegram[4],
+            { fivegram },
+            asInt,
+            asLong,
+            asObject,
+            notEncodable
+        )
     }
 
     fun writeBinary(dataOut: DataOutput) {

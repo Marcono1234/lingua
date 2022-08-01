@@ -15,6 +15,7 @@ internal class ImmutableByte2IntMap private constructor(
     private val values: IntArray
 ) {
     companion object {
+        @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableByte2IntMap {
             val length = inputStream.readShort()
 

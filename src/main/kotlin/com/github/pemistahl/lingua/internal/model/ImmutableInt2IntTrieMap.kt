@@ -65,6 +65,7 @@ internal class ImmutableInt2IntTrieMap private constructor(
     private val values: IntArray
 ) {
     companion object {
+        @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableInt2IntTrieMap {
             val size = inputStream.readInt()
 
@@ -112,6 +113,7 @@ internal class ImmutableInt2IntTrieMap private constructor(
          * @param totalSize [ImmutableInt2IntTrieMap.size]
          * @param firstLayerGlobalIndex [firstKeyGlobalIndices]`[firstLayerIndex]`
          */
+        @JvmStatic
         private fun calculateEstimatedRemainderIndex(
             totalSize: Int,
             firstLayerGlobalIndex: Int,
@@ -271,7 +273,7 @@ internal class ImmutableInt2IntTrieMap private constructor(
         )
 
         return if (index < 0) 0 else {
-            if (index < indValuesIndices.size) values[indValuesIndices[index].toUShort().toInt()]
+            if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
             else if (indValuesIndices.isEmpty()) values[index]
             else values[index - indValuesIndices.size + maxIndirectionIndices]
         }

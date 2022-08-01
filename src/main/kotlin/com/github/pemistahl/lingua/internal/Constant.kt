@@ -139,6 +139,5 @@ internal object Constant {
 
     val LANGUAGES_SUPPORTING_LOGOGRAMS = enumSetOf(CHINESE, JAPANESE, KOREAN)
     val MULTIPLE_WHITESPACE = Regex("\\s+")
-    val NUMBERS = Regex("\\p{N}")
-    val PUNCTUATION = Regex("\\p{P}")
+    val NUMBERS_AND_PUNCTUATION = Regex("\\p{N}|\\p{P}")
 }

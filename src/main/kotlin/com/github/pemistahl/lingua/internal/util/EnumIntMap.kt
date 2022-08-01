@@ -32,6 +32,10 @@ internal class EnumIntMap<E : Enum<E>>(
         values[keyIndexer.keyToIndex(enumConstant)]++
     }
 
+    fun clear() {
+        values.fill(0)
+    }
+
     fun countNonZeroValues() = values.count { it != 0 }
 
     fun firstNonZero(): E? {
@@ -71,9 +75,10 @@ internal class EnumIntMap<E : Enum<E>>(
             // First try finding constant with same value behind last result
             for (index in nextIndex until values.size) {
                 val value = values[index]
-                if (value == lastMax && value > maxValue) {
+                if (value == lastMax && value > 0) {
                     maxIndex = index
                     maxValue = value
+                    break
                 }
             }
 

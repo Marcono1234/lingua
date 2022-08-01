@@ -90,6 +90,7 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
 ) {
     companion object {
         @Suppress("unused") // used by buildSrc for model generation
+        @JvmStatic
         fun fromJson(
             unigrams: Object2IntOpenHashMap<String>,
             bigrams: Object2IntOpenHashMap<String>,
@@ -110,10 +111,12 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
             return builder.finishCreation()
         }
 
+        @JvmStatic
         private fun getBinaryModelResourceName(languageCode: String): String {
             return getBinaryModelResourceName(languageCode, "uni-bi-trigrams.bin")
         }
 
+        @JvmStatic
         fun fromBinary(languageCode: String): UniBiTrigramRelativeFrequencyLookup {
             openBinaryDataInput(getBinaryModelResourceName(languageCode)).use {
                 val charOffsetsData = CharOffsetsData.fromBinary(it)
@@ -296,6 +299,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         )
 
         @Suppress("unused") // used by buildSrc for model generation
+        @JvmStatic
         fun fromJson(
             quadrigrams: Object2IntOpenHashMap<String>,
             fivegrams: Object2IntOpenHashMap<String>
@@ -312,10 +316,12 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
             return builder.finishCreation()
         }
 
+        @JvmStatic
         private fun getBinaryModelResourceName(languageCode: String): String {
             return getBinaryModelResourceName(languageCode, "quadri-fivegrams.bin")
         }
 
+        @JvmStatic
         fun fromBinary(languageCode: String): QuadriFivegramRelativeFrequencyLookup {
             openBinaryDataInput(getBinaryModelResourceName(languageCode)).use {
                 val charOffsetsData = CharOffsetsData.fromBinary(it)
@@ -396,17 +402,28 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         }
     }
 
-    fun getFrequency(ngram: String): Double {
+    // Note: Effectively this is a destructured ReusableObjectNgram, but to keep number of classes for buildSrc
+    // binary model task low, avoid dependency on other class (in other package)
+    inline fun getFrequency(
+        length: Int,
+        char0: Char,
+        char1: Char,
+        char2: Char,
+        char3: Char,
+        char4: Char,
+        fivegramAsString: () -> String,
+    ): Double {
         return decodeFrequency(
-            when (ngram.length) {
+            when (length) {
                 4 -> charOffsetsData.useEncodedQuadrigram(
-                    ngram,
+                    char0, char1, char2, char3,
                     { quadrigramsAsInt.get(it) },
                     { quadrigramsAsLong.get(it) },
                     { 0 }
                 )
                 5 -> charOffsetsData.useEncodedFivegram(
-                    ngram,
+                    char0, char1, char2, char3, char4,
+                    fivegramAsString,
                     { fivegramsAsInt.get(it) },
                     { fivegramsAsLong.get(it) },
                     { fivegramsAsObject.get(it) },

@@ -2,7 +2,7 @@
 
 Legend: 'low accuracy mode | high accuracy mode'
 
->>> Accuracy on average: 32.73% | 72.63%
+>>> Accuracy on average: 32.77% | 72.67%
 
 >> Detection of 1000 single words (average length: 6 chars)
 Accuracy: 11.30% | 60.70%
@@ -13,7 +13,7 @@ Accuracy: 19.60% | 64.30%
 Erroneously classified as MARATHI: 7.70% | 35.70%, UNKNOWN: 72.70% | 0.00%
 
 >> Detection of 1000 sentences (average length: 81 chars)
-Accuracy: 67.30% | 92.90%
-Erroneously classified as MARATHI: 9.20% | 6.40%, UNKNOWN: 23.20% | 0.50%, ENGLISH: 0.10% | 0.20%, BOKMAL: 0.20% | 0.00%
+Accuracy: 67.40% | 93.00%
+Erroneously classified as MARATHI: 9.20% | 6.40%, UNKNOWN: 23.20% | 0.50%, ENGLISH: 0.00% | 0.10%, BOKMAL: 0.20% | 0.00%
 
->> Exact values: 32.73333333333334 11.3 19.6 67.30000000000001 72.63333333333334 60.699999999999996 64.3 92.9
+>> Exact values: 32.76666666666667 11.3 19.6 67.4 72.66666666666667 60.699999999999996 64.3 93.0
