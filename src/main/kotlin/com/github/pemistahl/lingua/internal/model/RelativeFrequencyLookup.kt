@@ -1,7 +1,7 @@
 package com.github.pemistahl.lingua.internal.model
 
 import it.unimi.dsi.fastutil.chars.Char2ShortMaps
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -42,32 +42,6 @@ private fun getBinaryModelResourceName(languageCode: String, fileName: String): 
     return "/language-models/$languageCode/$fileName"
 }
 
-/**
- * Multiply frequency, which is in range (0.0, 1.0), with UInt.MAX_VALUE + 1 to
- * map the decimal places to a 32-bit integer.
- */
-private const val ENCODING_MULTIPLIER = 1L shl 32
-
-// TODO: Check if custom encoding is really worth it (compare accuracy reports)
-internal fun encodeFrequency(numerator: Int, denominator: Int): Int {
-    // Use custom encoding since 32-bit Float 'wastes' bits for sign and exponent
-    val encoded = (numerator * ENCODING_MULTIPLIER) / denominator
-    return when {
-        // For values which round to >= 1.0 pretend they are slightly < 1.0
-        // Otherwise they would be encoded as 0
-        encoded > UInt.MAX_VALUE.toLong() -> UInt.MAX_VALUE.toInt()
-        // For values equal to 0 pretend they are slightly > 0.0 to allow using
-        // 0 as special value for binary model files
-        encoded == 0L -> 1
-        else -> encoded.toInt()
-    }
-}
-
-/** Counterpart to [encodeFrequency] */
-private fun decodeFrequency(encoded: Int): Double {
-    return encoded.toUInt().toDouble() / ENCODING_MULTIPLIER
-}
-
 /*
  * Implementation note:
  * Declares two types of lookups (uni-, bi- and trigrams, and quadri- and fivegrams)
@@ -82,32 +56,33 @@ private fun decodeFrequency(encoded: Int): Double {
  */
 internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     private val charOffsetsData: CharOffsetsData,
-    private val unigramsAsByte: ImmutableByte2IntMap,
-    private val unigramsAsShort: ImmutableShort2IntMap,
-    private val bigramsAsShort: ImmutableShort2IntMap,
-    private val bigramsAsInt: ImmutableInt2IntTrieMap,
-    private val trigramsAsInt: ImmutableInt2IntTrieMap,
-    private val trigramsAsLong: ImmutableLong2IntMap,
+    private val unigramsAsByte: ImmutableByte2FloatMap,
+    private val unigramsAsShort: ImmutableShort2FloatMap,
+    private val bigramsAsShort: ImmutableShort2FloatMap,
+    private val bigramsAsInt: ImmutableInt2FloatTrieMap,
+    private val trigramsAsInt: ImmutableInt2FloatTrieMap,
+    private val trigramsAsLong: ImmutableLong2FloatMap,
 ) {
     companion object {
         @Suppress("unused") // used by buildSrc for model generation
         @JvmStatic
         fun fromJson(
-            unigrams: Object2IntOpenHashMap<String>,
-            bigrams: Object2IntOpenHashMap<String>,
-            trigrams: Object2IntOpenHashMap<String>
+            unigrams: Object2FloatOpenHashMap<String>,
+            bigrams: Object2FloatOpenHashMap<String>,
+            trigrams: Object2FloatOpenHashMap<String>
         ): UniBiTrigramRelativeFrequencyLookup {
-            val charOffsetsData = CharOffsetsData.createCharOffsetsData(unigrams, bigrams, trigrams)
+            val ngrams = unigrams.keys.asSequence().plus(bigrams.keys).plus(trigrams.keys)
+            val charOffsetsData = CharOffsetsData.createCharOffsetsData(ngrams)
 
             val builder = Builder(charOffsetsData)
-            unigrams.object2IntEntrySet().fastForEach {
-                builder.putUnigramFrequency(it.key, it.intValue)
+            unigrams.object2FloatEntrySet().fastForEach {
+                builder.putUnigramFrequency(it.key, it.floatValue)
             }
-            bigrams.object2IntEntrySet().fastForEach {
-                builder.putBigramFrequency(it.key, it.intValue)
+            bigrams.object2FloatEntrySet().fastForEach {
+                builder.putBigramFrequency(it.key, it.floatValue)
             }
-            trigrams.object2IntEntrySet().fastForEach {
-                builder.putTrigramFrequency(it.key, it.intValue)
+            trigrams.object2FloatEntrySet().fastForEach {
+                builder.putTrigramFrequency(it.key, it.floatValue)
             }
             return builder.finishCreation()
         }
@@ -122,14 +97,14 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
             openBinaryDataInput(getBinaryModelResourceName(languageCode)).use {
                 val charOffsetsData = CharOffsetsData.fromBinary(it)
 
-                val unigramsAsByte = ImmutableByte2IntMap.fromBinary(it)
-                val unigramsAsShort = ImmutableShort2IntMap.fromBinary(it)
+                val unigramsAsByte = ImmutableByte2FloatMap.fromBinary(it)
+                val unigramsAsShort = ImmutableShort2FloatMap.fromBinary(it)
 
-                val bigramsAsShort = ImmutableShort2IntMap.fromBinary(it)
-                val bigramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
+                val bigramsAsShort = ImmutableShort2FloatMap.fromBinary(it)
+                val bigramsAsInt = ImmutableInt2FloatTrieMap.fromBinary(it)
 
-                val trigramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
-                val trigramsAsLong = ImmutableLong2IntMap.fromBinary(it)
+                val trigramsAsInt = ImmutableInt2FloatTrieMap.fromBinary(it)
+                val trigramsAsLong = ImmutableLong2FloatMap.fromBinary(it)
 
                 // Should have reached end of data
                 check(it.read() == -1)
@@ -150,57 +125,48 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     private class Builder(
         private val charOffsetsData: CharOffsetsData,
     ) {
-        private val unigramsAsByteBuilder = ImmutableByte2IntMap.Builder()
-        private val unigramsAsShortBuilder = ImmutableShort2IntMap.Builder()
-        private val bigramsAsShortBuilder = ImmutableShort2IntMap.Builder()
-        private val bigramsAsIntBuilder = ImmutableInt2IntTrieMap.Builder()
-        private val trigramsAsIntBuilder = ImmutableInt2IntTrieMap.Builder()
-        private val trigramsAsLongBuilder = ImmutableLong2IntMap.Builder()
+        private val unigramsAsByteBuilder = ImmutableByte2FloatMap.Builder()
+        private val unigramsAsShortBuilder = ImmutableShort2FloatMap.Builder()
+        private val bigramsAsShortBuilder = ImmutableShort2FloatMap.Builder()
+        private val bigramsAsIntBuilder = ImmutableInt2FloatTrieMap.Builder()
+        private val trigramsAsIntBuilder = ImmutableInt2FloatTrieMap.Builder()
+        private val trigramsAsLongBuilder = ImmutableLong2FloatMap.Builder()
 
-        fun putUnigramFrequency(unigram: String, encodedFrequency: Int) {
-            if (encodedFrequency == 0) {
-                throw AssertionError("Invalid encoded frequency 0 for ngram '$unigram'")
-            }
+        fun putUnigramFrequency(unigram: String, frequency: Float) {
             if (unigram.length != 1) {
                 throw IllegalArgumentException("Invalid ngram length ${unigram.length}")
             }
 
             charOffsetsData.useEncodedUnigram(
                 unigram,
-                { unigramsAsByteBuilder.add(it, encodedFrequency) },
-                { unigramsAsShortBuilder.add(it, encodedFrequency) },
+                { unigramsAsByteBuilder.add(it, frequency) },
+                { unigramsAsShortBuilder.add(it, frequency) },
                 { throw AssertionError("Char offsets don't include chars of: $unigram") }
             )
         }
 
-        fun putBigramFrequency(bigram: String, encodedFrequency: Int) {
-            if (encodedFrequency == 0) {
-                throw AssertionError("Invalid encoded frequency 0 for ngram '$bigram'")
-            }
+        fun putBigramFrequency(bigram: String, frequency: Float) {
             if (bigram.length != 2) {
                 throw IllegalArgumentException("Invalid ngram length ${bigram.length}")
             }
 
             charOffsetsData.useEncodedBigram(
                 bigram,
-                { bigramsAsShortBuilder.add(it, encodedFrequency) },
-                { bigramsAsIntBuilder.add(it, encodedFrequency) },
+                { bigramsAsShortBuilder.add(it, frequency) },
+                { bigramsAsIntBuilder.add(it, frequency) },
                 { throw AssertionError("Char offsets don't include chars of: $bigram") }
             )
         }
 
-        fun putTrigramFrequency(trigram: String, encodedFrequency: Int) {
-            if (encodedFrequency == 0) {
-                throw AssertionError("Invalid encoded frequency 0 for ngram '$trigram'")
-            }
+        fun putTrigramFrequency(trigram: String, frequency: Float) {
             if (trigram.length != 3) {
                 throw IllegalArgumentException("Invalid ngram length ${trigram.length}")
             }
 
             charOffsetsData.useEncodedTrigram(
                 trigram,
-                { trigramsAsIntBuilder.add(it, encodedFrequency) },
-                { trigramsAsLongBuilder.add(it, encodedFrequency) },
+                { trigramsAsIntBuilder.add(it, frequency) },
+                { trigramsAsLongBuilder.add(it, frequency) },
                 { throw AssertionError("Char offsets don't include chars of: $trigram") }
             )
         }
@@ -221,29 +187,30 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
     // Note: Effectively this is a destructured PrimitiveNgram, but to keep number of classes for buildSrc
     // binary model task low, avoid dependency on other class (in other package)
     fun getFrequency(length: Int, char0: Char, char1: Char, char2: Char): Double {
-        return decodeFrequency(
-            when (length) {
-                1 -> charOffsetsData.useEncodedUnigram(
-                    char0,
-                    { unigramsAsByte.get(it) },
-                    { unigramsAsShort.get(it) },
-                    { 0 }
-                )
-                2 -> charOffsetsData.useEncodedBigram(
-                    char0, char1,
-                    { bigramsAsShort.get(it) },
-                    { bigramsAsInt.get(it) },
-                    { 0 }
-                )
-                3 -> charOffsetsData.useEncodedTrigram(
-                    char0, char1, char2,
-                    { trigramsAsInt.get(it) },
-                    { trigramsAsLong.get(it) },
-                    { 0 }
-                )
-                else -> throw AssertionError("Invalid ngram length $length")
-            }
-        )
+        // Note: Explicitly specify type Float here to avoid accidentally having implicit type Number
+        // (and therefore boxing) when one of the results is not a Float
+        val frequency: Float = when (length) {
+            1 -> charOffsetsData.useEncodedUnigram(
+                char0,
+                { unigramsAsByte.get(it) },
+                { unigramsAsShort.get(it) },
+                { 0f }
+            )
+            2 -> charOffsetsData.useEncodedBigram(
+                char0, char1,
+                { bigramsAsShort.get(it) },
+                { bigramsAsInt.get(it) },
+                { 0f }
+            )
+            3 -> charOffsetsData.useEncodedTrigram(
+                char0, char1, char2,
+                { trigramsAsInt.get(it) },
+                { trigramsAsLong.get(it) },
+                { 0f }
+            )
+            else -> throw AssertionError("Invalid ngram length $length")
+        }
+        return frequency.toDouble()
     }
 
     /**
@@ -283,36 +250,37 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
  */
 internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     private val charOffsetsData: CharOffsetsData,
-    private val quadrigramsAsInt: ImmutableInt2IntTrieMap,
-    private val quadrigramsAsLong: ImmutableLong2IntMap,
-    private val fivegramsAsInt: ImmutableInt2IntTrieMap,
-    private val fivegramsAsLong: ImmutableLong2IntMap,
-    private val fivegramsAsObject: ImmutableFivegram2IntMap,
+    private val quadrigramsAsInt: ImmutableInt2FloatTrieMap,
+    private val quadrigramsAsLong: ImmutableLong2FloatMap,
+    private val fivegramsAsInt: ImmutableInt2FloatTrieMap,
+    private val fivegramsAsLong: ImmutableLong2FloatMap,
+    private val fivegramsAsObject: ImmutableFivegram2FloatMap,
 ) {
     companion object {
         val empty = QuadriFivegramRelativeFrequencyLookup(
             CharOffsetsData(Char2ShortMaps.EMPTY_MAP),
-            ImmutableInt2IntTrieMap.Builder().build(),
-            ImmutableLong2IntMap.Builder().build(),
-            ImmutableInt2IntTrieMap.Builder().build(),
-            ImmutableLong2IntMap.Builder().build(),
-            ImmutableFivegram2IntMap.Builder().build(),
+            ImmutableInt2FloatTrieMap.Builder().build(),
+            ImmutableLong2FloatMap.Builder().build(),
+            ImmutableInt2FloatTrieMap.Builder().build(),
+            ImmutableLong2FloatMap.Builder().build(),
+            ImmutableFivegram2FloatMap.Builder().build(),
         )
 
         @Suppress("unused") // used by buildSrc for model generation
         @JvmStatic
         fun fromJson(
-            quadrigrams: Object2IntOpenHashMap<String>,
-            fivegrams: Object2IntOpenHashMap<String>
+            quadrigrams: Object2FloatOpenHashMap<String>,
+            fivegrams: Object2FloatOpenHashMap<String>
         ): QuadriFivegramRelativeFrequencyLookup {
-            val charOffsetsData = CharOffsetsData.createCharOffsetsData(quadrigrams, fivegrams)
+            val ngrams = quadrigrams.keys.asSequence().plus(fivegrams.keys)
+            val charOffsetsData = CharOffsetsData.createCharOffsetsData(ngrams)
             val builder = Builder(charOffsetsData)
 
-            quadrigrams.object2IntEntrySet().fastForEach {
-                builder.putQuadrigramFrequency(it.key, it.intValue)
+            quadrigrams.object2FloatEntrySet().fastForEach {
+                builder.putQuadrigramFrequency(it.key, it.floatValue)
             }
-            fivegrams.object2IntEntrySet().fastForEach {
-                builder.putFivegramFrequency(it.key, it.intValue)
+            fivegrams.object2FloatEntrySet().fastForEach {
+                builder.putFivegramFrequency(it.key, it.floatValue)
             }
             return builder.finishCreation()
         }
@@ -327,12 +295,12 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
             openBinaryDataInput(getBinaryModelResourceName(languageCode)).use {
                 val charOffsetsData = CharOffsetsData.fromBinary(it)
 
-                val quadrigramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
-                val quadrigramsAsLong = ImmutableLong2IntMap.fromBinary(it)
+                val quadrigramsAsInt = ImmutableInt2FloatTrieMap.fromBinary(it)
+                val quadrigramsAsLong = ImmutableLong2FloatMap.fromBinary(it)
 
-                val fivegramsAsInt = ImmutableInt2IntTrieMap.fromBinary(it)
-                val fivegramsAsLong = ImmutableLong2IntMap.fromBinary(it)
-                val fivegramsAsObject = ImmutableFivegram2IntMap.fromBinary(it)
+                val fivegramsAsInt = ImmutableInt2FloatTrieMap.fromBinary(it)
+                val fivegramsAsLong = ImmutableLong2FloatMap.fromBinary(it)
+                val fivegramsAsObject = ImmutableFivegram2FloatMap.fromBinary(it)
 
                 // Should have reached end of data
                 check(it.read() == -1)
@@ -352,41 +320,35 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
     private class Builder(
         private val charOffsetsData: CharOffsetsData,
     ) {
-        private val quadrigramsAsIntBuilder = ImmutableInt2IntTrieMap.Builder()
-        private val quadrigramsAsLongBuilder = ImmutableLong2IntMap.Builder()
-        private val fivegramsAsIntBuilder = ImmutableInt2IntTrieMap.Builder()
-        private val fivegramsAsLongBuilder = ImmutableLong2IntMap.Builder()
-        private val fivegramsAsObjectBuilder = ImmutableFivegram2IntMap.Builder()
+        private val quadrigramsAsIntBuilder = ImmutableInt2FloatTrieMap.Builder()
+        private val quadrigramsAsLongBuilder = ImmutableLong2FloatMap.Builder()
+        private val fivegramsAsIntBuilder = ImmutableInt2FloatTrieMap.Builder()
+        private val fivegramsAsLongBuilder = ImmutableLong2FloatMap.Builder()
+        private val fivegramsAsObjectBuilder = ImmutableFivegram2FloatMap.Builder()
 
-        fun putQuadrigramFrequency(quadrigram: String, encodedFrequency: Int) {
-            if (encodedFrequency == 0) {
-                throw AssertionError("Invalid encoded frequency 0 for ngram '$quadrigram'")
-            }
+        fun putQuadrigramFrequency(quadrigram: String, frequency: Float) {
             if (quadrigram.length != 4) {
                 throw IllegalArgumentException("Invalid ngram length ${quadrigram.length}")
             }
 
             charOffsetsData.useEncodedQuadrigram(
                 quadrigram,
-                { quadrigramsAsIntBuilder.add(it, encodedFrequency) },
-                { quadrigramsAsLongBuilder.add(it, encodedFrequency) },
+                { quadrigramsAsIntBuilder.add(it, frequency) },
+                { quadrigramsAsLongBuilder.add(it, frequency) },
                 { throw AssertionError("Char offsets don't include chars of: $quadrigram") }
             )
         }
 
-        fun putFivegramFrequency(fivegram: String, encodedFrequency: Int) {
-            if (encodedFrequency == 0) {
-                throw AssertionError("Invalid encoded frequency 0 for ngram '$fivegram'")
-            }
+        fun putFivegramFrequency(fivegram: String, frequency: Float) {
             if (fivegram.length != 5) {
                 throw IllegalArgumentException("Invalid ngram length ${fivegram.length}")
             }
 
             charOffsetsData.useEncodedFivegram(
                 fivegram,
-                { fivegramsAsIntBuilder.add(it, encodedFrequency) },
-                { fivegramsAsLongBuilder.add(it, encodedFrequency) },
-                { fivegramsAsObjectBuilder.add(it, encodedFrequency) },
+                { fivegramsAsIntBuilder.add(it, frequency) },
+                { fivegramsAsLongBuilder.add(it, frequency) },
+                { fivegramsAsObjectBuilder.add(it, frequency) },
                 { throw AssertionError("Char offsets don't include chars of: $fivegram") }
             )
         }
@@ -414,25 +376,26 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         char4: Char,
         fivegramAsString: () -> String,
     ): Double {
-        return decodeFrequency(
-            when (length) {
-                4 -> charOffsetsData.useEncodedQuadrigram(
-                    char0, char1, char2, char3,
-                    { quadrigramsAsInt.get(it) },
-                    { quadrigramsAsLong.get(it) },
-                    { 0 }
-                )
-                5 -> charOffsetsData.useEncodedFivegram(
-                    char0, char1, char2, char3, char4,
-                    fivegramAsString,
-                    { fivegramsAsInt.get(it) },
-                    { fivegramsAsLong.get(it) },
-                    { fivegramsAsObject.get(it) },
-                    { 0 }
-                )
-                else -> throw IllegalArgumentException("Invalid Ngram length")
-            }
-        )
+        // Note: Explicitly specify type Float here to avoid accidentally having implicit type Number
+        // (and therefore boxing) when one of the results is not a Float
+        val frequency: Float = when (length) {
+            4 -> charOffsetsData.useEncodedQuadrigram(
+                char0, char1, char2, char3,
+                { quadrigramsAsInt.get(it) },
+                { quadrigramsAsLong.get(it) },
+                { 0f }
+            )
+            5 -> charOffsetsData.useEncodedFivegram(
+                char0, char1, char2, char3, char4,
+                fivegramAsString,
+                { fivegramsAsInt.get(it) },
+                { fivegramsAsLong.get(it) },
+                { fivegramsAsObject.get(it) },
+                { 0f }
+            )
+            else -> throw IllegalArgumentException("Invalid Ngram length")
+        }
+        return frequency.toDouble()
     }
 
     /**

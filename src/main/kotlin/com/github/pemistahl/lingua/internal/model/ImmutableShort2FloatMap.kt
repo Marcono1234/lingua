@@ -1,18 +1,18 @@
 package com.github.pemistahl.lingua.internal.model
 
+import com.github.pemistahl.lingua.internal.model.extension.readFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.readInt
-import com.github.pemistahl.lingua.internal.model.extension.readIntArray
 import com.github.pemistahl.lingua.internal.model.extension.readShort
 import com.github.pemistahl.lingua.internal.model.extension.readShortArray
-import com.github.pemistahl.lingua.internal.model.extension.writeIntArray
+import com.github.pemistahl.lingua.internal.model.extension.writeFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.writeShortArray
-import it.unimi.dsi.fastutil.shorts.Short2IntAVLTreeMap
-import it.unimi.dsi.fastutil.shorts.Short2IntSortedMap
+import it.unimi.dsi.fastutil.shorts.Short2FloatAVLTreeMap
+import it.unimi.dsi.fastutil.shorts.Short2FloatSortedMap
 import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-internal class ImmutableShort2IntMap private constructor(
+internal class ImmutableShort2FloatMap private constructor(
     private val keys: ShortArray,
     /**
      * For an index _i_ obtained based on [keys]:
@@ -24,11 +24,11 @@ internal class ImmutableShort2IntMap private constructor(
      * so the question is only whether indirection reduces memory usage)
      */
     private val indValuesIndices: ShortArray,
-    private val values: IntArray
+    private val values: FloatArray
 ) {
     companion object {
         @JvmStatic
-        fun fromBinary(inputStream: InputStream): ImmutableShort2IntMap {
+        fun fromBinary(inputStream: InputStream): ImmutableShort2FloatMap {
             val keys = inputStream.readShortArray(inputStream.readInt())
             // Don't need to check for overflow here; if the map contains the maximum of 65536 unique values,
             // then indValuesIndices won't be used (i.e. it will be empty) because indirect lookup would require
@@ -38,32 +38,32 @@ internal class ImmutableShort2IntMap private constructor(
             var valuesLength = inputStream.readShort()
             // Detect overflow when map contains UShort.MAX_VALUE + 1 values
             if (keys.isNotEmpty() && valuesLength == 0) valuesLength = 65536
-            val values = inputStream.readIntArray(valuesLength)
+            val values = inputStream.readFloatArray(valuesLength)
 
-            return ImmutableShort2IntMap(keys, indValuesIndices, values)
+            return ImmutableShort2FloatMap(keys, indValuesIndices, values)
         }
     }
 
     class Builder {
-        private val map: Short2IntSortedMap = Short2IntAVLTreeMap()
+        private val map: Short2FloatSortedMap = Short2FloatAVLTreeMap()
 
-        fun add(key: Short, value: Int) {
+        fun add(key: Short, value: Float) {
             val old = map.put(key, value)
-            check(old == 0)
+            check(old == 0f)
         }
 
-        fun build(): ImmutableShort2IntMap {
+        fun build(): ImmutableShort2FloatMap {
             val keys = map.keys.toShortArray()
 
             return createValueArrays(map.values) { indValuesIndices, values ->
-                return@createValueArrays ImmutableShort2IntMap(keys, indValuesIndices, values)
+                return@createValueArrays ImmutableShort2FloatMap(keys, indValuesIndices, values)
             }
         }
     }
 
-    fun get(key: Short): Int {
+    fun get(key: Short): Float {
         val index = keys.binarySearch(key)
-        return if (index < 0) 0 else {
+        return if (index < 0) 0f else {
             if (indValuesIndices.isEmpty()) values[index]
             else values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
         }
@@ -80,6 +80,6 @@ internal class ImmutableShort2IntMap private constructor(
         dataOutput.writeShortArray(indValuesIndices)
 
         dataOutput.writeShort(values.size)
-        dataOutput.writeIntArray(values)
+        dataOutput.writeFloatArray(values)
     }
 }

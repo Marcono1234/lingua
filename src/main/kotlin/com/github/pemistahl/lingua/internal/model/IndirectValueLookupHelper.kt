@@ -1,7 +1,7 @@
 /**
  * Helper functions for indirect encoded frequency lookup.
  *
- * The `Immutable...2IntMap` classes (except for [ImmutableByte2IntMap]) support two lookup modes for encoded
+ * The `Immutable...2FloatMap` classes (except for [ImmutableByte2FloatMap]) support two lookup modes for encoded
  * frequencies: direct and indirect
  *
  * In _direct_ mode the index determined from the `keys` array can directly be used to look up the value from
@@ -15,16 +15,16 @@
 
 package com.github.pemistahl.lingua.internal.model
 
-import it.unimi.dsi.fastutil.ints.IntCollection
-import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet
+import it.unimi.dsi.fastutil.floats.FloatCollection
+import it.unimi.dsi.fastutil.floats.FloatLinkedOpenHashSet
 
-private inline fun IntArray.forEachIndexedStartingAt(start: Int, action: (index: Int, i: Int) -> Unit) {
+private inline fun FloatArray.forEachIndexedStartingAt(start: Int, action: (index: Int, f: Float) -> Unit) {
     for (i in start until size) {
         action(i - start, get(i))
     }
 }
 
-private inline fun IntArray.forEachIndexedUntil(endExclusive: Int, action: (index: Int, i: Int) -> Unit) {
+private inline fun FloatArray.forEachIndexedUntil(endExclusive: Int, action: (index: Int, f: Float) -> Unit) {
     repeat(endExclusive) {
         action(it, get(it))
     }
@@ -33,16 +33,16 @@ private inline fun IntArray.forEachIndexedUntil(endExclusive: Int, action: (inde
 internal const val maxIndirectionIndices = 65536 // number of values representable by a short
 
 internal inline fun <T> createValueArrays(
-    intValues: IntCollection,
-    resultHandler: (indValuesIndices: ShortArray, values: IntArray) -> T
+    floatValues: FloatCollection,
+    resultHandler: (indValuesIndices: ShortArray, values: FloatArray) -> T
 ): T {
-    val indirectValues = IntLinkedOpenHashSet()
+    val indirectValues = FloatLinkedOpenHashSet()
     var indirectLookupEndIndex = 0
 
     // Use int array to avoid boxing, and for faster lookup
-    val intValuesArray = intValues.toIntArray()
+    val floatValuesArray = floatValues.toFloatArray()
     run indirectlyAccessibleValues@{
-        intValuesArray.forEach {
+        floatValuesArray.forEach {
             // Only have to break the loop if value is not contained and max size is reached
             if (!indirectValues.contains(it)) {
                 if (indirectValues.size >= maxIndirectionIndices) {
@@ -57,32 +57,32 @@ internal inline fun <T> createValueArrays(
     }
 
     val indirectValuesCount = indirectValues.size
-    val indirectValuesArray = indirectValues.toIntArray()
+    val indirectValuesArray = indirectValues.toFloatArray()
 
     val shortWeight = 1 // 16bit
     val intWeight = 2 // 32bit = 2 * short
 
-    val directLookupCount = intValuesArray.size - indirectLookupEndIndex
+    val directLookupCount = floatValuesArray.size - indirectLookupEndIndex
     val indirectCost = indirectLookupEndIndex * shortWeight + (indirectValuesCount + directLookupCount) * intWeight
 
-    val directCost = intValuesArray.size * intWeight
+    val directCost = floatValuesArray.size * intWeight
 
     return if (indirectCost < directCost) {
         val values = indirectValuesArray.copyOf(indirectValuesCount + directLookupCount)
 
-        intValuesArray.forEachIndexedStartingAt(indirectLookupEndIndex) { index, i ->
-            values[indirectValuesCount + index] = i
+        floatValuesArray.forEachIndexedStartingAt(indirectLookupEndIndex) { index, f ->
+            values[indirectValuesCount + index] = f
         }
 
         val indValuesIndices = ShortArray(indirectLookupEndIndex)
-        intValuesArray.forEachIndexedUntil(indirectLookupEndIndex) { index, i ->
-            val indirectIndex = indirectValuesArray.indexOf(i)
+        floatValuesArray.forEachIndexedUntil(indirectLookupEndIndex) { index, f ->
+            val indirectIndex = indirectValuesArray.indexOfFirst { it == f }
             assert(indirectIndex != -1)
             indValuesIndices[index] = indirectIndex.toShort()
         }
 
         resultHandler(indValuesIndices, values)
     } else {
-        resultHandler(ShortArray(0), intValuesArray)
+        resultHandler(ShortArray(0), floatValuesArray)
     }
 }

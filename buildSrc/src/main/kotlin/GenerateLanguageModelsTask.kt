@@ -1,8 +1,7 @@
 import com.github.pemistahl.lingua.internal.model.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.model.UniBiTrigramRelativeFrequencyLookup
-import com.github.pemistahl.lingua.internal.model.encodeFrequency
 import com.squareup.moshi.JsonReader
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
 import okio.buffer
 import okio.source
 import org.gradle.api.DefaultTask
@@ -70,10 +69,13 @@ abstract class GenerateLanguageModelsTask () : DefaultTask() {
                     map
                 }
                 .forEach { languageCode, entries ->
-                    fun readModel(fileName: String): Object2IntOpenHashMap<String> {
+                    fun readModel(fileName: String): Object2FloatOpenHashMap<String> {
+                        // If model file does not exist return empty map; some languages such as Chinese don't
+                        // have model files for all ngram lengths, see
+                        // https://github.com/pemistahl/lingua/commit/444aaa0848840e542d5c8bdc54ea1aff092f209b
                         return entries.get(fileName)?.let {
                             jarFile.getInputStream(it).use(::readJsonLanguageModel)
-                        } ?: Object2IntOpenHashMap<String>()
+                        } ?: Object2FloatOpenHashMap<String>()
                     }
 
                     val uniBiTrigramFile = UniBiTrigramRelativeFrequencyLookup.fromJson(
@@ -117,26 +119,26 @@ abstract class GenerateLanguageModelsTask () : DefaultTask() {
         })
     }
 
-    private fun readJsonLanguageModel(jsonStream: InputStream): Object2IntOpenHashMap<String> {
+    private fun readJsonLanguageModel(jsonStream: InputStream): Object2FloatOpenHashMap<String> {
         val jsonReader = JsonReader.of(jsonStream.source().buffer())
         jsonReader.beginObject()
 
-        var ngramsMap: Object2IntOpenHashMap<String>? = null
+        var ngramsMap: Object2FloatOpenHashMap<String>? = null
 
         while (jsonReader.hasNext()) {
             when (val name = jsonReader.nextName()) {
                 "language" -> { jsonReader.skipValue() }
                 "ngrams" -> {
                     if (ngramsMap == null) {
-                        ngramsMap = Object2IntOpenHashMap()
+                        ngramsMap = Object2FloatOpenHashMap()
                         jsonReader.beginObject()
                         while (jsonReader.hasNext()) {
                             val (numerator, denominator) = jsonReader.nextName().split('/')
                                 .map(String::toInt)
-                            val encodedFrequency = encodeFrequency(numerator, denominator)
+                            val frequency = numerator.toFloat() / denominator
                             val ngrams = jsonReader.nextString().split(' ')
                             ngrams.forEach { ngram ->
-                                ngramsMap.put(ngram, encodedFrequency)
+                                ngramsMap.put(ngram, frequency)
                             }
                         }
                         jsonReader.endObject()

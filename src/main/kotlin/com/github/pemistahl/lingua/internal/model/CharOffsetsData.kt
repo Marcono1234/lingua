@@ -9,7 +9,6 @@ import it.unimi.dsi.fastutil.chars.Char2IntOpenHashMap
 import it.unimi.dsi.fastutil.chars.Char2ShortLinkedOpenHashMap
 import it.unimi.dsi.fastutil.chars.Char2ShortMap
 import it.unimi.dsi.fastutil.chars.Char2ShortOpenHashMap
-import it.unimi.dsi.fastutil.objects.Object2IntMap
 import java.io.DataInputStream
 import java.io.DataOutput
 import java.util.TreeSet
@@ -21,10 +20,9 @@ internal class CharOffsetsData(
 ) {
     companion object {
         @JvmStatic
-        fun createCharOffsetsData(vararg ngrams: Object2IntMap<String>): CharOffsetsData {
+        fun createCharOffsetsData(ngrams: Sequence<String>): CharOffsetsData {
             val charCounts = Char2IntOpenHashMap()
-            ngrams.asSequence().flatMap(Object2IntMap<String>::keys)
-                .forEach { ngram -> ngram.chars().forEach { charCounts.addTo(it.toChar(), 1) } }
+            ngrams.forEach { ngram -> ngram.chars().forEach { charCounts.addTo(it.toChar(), 1) } }
 
             // Sort by occurrence count; most frequent chars first
             val charRanks = TreeSet(

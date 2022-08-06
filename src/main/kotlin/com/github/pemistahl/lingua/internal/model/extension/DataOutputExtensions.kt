@@ -17,3 +17,7 @@ internal fun DataOutput.writeIntArray(array: IntArray) {
 internal fun DataOutput.writeLongArray(array: LongArray) {
     array.forEach(::writeLong)
 }
+
+internal fun DataOutput.writeFloatArray(array: FloatArray) {
+    array.forEach(::writeFloat)
+}

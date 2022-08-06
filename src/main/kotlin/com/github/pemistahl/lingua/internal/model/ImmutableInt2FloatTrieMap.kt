@@ -2,17 +2,20 @@ package com.github.pemistahl.lingua.internal.model
 
 import com.github.pemistahl.lingua.internal.model.extension.readByte
 import com.github.pemistahl.lingua.internal.model.extension.readByteArray
+import com.github.pemistahl.lingua.internal.model.extension.readFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.readInt
 import com.github.pemistahl.lingua.internal.model.extension.readIntArray
 import com.github.pemistahl.lingua.internal.model.extension.readShortArray
+import com.github.pemistahl.lingua.internal.model.extension.writeFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.writeIntArray
 import com.github.pemistahl.lingua.internal.model.extension.writeShortArray
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectAVLTreeMap
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectFunction
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectSortedMap
-import it.unimi.dsi.fastutil.ints.IntArrayList
-import it.unimi.dsi.fastutil.shorts.Short2IntAVLTreeMap
-import it.unimi.dsi.fastutil.shorts.Short2IntSortedMap
+import it.unimi.dsi.fastutil.floats.FloatArrayList
+import it.unimi.dsi.fastutil.floats.FloatConsumer
+import it.unimi.dsi.fastutil.shorts.Short2FloatAVLTreeMap
+import it.unimi.dsi.fastutil.shorts.Short2FloatSortedMap
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -26,7 +29,7 @@ import kotlin.random.Random
  * int key map because there it is easier to encode the first two bytes (16 bits total) separately, which leaves behind
  * a short (16 bit). Whereas for a long key map, it would leave behind 48 bits, for which no primitive exists, and
  * encoding more than 2 bytes separately might decrease the likelihood that common prefixes exist.
- * Additionally, the keys of Int2Int maps are currently taking up the most memory compared to the other map types.
+ * Additionally, the keys of Int2Float maps are currently taking up the most memory compared to the other map types.
  *
  * This implementation assumes that for a language all ngrams encoded as primitive int may share a common prefix, e.g.
  * because the first two bytes correspond to the first two chars of the ngram. This might not apply to all primitive
@@ -42,7 +45,7 @@ import kotlin.random.Random
  * If _first key_, or the combination of _first key_ and _second key_ occurs frequently in the keys, this can save up
  * a lot of memory because this common prefix only has to be encoded once.
  */
-internal class ImmutableInt2IntTrieMap private constructor(
+internal class ImmutableInt2FloatTrieMap private constructor(
     private val size: Int,
     private val firstKeyLayer: ByteArray,
     /**
@@ -62,11 +65,11 @@ internal class ImmutableInt2IntTrieMap private constructor(
      * - else: Look up value from `values[i - indValuesIndices.length + maxIndirectionIndices]`
      */
     private val indValuesIndices: ShortArray,
-    private val values: IntArray
+    private val values: FloatArray
 ) {
     companion object {
         @JvmStatic
-        fun fromBinary(inputStream: InputStream): ImmutableInt2IntTrieMap {
+        fun fromBinary(inputStream: InputStream): ImmutableInt2FloatTrieMap {
             val size = inputStream.readInt()
 
             var firstKeyLayerSize = inputStream.readByte()
@@ -92,9 +95,9 @@ internal class ImmutableInt2IntTrieMap private constructor(
             val keyRemainderLayer = inputStream.readShortArray(size)
 
             val indValuesIndices = inputStream.readShortArray(inputStream.readInt())
-            val values = inputStream.readIntArray(inputStream.readInt())
+            val values = inputStream.readFloatArray(inputStream.readInt())
 
-            return ImmutableInt2IntTrieMap(
+            return ImmutableInt2FloatTrieMap(
                 size,
                 firstKeyLayer,
                 firstKeyGlobalIndices,
@@ -107,10 +110,10 @@ internal class ImmutableInt2IntTrieMap private constructor(
         }
 
         /**
-         * Calculates the estimated index in [ImmutableInt2IntTrieMap.keyRemainderLayer]. The caller should then
-         * determine the actual search range using [ImmutableInt2IntTrieMap.keyRemainderLayerSearchData].
+         * Calculates the estimated index in [ImmutableInt2FloatTrieMap.keyRemainderLayer]. The caller should then
+         * determine the actual search range using [ImmutableInt2FloatTrieMap.keyRemainderLayerSearchData].
          *
-         * @param totalSize [ImmutableInt2IntTrieMap.size]
+         * @param totalSize [ImmutableInt2FloatTrieMap.size]
          * @param firstLayerGlobalIndex [firstKeyGlobalIndices]`[firstLayerIndex]`
          */
         @JvmStatic
@@ -131,7 +134,7 @@ internal class ImmutableInt2IntTrieMap private constructor(
         }
 
         /**
-         * Number of bits used to encode the search size in [ImmutableInt2IntTrieMap.keyRemainderLayerSearchData].
+         * Number of bits used to encode the search size in [ImmutableInt2FloatTrieMap.keyRemainderLayerSearchData].
          *
          * This value can be adjusted if necessary; there probably exists no perfect value which supports the
          * theoretical combination of maximum offset and maximum search size.
@@ -140,24 +143,30 @@ internal class ImmutableInt2IntTrieMap private constructor(
     }
 
     class Builder {
-        private val map: Byte2ObjectSortedMap<Byte2ObjectSortedMap<Short2IntSortedMap>> = Byte2ObjectAVLTreeMap()
+        private val map: Byte2ObjectSortedMap<Byte2ObjectSortedMap<Short2FloatSortedMap>> = Byte2ObjectAVLTreeMap()
 
-        fun add(key: Int, value: Int) {
+        fun add(key: Int, value: Float) {
             val firstKey = key.toByte()
             val secondKey = key.shr(8).toByte()
             val keyRemainder = key.shr(16).toShort()
 
             val old = map.computeIfAbsent(firstKey, Byte2ObjectFunction { Byte2ObjectAVLTreeMap() })
-                .computeIfAbsent(secondKey, Byte2ObjectFunction { Short2IntAVLTreeMap() })
+                .computeIfAbsent(secondKey, Byte2ObjectFunction { Short2FloatAVLTreeMap() })
                 .put(keyRemainder, value)
-            check(old == 0)
+            check(old == 0f)
         }
 
-        fun build(): ImmutableInt2IntTrieMap {
-            val allValues = map.values.stream()
+        fun build(): ImmutableInt2FloatTrieMap {
+            val allValues = FloatArrayList()
+            map.values.stream()
                 .flatMap { map -> map.values.stream() }
-                .flatMapToInt { map -> map.values.intStream() }
-                .toArray()
+                .forEach { map ->
+                    map.values.forEach(
+                        FloatConsumer {
+                            allValues.add(it)
+                        }
+                    )
+                }
 
             val totalSize = allValues.size
             val firstKeyLayer = ByteArray(map.size)
@@ -166,10 +175,9 @@ internal class ImmutableInt2IntTrieMap private constructor(
             val keyRemainderLayerSearchData = Array(map.size) { IntArray(0) }
             val keyRemainderLayer = ShortArray(totalSize)
 
-            var firstKeyIndex = 0
             var globalIndex = 0
 
-            for (firstMapEntry in map.byte2ObjectEntrySet()) {
+            for ((firstKeyIndex, firstMapEntry) in map.byte2ObjectEntrySet().withIndex()) {
                 val firstKey = firstMapEntry.byteKey
                 val secondKeyMap = firstMapEntry.value
 
@@ -182,8 +190,7 @@ internal class ImmutableInt2IntTrieMap private constructor(
                 val firstKeyGlobalIndex = globalIndex
                 firstKeyGlobalIndices[firstKeyIndex] = firstKeyGlobalIndex
 
-                var secondKeyIndex = 0
-                for (secondMapEntry in secondKeyMap.byte2ObjectEntrySet()) {
+                for ((secondKeyIndex, secondMapEntry) in secondKeyMap.byte2ObjectEntrySet().withIndex()) {
                     val secondKey = secondMapEntry.byteKey
                     val keyRemainderMap = secondMapEntry.value
                     secondKeyLayer[secondKeyIndex] = secondKey
@@ -215,14 +222,12 @@ internal class ImmutableInt2IntTrieMap private constructor(
                         globalIndex++
                     }
 
-                    secondKeyIndex++
                 }
 
-                firstKeyIndex++
             }
 
-            return createValueArrays(IntArrayList.wrap(allValues)) { indValuesIndices, values ->
-                return@createValueArrays ImmutableInt2IntTrieMap(
+            return createValueArrays(allValues) { indValuesIndices, values ->
+                return@createValueArrays ImmutableInt2FloatTrieMap(
                     totalSize,
                     firstKeyLayer,
                     firstKeyGlobalIndices,
@@ -236,15 +241,15 @@ internal class ImmutableInt2IntTrieMap private constructor(
         }
     }
 
-    fun get(key: Int): Int {
+    fun get(key: Int): Float {
         val firstKey = key.toByte()
         val firstKeyIndex = firstKeyLayer.binarySearch(firstKey)
-        if (firstKeyIndex < 0) return 0
+        if (firstKeyIndex < 0) return 0f
 
         val secondKey = key.shr(8).toByte()
         val secondKeyLayer = secondKeyLayers[firstKeyIndex]
         val secondKeyIndex = secondKeyLayer.binarySearch(secondKey)
-        if (secondKeyIndex < 0) return 0
+        if (secondKeyIndex < 0) return 0f
 
         // Determine where to search within keyRemainderLayer
         val estimatedRemainderIndex = calculateEstimatedRemainderIndex(
@@ -272,7 +277,7 @@ internal class ImmutableInt2IntTrieMap private constructor(
             remainderSearchStartIndex + remainderSearchSize
         )
 
-        return if (index < 0) 0 else {
+        return if (index < 0) 0f else {
             if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
             else if (indValuesIndices.isEmpty()) values[index]
             else values[index - indValuesIndices.size + maxIndirectionIndices]
@@ -298,18 +303,18 @@ internal class ImmutableInt2IntTrieMap private constructor(
         dataOutput.writeShortArray(indValuesIndices)
 
         dataOutput.writeInt(values.size)
-        dataOutput.writeIntArray(values)
+        dataOutput.writeFloatArray(values)
     }
 }
 
 // TODO DEBUG
-fun main() {
+internal fun main() {
     var random = Random(0)
-    val builder = ImmutableInt2IntTrieMap.Builder()
+    val builder = ImmutableInt2FloatTrieMap.Builder()
 
     val times = 79999
     repeat(times) {
-        builder.add(random.nextInt(), it)
+        builder.add(random.nextInt(), it.toFloat())
     }
 
     var map = builder.build()
@@ -319,14 +324,14 @@ fun main() {
     println(out.size())
 
     val inStream = ByteArrayInputStream(out.toByteArray())
-    map = ImmutableInt2IntTrieMap.fromBinary(inStream)
+    map = ImmutableInt2FloatTrieMap.fromBinary(inStream)
     check(inStream.read() == -1)
 
     random = Random(0)
     repeat(times) {
         val key = random.nextInt()
         val value = map.get(key)
-        require(value == it) {
+        require(value == it.toFloat()) {
             "[$it]: Failed; $key, $value"
         }
     }

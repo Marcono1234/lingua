@@ -65,6 +65,13 @@ internal fun InputStream.readLongArray(length: Int): LongArray {
     return array
 }
 
+internal fun InputStream.readFloatArray(length: Int): FloatArray {
+    val byteArray = readByteArray(length * Float.SIZE_BYTES)
+    val array = FloatArray(length)
+    ByteBuffer.wrap(byteArray).asFloatBuffer().get(array)
+    return array
+}
+
 internal fun InputStream.readFivegramArray(length: Int): Array<String> {
     val byteArray = readByteArray(length * Char.SIZE_BYTES * 5)
     val charArray = CharArray(length * 5)

@@ -5,15 +5,25 @@ models and model files, compared to the original Lingua implementation. Some of 
 positively affect frequency lookup time (and therefore language detection speed) or reduce the amount of memory
 'garbage' produced during lookup, while others might negatively affect the lookup to gain improvements in other areas.
 
-:warning: The performance difference for these optimizations has not been properly tested. Some of these optimizations
+:warning: The performance differences for these optimizations have not been properly tested. Some of these optimizations
 might be "premature", and not actually necessary. Additionally, optimizations in one area might negatively affect
-performance in another area. For example a more compact in-memory model might increase lookup time.
+performance in another area. For example a more compact in-memory model might increase lookup time. In general these
+optimizations also make the code more complex, which in turn makes it more difficult to maintain.
 
 ## Language detection
 
 Optimizations implemented or considered for the process of language detection.
 
 ### Implemented
+
+#### Word splitting with custom word list class
+
+As part of language detection Lingua first splits up the input text in words. The original Lingua implementation
+does this by simply creating substrings from the input text. Depending on the length of the input text this can
+create quite a lot of temporary substring objects. To avoid this a custom `WordList` class can be used which for
+each word just stores the offset from the last word and the length of the word. That class can then provide a
+custom iteration function which provides a single `CharSequence` instance which is reused for each word. This way
+nearly all allocations for word splitting can be avoided.
 
 #### Primitive ngram encoding with inline class
 
@@ -23,6 +33,14 @@ can be used to provide abstraction over it and provide convenience functions. A 
 uni-, bi- and trigrams. For quadri- and fivegrams it would still be necessary to use a `String` object. However,
 Lingua only [uses trigrams for larger texts](https://github.com/pemistahl/lingua/blob/4ca58ead2d2ce6bad6d85574b7efd5b3ca29aa4b/src/main/kotlin/com/github/pemistahl/lingua/api/LanguageDetector.kt#L147)
 so only short texts would be affected, where the effect of using `String` objects might not be that big.
+
+#### Object ngram encoding with reused instance
+
+For ngrams which cannot be [encoded as primitive type](#primitive-ngram-encoding-with-inline-class) a `String`
+or `CharSequence` has to be used. To avoid creating large amounts of temporary substrings at runtime when
+sub-grams (ngrams of shorter length) are derived, a single object storing the ngram in a `Char` dropped is used.
+`array[0]` encodes the length of the ngram, `array[1]`, `array[2]`, ... `array[5]` encode the characters of the
+ngram. When a sub-ngram is then derived, its encoded length in `array[0]` is simply decremented.
 
 ## In-memory model
 
@@ -62,7 +80,7 @@ to a small number.
 In theory for some ngrams smaller primitive types might work as well, e.g. when using the offset based encoding
 described below it would be reasonable to encode a trigram and quadrigram as `Short`. However, during testing
 the memory reduction by this was only very small. The reason for this might be that some other optimizations,
-such as a [trie structure for keys](#trie-like-data-structure-for-int-to-int-map), or
+such as a [trie structure for keys](#trie-like-data-structure-for-int-to-float-map), or
 [shared frequency values](#shared-frequency-values) work better for an `Int` key map.
 
 ##### Offset based encoding 
@@ -84,12 +102,15 @@ during lookup due to the additional binary search per char. On the other hand, l
 the chars if not used by the language (and therefore that ngram does not exist either), without having to
 perform a lookup on the frequency map.
 
+Note: The original approach of using a `Char` array was dropped and replaced with a fastutil `Char2Short...HashMap`.
+The memory overhead of this really small (< 1 MB), but it makes language detection faster.
+
 #### Sorted array map structure
 
 The most compact way to store [primitive encoded ngrams](#primitive-ngram-encoding) is to use a sorted array map
 structure, where one sorted primitive array represents the ngram keys, and another array (for example an
 `Int` array, see [frequency encoding](#frequency-encoding)) contains the frequency value for each ngram.
-This implementation is based on in fvasco's proof of concept in https://github.com/pemistahl/lingua/issues/101#issuecomment-1086563136.
+This implementation is based on fvasco's proof of concept described in [this comment](https://github.com/pemistahl/lingua/issues/101#issuecomment-1086563136).
 
 In theory this can make lookup slower because a binary search has to be performed, compared to O(1) for
 a hash map in the best case. However, it is likely that the loops in `Arrays.binarySearch` are handled
@@ -126,7 +147,7 @@ an indirect lookup would be more efficient.
 The disadvantage of this approach is that lookup might become slightly slower, and that the
 creation and handling of the value index array adds additional complexity.
 
-#### Trie-like data structure for `Int`-to-`Int` map
+#### Trie-like data structure for `Int`-to-`Float` map
 
 Ngrams often share common prefixes, whether encoded as `Char` array or with a [primitive encoding](#primitive-ngram-encoding).
 This can be leveraged to reduce memory usage by encoding ngrams in a trie-like structure where common prefixes
@@ -139,7 +160,7 @@ most likely negate any memory reductions. Additionally, when using multidimensio
 arrays has to be considered. Even if the theoretical (or model file size) decreases, due to the overhead for every
 array instance, the runtime memory usage might still be the same or even increase.
 
-Currently, only for `Int`-to`Int` maps a trie-like structure is implemented, see also the section
+Currently, only for `Int`-to-`Float` maps a trie-like structure is implemented, see also the section
 [trie-like data structure for other maps](#trie-like-data-structure-for-other-maps).
 
 The implementation has separate layers for the first and the second byte of the `Int`, the remainder is stored
@@ -171,23 +192,10 @@ will never be loaded. This includes:
 - making sure that `LanguageDetector` in no situation tries to access them, even when shorter
   texts are provided for detection
 
-While this might (severely) decrease accuracy for short texts, but it has no effect on longer texts because
+While this might (severely) decrease accuracy for short texts, it has no effect on longer texts because
 it is identical to Lingua's current behavior for these longer texts.
 
-#### Frequency encoding
-
-Ngram frequencies expressed as floating point value are in the range 0.0 < _f_ < 1.0. Therefore, encoding them
-as regular `Float` or `Double` is wasteful because for example their sign bit and some bits of their exponent
-will never be used. A custom encoding which maps that value range from 0.0 to 1.0 to bytes can therefore represent
-the same frequency, but requires fewer bytes. 32 bit, compared to the 64-bit `Double` values used by the original
-Lingua implementation, can still yield good accuracy. Note that Lingua's original JSON models store the frequency
-as fraction and are therefore lossless, but even when reducing the fraction (which is already done for the JSON
-models), for large models it might not be possible to store the integer values of the numerator and the denominator
-both combined in 32 bit.
-
-It might even be possible to increase accuracy by reducing the range 0.0 to 1.0 further because it is unlikely
-that any ngram has a frequency close to 0.0 or 1.0. This is currently not implemented and it has to be verified
-whether that is really possible and what advantages, if any, this gives.
+This was also [implemented in Lingua version 1.2.0](https://github.com/pemistahl/lingua/commit/a845fe49fd54c43e3138419c08e535d3fc14c136).
 
 ### Not implemented
 
@@ -200,12 +208,12 @@ This was implemented originally, but was dropped when a [sorted array map struct
 was used instead to store the frequencies. The disadvantage of using fastutil collections is also, that there
 is currently no way to efficiently reconstruct them from binary data. They only support Java serialization, which
 is inefficient due to overhead for class structure representation and dangerous due to being able to load
-arbitrary classes. Though, they at least allow specifying an expected map size for their constructor.
+arbitrary classes. Though, these map types at least allow specifying an expected map size for their constructor.
 
 #### Trie-like data structure for other maps
 
 Ngrams often share common prefixes, whether encoded as `Char` array or with a [primitive encoding](#primitive-ngram-encoding).
-This cn be leveraged to reduce memory usage by encoding ngrams in a trie-like structure where common prefixes
+This can be leveraged to reduce memory usage by encoding ngrams in a trie-like structure where common prefixes
 are not repeated. When primitive encoding is used, the effectiveness depends on how the primitive encoding is
 performed, and how likely common prefixes are.
 
@@ -215,16 +223,16 @@ most likely negate any memory reductions. Additionally, when using multidimensio
 arrays has to be considered. Even if the theoretical (or model file size) decreases, due to the overhead for every
 array instance, the runtime memory usage might still be the same or even increase.
 
-Currently, only a trie-like encoding is implemented for [`Int`-to-`Int` maps](#trie-like-data-structure-for-int-to-int-map)
+Currently, only a trie-like encoding is implemented for [`Int`-to-`Float` maps](#trie-like-data-structure-for-int-to-float-map)
 because those take up the majority of memory. Other map types either contain too few entries at the moment to be
 worth the additional complexity and memory overhead to implement a trie, or they cannot be split very well into
 smaller primitive types. For example, encoding the first two bytes of a 64-bit `Long` would have a 48-bit remainder.
 The remainder would therefore have to be split again, possibly introducing another trie layer, or having two separate arrays
 to store the parts of the remainder. And then it would be necessary to map to the frequency value in some way.
-Because `Long`-to-`Int` maps currently don't have that many entries, it is most likely not worth it to implement this
+Because `Long`-to-`Float` maps currently don't have that many entries, it is most likely not worth it to implement this
 yet.
 
-For `Short`-to-`Int` maps it might be reasonable to implement them as trie, but it appears for them the overhead
+For `Short`-to-`Float` maps it might be reasonable to implement them as trie, but it appears for them the overhead
 of mapping to the corresponding frequency value negates most of the saved memory, see also
 [compressed primitive encoding](#compressed-primitive-encoding).
 
@@ -247,7 +255,28 @@ a lowercase variant (e.g. `U+01C5`), or which are considered uppercase but have 
 
 This was originally implemented, but dropped in favor of [offset based encoding](#offset-based-encoding), since
 that groups the used letters more cleanly per language and simplifies encoding, such as not having to use a base
-index and a difference to that base index for subsequent chars.
+index and a difference to that base index for subsequent chars. Additionally, it is not dependent on the Unicode data
+of the JDK used to construct the language models.
+
+#### Frequency encoding
+
+Ngram frequencies expressed as floating point value are in the range 0.0 < _f_ < 1.0. Therefore, encoding them
+as regular `Float` or `Double` is wasteful because for example their sign bit and some bits of their exponent
+will never be used. A custom encoding which maps that value range from 0.0 to 1.0 to bytes can therefore represent
+the same frequency, but requires fewer bytes. 32-bit, compared to the 64-bit `Double` values used by the original
+Lingua implementation, can still yield good accuracy (since version 1.2.0 Lingua also uses [`Float` to store the
+frequencies](https://github.com/pemistahl/lingua/commit/7633ea97dc0d39eee589427ce594394890f1502f)). Note that
+Lingua's original JSON models store the frequency as fraction and are therefore lossless, but even when reducing
+the fraction (which is already done for the JSON models), for large models it might not be possible to store the
+integer values of the numerator and the denominator both combined in 32 bits.
+
+It might even be possible to increase accuracy by reducing the range 0.0 to 1.0 further because it is unlikely
+that any ngram has a frequency close to 0.0 or 1.0. This is currently not implemented, and it has to be verified
+whether that is really possible and what advantages, if any, this gives.
+
+Frequency encoding was originally implemented, but it only had a very small effect on precision at the cost
+of adding additional complexity. Therefore, this optimization was dropped and instead of an encoded `Int`,
+frequencies are now stored as `Float`, which requires the same amount of memory (32 bits).
 
 ## Model file
 
@@ -286,7 +315,7 @@ each ngram separately.
 
 For example, first the frequency could be written and then all ngrams which have that frequency. To account for
 frequencies which are unique to one (or only few) ngrams, a custom encoding could be used. The following assumes
-frequencies to be encoded with 32 bit, and that 0 is not a valid frequency value:
+frequencies to be encoded with 32 bits, and that 0 is not a valid frequency value:
 - If < 3 ngrams have the same frequency: Store each of them as frequency followed by ngram
 - Else: Write 32-bit 0 (to differentiate it from a valid frequency), followed by frequency, followed by number of
   ngrams with that frequency, followed by all the ngrams
@@ -296,13 +325,13 @@ frequency, then to avoid a clash with the 32-bit 0 mentioned above, the frequenc
 be > 0. This will most likely have no effect on the accuracy.
 
 This way for _n_ ngrams with the same frequency, in addition to the encoded ngrams themselves the following number of
-bytes would be required (assumes frequencies to be encoded with 32 bit = 4 byte):
+bytes would be required (assumes frequencies to be encoded with 32 bits = 4 bytes):
 - If _n_ < 3: _n_ * 4
 - Else: 4 + 4 + 4 = 32-bit 0 + frequency + count (assuming count is 32-bit integer; 16 bit might suffice as well)
 
 This was originally implemented but discarded when a [sorted array map structure](#sorted-array-map-structure) was
 used for the in-memory model. It might still be possible to implement, but the implementation would be quite
-complex to sort the ngrams again, and possibly also restore the [shared frequency values structure](#shared-frequency-values).
+complex to sort the ngrams again when the model is loaded, and possibly also restore the [shared frequency values structure](#shared-frequency-values).
 This might also increase loading time (to be verified; smaller model file size on the other hand might decrease read time).
 
 #### Trie-like model
@@ -314,8 +343,8 @@ Unless the encoded ngrams are converted when loaded, the effectiveness of this d
 [primitive in-memory encoding](#primitive-ngram-encoding). The more common a prefix of an encoded ngram is, the more
 memory can be reduced.
 
-This is not implemented because at the moment the most memory is used by the `Int`-to-`Int` maps, which already
-use a [trie-like data structure](#trie-like-data-structure-for-int-to-int-map) for the in-memory model, which
+This is not implemented because at the moment the most memory is used by the `Int`-to-`Float` maps, which already
+use a [trie-like data structure](#trie-like-data-structure-for-int-to-float-map) for the in-memory model, which
 is also written in this way to the model file. For other maps this trie-like model would likely not be worth it.
 However, for the model file the memory reduction might be greater than for the in-memory model because the overhead
 for nested arrays is smaller. For example to encode the length of a `Byte` array, only a `Byte` is needed (or if length 0
