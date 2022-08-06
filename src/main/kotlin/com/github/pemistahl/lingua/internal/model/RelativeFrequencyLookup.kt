@@ -1,5 +1,6 @@
 package com.github.pemistahl.lingua.internal.model
 
+import it.unimi.dsi.fastutil.chars.Char2ShortMaps
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -290,7 +291,7 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
 ) {
     companion object {
         val empty = QuadriFivegramRelativeFrequencyLookup(
-            CharOffsetsData(CharArray(0), ShortArray(0)),
+            CharOffsetsData(Char2ShortMaps.EMPTY_MAP),
             ImmutableInt2IntTrieMap.Builder().build(),
             ImmutableLong2IntMap.Builder().build(),
             ImmutableInt2IntTrieMap.Builder().build(),

@@ -4,23 +4,20 @@ import com.github.pemistahl.lingua.internal.model.extension.readCharArray
 import com.github.pemistahl.lingua.internal.model.extension.readShortArray
 import com.github.pemistahl.lingua.internal.model.extension.writeCharArray
 import com.github.pemistahl.lingua.internal.model.extension.writeShortArray
-import it.unimi.dsi.fastutil.chars.Char2IntAVLTreeMap
 import it.unimi.dsi.fastutil.chars.Char2IntMap
 import it.unimi.dsi.fastutil.chars.Char2IntOpenHashMap
+import it.unimi.dsi.fastutil.chars.Char2ShortLinkedOpenHashMap
+import it.unimi.dsi.fastutil.chars.Char2ShortMap
+import it.unimi.dsi.fastutil.chars.Char2ShortOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2IntMap
 import java.io.DataInputStream
 import java.io.DataOutput
 import java.util.TreeSet
 
+private const val NO_VALUE = (-1).toShort()
+
 internal class CharOffsetsData(
-    /** All of the chars used by the ngrams, sorted in ascending order */
-    private val chars: CharArray,
-    /**
-     * For each char at the corresponding position in [chars], stores the relative encoding offset for that char.
-     * The encoding offsets are assigned in ascending order (starting at 0), starting with the most frequent chars.
-     * This makes it likelier that for many ngrams a compact primitive encoding can be used.
-     */
-    private val charOffsets: ShortArray,
+    private val offsetMap: Char2ShortMap
 ) {
     companion object {
         @JvmStatic
@@ -36,15 +33,11 @@ internal class CharOffsetsData(
             )
             charCounts.char2IntEntrySet().forEach(charRanks::add)
 
-            // Sort by char value, mapping to its occurrence index
-            val charsToOffset = Char2IntAVLTreeMap()
-            charRanks.forEachIndexed { index, entry -> charsToOffset.put(entry.charKey, index) }
+            // Use linked map here to make sure `writeBinary` uses consistent order
+            val charsToOffset = Char2ShortLinkedOpenHashMap()
+            charRanks.forEachIndexed { index, entry -> charsToOffset.put(entry.charKey, index.toShort()) }
 
-            val chars = charsToOffset.keys.toCharArray()
-            val charOffsets = ShortArray(chars.size)
-            charsToOffset.values.forEachIndexed { index, i -> charOffsets[index] = i.toShort() }
-
-            return CharOffsetsData(chars, charOffsets)
+            return CharOffsetsData(charsToOffset)
         }
 
         @JvmStatic
@@ -53,19 +46,26 @@ internal class CharOffsetsData(
             val chars = dataIn.readCharArray(charsCount)
             val charOffsets = dataIn.readShortArray(charsCount)
 
-            return CharOffsetsData(chars, charOffsets)
+            val map = Char2ShortOpenHashMap(charsCount)
+            map.defaultReturnValue(NO_VALUE)
+            chars.forEachIndexed { index, c ->
+                map.put(c, charOffsets[index])
+            }
+
+            return CharOffsetsData(map)
         }
     }
 
     init {
-        // Assume that language uses at most 65535 chars (otherwise binary encoding would overflow)
-        check(chars.size <= 65535)
+        // Assume that language uses at most 65535 - 1 chars (otherwise binary encoding would overflow)
+        // - 1 because have to reserve one offset value to indicate 'no value'
+        check(offsetMap.size <= 65535 - 1)
     }
 
     private fun getCharOffset(char: Char): Int {
-        val charIndex = chars.binarySearch(char)
-        if (charIndex < 0) return -1
-        return charOffsets[charIndex].toInt().and(0xFFFF) // UShort
+        val charIndex = offsetMap.get(char)
+        if (charIndex == NO_VALUE) return -1
+        return charIndex.toInt().and(0xFFFF) // UShort
     }
 
     inline fun <R> useEncodedUnigram(
@@ -284,8 +284,8 @@ internal class CharOffsetsData(
     }
 
     fun writeBinary(dataOut: DataOutput) {
-        dataOut.writeShort(chars.size)
-        dataOut.writeCharArray(chars)
-        dataOut.writeShortArray(charOffsets)
+        dataOut.writeShort(offsetMap.size)
+        dataOut.writeCharArray(offsetMap.keys.toCharArray())
+        dataOut.writeShortArray(offsetMap.values.toShortArray())
     }
 }
