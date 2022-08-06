@@ -34,9 +34,8 @@ jobs:
         run: gradlew.bat check
         shell: cmd
 
-# TODO: Don't update, just check for differences and create diff (but don't let workflow fail)
-  update-accuracy-reports:
-    name: Update accuracy reports
+  check-accuracy-reports:
+    name: Check accuracy reports
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -58,5 +57,17 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      - name: Update accuracy reports
-        run: ./.github/workflow-scripts/update-accuracy-reports.sh
+      - name: Check accuracy reports
+        id: check-accuracy-reports
+        run: |
+          ./gradlew clean accuracyReport -Pdetectors=Lingua
+          # --exit-code causes exit code 1 if difference is detected
+          git diff --output=accuracy-reports.diff --exit-code
+
+      - name: Upload accuracy reports diff
+        uses: actions/upload-artifact@v3
+        # Only run if accuracy reports differ
+        if: steps.check-accuracy-reports.outcome == 'failure'
+        with:
+          name: accuracy-reports-diff
+          path: accuracy-reports.diff
