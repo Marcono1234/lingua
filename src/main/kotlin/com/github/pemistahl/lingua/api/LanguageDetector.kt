@@ -45,9 +45,8 @@ import java.util.EnumMap
 import java.util.EnumSet
 import java.util.SortedMap
 import java.util.TreeMap
-import java.util.concurrent.Callable
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
-import java.util.concurrent.FutureTask
 import kotlin.math.ln
 
 private const val FULL_WORD_VALUE = 1.0
@@ -94,40 +93,6 @@ class LanguageDetector internal constructor(
         if (isEveryLanguageModelPreloaded) {
             preloadLanguageModels()
         }
-    }
-
-    // TODO: Might be inefficient because it blocks the current thread instead of having it participate in the
-    //       work; maybe rewrite to use CompletableFuture, might then also allow nested task submission (?)
-    private fun <E> executeTasks(tasks: List<Callable<E>>): List<E> {
-        val futures = tasks.map { FutureTask(it) }
-        futures.forEach(executor::execute)
-
-        val results = ArrayList<E>(tasks.size)
-        var exception: Throwable? = null
-        futures.forEach {
-            try {
-                if (exception == null) {
-                    results.add(it.get())
-                }
-                // Else, only collect other exceptions (if they are available already) in case they contain root case,
-                // such ExceptionInInitializerError; discard result of Future
-                else if (it.isDone) {
-                    it.get()
-                } else {
-                    it.cancel(true)
-                }
-            } catch (e: Throwable) {
-                if (exception == null) {
-                    exception = e
-                } else {
-                    exception!!.addSuppressed(e)
-                }
-            }
-        }
-        if (exception != null) {
-            throw exception!!
-        }
-        return results
     }
 
     /**
@@ -203,45 +168,28 @@ class LanguageDetector internal constructor(
         } else {
             (1..5)
         }
-        // Important: Either run this here concurrently or computeLanguageProbabilities, but not both
-        // Otherwise this might cause deadlock where tasks here wait on tasks in computeLanguageProbabilities,
-        // but tasks in computeLanguageProbabilities cannot be picked up because all workers are busy waiting
-        // on computeLanguageProbabilities result
-        // TODO: Might not be efficient enough when only detecting few languages; then would always wait
-        //       for results for these few languages, while other workers are idle
-        val runMultiThreadedPerNgramLength = !isLongText && ngramSizeRange.count() > 1
         val allProbabilitiesAndUnigramCounts = ngramSizeRange.filter { i -> cleanedUpText.length >= i }
-            .let { ngramLengths ->
-                fun computeProbabilities(ngramLength: Int): Pair<EnumDoubleMap<Language>, EnumIntMap<Language>?> {
-                    val testDataModel = TestDataLanguageModel.fromText(cleanedUpText, ngramLength)
-                    val probabilities = computeLanguageProbabilities(testDataModel, filteredLanguages, isLongText)
+            .map { ngramLength ->
+                val testDataModel = TestDataLanguageModel.fromText(cleanedUpText, ngramLength)
+                computeLanguageProbabilities(testDataModel, filteredLanguages)
+                    .thenApply { probabilities ->
+                        val unigramCounts = if (ngramLength == 1) {
+                            val languages = probabilities.getNonZeroKeys()
 
-                    val unigramCounts = if (ngramLength == 1) {
-                        val languages = probabilities.getNonZeroKeys()
-
-                        val unigramFilteredLanguages =
-                            if (languages.isNotEmpty()) filteredLanguages.asSequence()
-                                .filter { languages.contains(it) }
-                                .toSet()
-                            else filteredLanguages
-                        countUnigramsOfInputText(testDataModel, unigramFilteredLanguages)
-                    } else {
-                        null
-                    }
-
-                    return Pair(probabilities, unigramCounts)
-                }
-
-                return@let if (runMultiThreadedPerNgramLength) {
-                    executeTasks(
-                        ngramLengths.map { ngramLength ->
-                            Callable { computeProbabilities(ngramLength) }
+                            val unigramFilteredLanguages =
+                                if (languages.isNotEmpty()) filteredLanguages.asSequence()
+                                    .filter { languages.contains(it) }
+                                    .toSet()
+                                else filteredLanguages
+                            countUnigramsOfInputText(testDataModel, unigramFilteredLanguages)
+                        } else {
+                            null
                         }
-                    )
-                } else {
-                    ngramLengths.map(::computeProbabilities)
-                }
+
+                        return@thenApply Pair(probabilities, unigramCounts)
+                    }
             }
+            .map { it.join() }
 
         val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
         val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: EnumIntMap.newMap(languagesSubsetIndexer)
@@ -272,7 +220,6 @@ class LanguageDetector internal constructor(
         return text.trim().lowercase()
             .replaceAll(listOf(
                 NUMBERS_AND_PUNCTUATION to "",
-                // TODO: Maybe can remove this and change word splitting to consider any whitespace
                 MULTIPLE_WHITESPACE to " "
             ))
     }
@@ -487,55 +434,53 @@ class LanguageDetector internal constructor(
     private fun computeLanguageProbabilities(
         testDataModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>,
-        runMultiThreaded: Boolean,
-    ): EnumDoubleMap<Language> {
-        val probabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
-
-        // TODO: Once Kotlin supports it, convert these to local inline functions?
-        fun computeProbability(language: Language): Double {
-            val modelHolder = languageModels[language]!!.value()
-            val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
-            val quadriFivegramLookup = when {
-                // When model only contains primitives don't have to load quadriFivegramLookup
-                testDataModel.hasOnlyPrimitives() -> QuadriFivegramRelativeFrequencyLookup.empty
-                else -> modelHolder.quadriFivegramLookup.value
-            }
-
-            return computeSumOfNgramProbabilities(
-                uniBiTrigramsLookup,
-                quadriFivegramLookup,
-                testDataModel
-            )
-        }
-        fun handleProbability(language: Language, p: Double) {
-            var probability = p
-            if (probability < 0.0) {
-                // For languages with logograms increase probability since their words (=logograms)
-                // consist only of a single char compared to other languages whose words consist
-                // of multiple chars
-                if (language in LANGUAGES_SUPPORTING_LOGOGRAMS) {
-                    // Multiply by value < 1.0 since a smaller probability is better
-                    probability *= 0.85
-                }
-                probabilities.set(language, probability)
-            }
-        }
-
-        if (runMultiThreaded) {
-            executeTasks(
-                filteredLanguages.map { language ->
-                    Callable {
-                        language to computeProbability(language)
+    ): CompletableFuture<EnumDoubleMap<Language>> {
+        val probabilityFutures = filteredLanguages.map { language ->
+            CompletableFuture.supplyAsync(
+                {
+                    val modelHolder = languageModels[language]!!.value()
+                    val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
+                    val quadriFivegramLookup = when {
+                        // When model only contains primitives don't have to load quadriFivegramLookup
+                        testDataModel.hasOnlyPrimitives() -> QuadriFivegramRelativeFrequencyLookup.empty
+                        else -> modelHolder.quadriFivegramLookup.value
                     }
-                }
-            ).forEach { handleProbability(it.first, it.second) }
-        } else {
-            filteredLanguages.forEach { language ->
-                handleProbability(language, computeProbability(language))
-            }
-        }
 
-        return probabilities
+                    return@supplyAsync language to computeSumOfNgramProbabilities(
+                        uniBiTrigramsLookup,
+                        quadriFivegramLookup,
+                        testDataModel
+                    )
+                },
+                executor
+            )
+        }.toTypedArray()
+
+        /*
+         * Uses CompletableFuture.allOf instead of submitting another future with supplyAsync to executor
+         * and having it wait for all previous futures to avoid deadlock: Executor might choose to first
+         * run this combined future (instead of probability futures), and depending on free number of workers
+         * probability futures might therefore wait for combined future to finish -> deadlock
+         */
+        return CompletableFuture.allOf(*probabilityFutures).thenApply {
+            val probabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
+            // These `join` calls should not block because `allOf` should have made sure all futures are completed
+            probabilityFutures.map { it.join() }.forEach { (language, p) ->
+                var probability = p
+                if (probability < 0.0) {
+                    // For languages with logograms increase probability since their words (=logograms)
+                    // consist only of a single char compared to other languages whose words consist
+                    // of multiple chars
+                    if (language in LANGUAGES_SUPPORTING_LOGOGRAMS) {
+                        // Multiply by value < 1.0 since a smaller probability is better
+                        probability *= 0.85
+                    }
+                    probabilities.set(language, probability)
+                }
+            }
+
+            return@thenApply probabilities
+        }
     }
 
     private fun computeSumOfNgramProbabilities(
@@ -602,17 +547,20 @@ class LanguageDetector internal constructor(
     }
 
     private fun preloadLanguageModels() {
-        executeTasks(
-            languages.map {
-                Callable {
+        val futures = languages.map {
+            CompletableFuture.runAsync(
+                {
                     // Initialize values of Lazy objects
                     val modelHolder = languageModels[it]!!.value()
                     if (!isLowAccuracyModeEnabled) {
                         modelHolder.quadriFivegramLookup.value
                     }
-                }
-            }
-        )
+                },
+                executor
+            )
+        }.toTypedArray()
+        // Wait for futures to finish, to let caller know in case loading fails
+        CompletableFuture.allOf(*futures).join()
     }
 
     override fun equals(other: Any?) = when {
