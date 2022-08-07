@@ -40,7 +40,7 @@ import com.github.pemistahl.lingua.internal.util.extension.enumMapOf
 import com.github.pemistahl.lingua.internal.util.extension.filter
 import com.github.pemistahl.lingua.internal.util.extension.intersect
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
-import com.github.pemistahl.lingua.internal.util.replaceAll
+import com.github.pemistahl.lingua.internal.util.extension.replaceAll
 import java.util.EnumMap
 import java.util.EnumSet
 import java.util.SortedMap
