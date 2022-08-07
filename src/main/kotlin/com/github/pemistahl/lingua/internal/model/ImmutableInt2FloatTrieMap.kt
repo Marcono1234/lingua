@@ -16,13 +16,10 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList
 import it.unimi.dsi.fastutil.floats.FloatConsumer
 import it.unimi.dsi.fastutil.shorts.Short2FloatAVLTreeMap
 import it.unimi.dsi.fastutil.shorts.Short2FloatSortedMap
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import kotlin.math.max
-import kotlin.random.Random
 
 /**
  * Map where the first bytes of the int key are encoded in a trie-like way. This kind of map is only implemented for
@@ -221,9 +218,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
                         keyRemainderLayer[globalIndex] = keyRemainder
                         globalIndex++
                     }
-
                 }
-
             }
 
             return createValueArrays(allValues) { indValuesIndices, values ->
@@ -304,35 +299,5 @@ internal class ImmutableInt2FloatTrieMap private constructor(
 
         dataOutput.writeInt(values.size)
         dataOutput.writeFloatArray(values)
-    }
-}
-
-// TODO DEBUG
-internal fun main() {
-    var random = Random(0)
-    val builder = ImmutableInt2FloatTrieMap.Builder()
-
-    val times = 79999
-    repeat(times) {
-        builder.add(random.nextInt(), it.toFloat())
-    }
-
-    var map = builder.build()
-
-    val out = ByteArrayOutputStream()
-    map.writeBinary(out)
-    println(out.size())
-
-    val inStream = ByteArrayInputStream(out.toByteArray())
-    map = ImmutableInt2FloatTrieMap.fromBinary(inStream)
-    check(inStream.read() == -1)
-
-    random = Random(0)
-    repeat(times) {
-        val key = random.nextInt()
-        val value = map.get(key)
-        require(value == it.toFloat()) {
-            "[$it]: Failed; $key, $value"
-        }
     }
 }

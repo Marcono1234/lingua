@@ -31,10 +31,6 @@ val linguaDescription: String by project
 val linguaLicenseName: String by project
 val linguaLicenseUrl: String by project
 val linguaWebsiteUrl: String by project
-val linguaDeveloperId: String by project
-val linguaDeveloperName: String by project
-val linguaDeveloperEmail: String by project
-val linguaDeveloperUrl: String by project
 val linguaScmConnection: String by project
 val linguaScmDeveloperConnection: String by project
 val linguaScmUrl: String by project
@@ -42,7 +38,6 @@ val linguaSupportedDetectors: String by project
 val linguaSupportedLanguages: String by project
 val linguaMainClass: String by project
 val linguaCsvHeader: String by project
-val githubPackagesUrl: String by project
 
 val compileTestKotlin: KotlinCompile by tasks
 
@@ -367,14 +362,14 @@ val createLanguageModels by tasks.registering(GenerateLanguageModelsTask::class)
 sourceSets.main.get().output.dir(mutableMapOf<String, Any>("builtBy" to createLanguageModels), modelOutputDir_)
 
 dependencies {
-    lingua("com.github.pemistahl:lingua:1.2.1")
+    lingua("com.github.pemistahl:lingua:$linguaVersion")
 
     implementation(kotlin("stdlib"))
     implementation(libs.fastutil)
 
-    testImplementation("org.junit.jupiter:junit-jupiter:5.8.2")
-    testImplementation("org.assertj:assertj-core:3.22.0")
-    testImplementation("io.mockk:mockk:1.12.4")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.9.0")
+    testImplementation("org.assertj:assertj-core:3.23.1")
+    testImplementation("io.mockk:mockk:1.12.5")
 
     accuracyReportImplementation("com.optimaize.languagedetector:language-detector:0.6")
     accuracyReportImplementation("org.apache.opennlp:opennlp-tools:1.9.4")
@@ -414,30 +409,11 @@ publishing {
                         url.set(linguaLicenseUrl)
                     }
                 }
-                developers {
-                    developer {
-                        id.set(linguaDeveloperId)
-                        name.set(linguaDeveloperName)
-                        email.set(linguaDeveloperEmail)
-                        url.set(linguaDeveloperUrl)
-                    }
-                }
                 scm {
                     connection.set(linguaScmConnection)
                     developerConnection.set(linguaScmDeveloperConnection)
                     url.set(linguaScmUrl)
                 }
-            }
-        }
-    }
-
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri(githubPackagesUrl)
-            credentials {
-                username = linguaDeveloperId
-                password = project.findProperty("ghPackagesToken") as String?
             }
         }
     }
@@ -458,6 +434,6 @@ repositories {
 }
 
 // TODO: Signing is temporarily disabled
-tasks.withType<Sign>() {
+tasks.withType<Sign> {
     enabled = false
 }

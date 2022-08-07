@@ -85,7 +85,7 @@ internal class WordList private constructor(
         private val text: CharSequence,
         var start: Int = 0,
         var end: Int = 0,
-    ): CharSequence {
+    ) : CharSequence {
         override val length: Int
             get() = end - start
 

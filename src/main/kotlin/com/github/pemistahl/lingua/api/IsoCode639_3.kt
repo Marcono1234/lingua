@@ -21,6 +21,7 @@ package com.github.pemistahl.lingua.api
  *
  * ISO 639 is a standardized nomenclature used to classify languages.
  */
+@Suppress("ClassName")
 enum class IsoCode639_3 {
 
     /**

@@ -272,20 +272,18 @@ enum class Language(
      */
     UNKNOWN(IsoCode639_1.NONE, IsoCode639_3.NONE, emptySet());
 
-    private constructor (
+    constructor (
         isoCode639_1: IsoCode639_1,
         isoCode639_3: IsoCode639_3,
         unicodeScripts: Set<UnicodeScript>,
         uniqueCharacters: String
-    ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), uniqueCharacters) {
-    }
+    ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), uniqueCharacters)
 
-    private constructor (
+    constructor (
         isoCode639_1: IsoCode639_1,
         isoCode639_3: IsoCode639_3,
         unicodeScripts: Set<UnicodeScript>
-    ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), null) {
-    }
+    ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), null)
 
     companion object {
         private val allScriptsSet: Set<UnicodeScript> =

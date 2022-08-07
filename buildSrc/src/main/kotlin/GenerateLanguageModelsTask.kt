@@ -21,7 +21,7 @@ import java.util.jar.JarFile
 import kotlin.math.abs
 
 @CacheableTask
-abstract class GenerateLanguageModelsTask () : DefaultTask() {
+abstract class GenerateLanguageModelsTask : DefaultTask() {
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE) // only content matters, file name does not matter
     abstract val linguaArtifact: RegularFileProperty
@@ -30,6 +30,8 @@ abstract class GenerateLanguageModelsTask () : DefaultTask() {
      *      https://github.com/gradle/gradle/blob/19a20e98d7697333674c88f2db6dae1d0e3d206b/subprojects/core/src/main/java/org/gradle/api/internal/tasks/execution/CleanupStaleOutputsExecuter.java
      *      (?) https://github.com/gradle/gradle/issues/1349
      */
+    // Note: Currently creates `language-models/language-models/...` path (depending on which path `build.gradle.kts`
+    //       specifies) but that is probably acceptable
     @get:OutputDirectory
     abstract val modelOutputDir: DirectoryProperty
 
@@ -37,9 +39,6 @@ abstract class GenerateLanguageModelsTask () : DefaultTask() {
         group = "build"
         description = "Generates binary language models from upstream Lingua language models"
     }
-
-    // TODO: Currently creates `language-models/language-models/...` path
-    //      -> probably acceptable
 
     @TaskAction
     fun generateModels() {
@@ -60,11 +59,11 @@ abstract class GenerateLanguageModelsTask () : DefaultTask() {
                 .filter { it.name.startsWith("language-models/") && !it.isDirectory }
                 // Group by language code
                 .groupBy { it.name.substringAfter('/').substringBefore('/') }
-                .mapValues { it ->
+                .mapValues {
                     val map = mutableMapOf<String, JarEntry>()
                     it.value.forEach { entry ->
                         val fileName = entry.name.split('/', limit = 3)[2]
-                        map.put(fileName, entry)
+                        map[fileName] = entry
                     }
                     map
                 }
@@ -73,7 +72,7 @@ abstract class GenerateLanguageModelsTask () : DefaultTask() {
                         // If model file does not exist return empty map; some languages such as Chinese don't
                         // have model files for all ngram lengths, see
                         // https://github.com/pemistahl/lingua/commit/444aaa0848840e542d5c8bdc54ea1aff092f209b
-                        return entries.get(fileName)?.let {
+                        return entries[fileName]?.let {
                             jarFile.getInputStream(it).use(::readJsonLanguageModel)
                         } ?: Object2FloatOpenHashMap<String>()
                     }
@@ -105,7 +104,7 @@ abstract class GenerateLanguageModelsTask () : DefaultTask() {
         // Clean up empty dirs
         Files.walkFileTree(modelOutputDir, object: SimpleFileVisitor<Path>() {
             override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
-                var isEmpty = Files.newDirectoryStream(dir).use { dirStream ->
+                val isEmpty = Files.newDirectoryStream(dir).use { dirStream ->
                     !dirStream.iterator().hasNext()
                 }
 

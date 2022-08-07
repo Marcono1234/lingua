@@ -6,7 +6,6 @@ target/
 .idea
 .project
 .c9/
-*.launch
 .settings/
 .metadata/
 *.sublime-workspace

@@ -1,7 +1,3 @@
-Performance optimizations considered and implemented for this fork are documented in [Performance optimizations.md](./Performance%20optimizations.md).
-
----
-
 ![lingua](images/logo.png)
 
 <br>
@@ -18,7 +14,50 @@ Performance optimizations considered and implemented for this fork are documente
 
 ---
 
-// TODO: Doc differences and fork info; e.g. .io API package being removed
+# Tiny Lingua
+
+Tiny Lingua is a fork of the [Lingua](https://github.com/pemistahl/lingua) project with the intention
+to increase detection speed and reduce memory consumption. See [`Performance optimizations.md`](./Performance%20optimizations.md)
+for a detailed description of considered and implemented performance optimizations of this project.
+Some of the changes have already backported to the original Lingua project.
+
+In general you should notice the following improvements when using this library:
+- Faster memory model load times  
+  This is especially noticeable when configuring Tiny Lingua to preload the models for all languages.
+- Reduced memory usage for language models  
+  With all language models loaded the original Lingua library requires > 1.2 GB of memory whereas this
+  library requires ~150 MB. (Though in most uses cases detection of all supported languages is not
+  necessary and a subset of these languages suffices.)
+- Reduced memory consumption during language detection  
+  The original Lingua library can require multiple MBs of temporary memory during language detection,
+  whereas this library only requires a fraction of that.
+- Better parallelization  
+  For multi-core processors this library distributes the work more evenly across the cores to increase
+  language detection speed.
+
+One main goal of this project is to provide the same language detection accuracy as the original Lingua
+project; in fact its model files are based on the model files of the original Lingua project in the
+corresponding version. Additionally, the API should be as close as the possible to the original API.
+The package names are the same, so this library can be easily used as replacement.
+However, there are some differences:
+- The package `com.github.pemistahl.lingua.api.io` has been removed  
+  Most likely this does not affect many users because you would normally not create your own language
+  models, but rely on the models provided by Lingua itself.
+- The format of the binary models stored in the JAR file is an implementation detail  
+  The format may change at any point and users of this library should not make any assumptions about it.
+
+The detection confidence values returned by this library won't be exactly the same as the ones
+returned by the original Lingua library. However, the differences should be negligible.
+
+:warning: The performance optimizations done in this project come at a price:
+- The code is not well tested. However, at least the regular accuracy report is generated and it is
+  compared against the previous report to detect any regression regarding detection accuracy.
+- The code may not be easily maintainable and integrating future upstream Lingua changes might be
+  difficult.
+
+The original README description (possibly with some adjustments) follows below:
+
+---
 
 ### Quick Info
 * this library tries to solve language detection of very short words and phrases, even shorter than tweets
@@ -2334,7 +2373,7 @@ cases if you exclude certain languages from the decision process or just explici
 ```kotlin
 // include all languages available in the library
 // WARNING: in the worst case this produces high memory
-//          consumption of approximately 3.5GB TODO: Update
+//          consumption of approximately 3.5GB
 //          and slow runtime performance
 //          (in high accuracy mode)
 LanguageDetectorBuilder.fromAllLanguages()

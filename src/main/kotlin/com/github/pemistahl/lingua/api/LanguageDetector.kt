@@ -218,10 +218,12 @@ class LanguageDetector internal constructor(
 
     private fun cleanUpInputText(text: String): CharSequence {
         return text.trim().lowercase()
-            .replaceAll(listOf(
-                NUMBERS_AND_PUNCTUATION to "",
-                MULTIPLE_WHITESPACE to " "
-            ))
+            .replaceAll(
+                listOf(
+                    NUMBERS_AND_PUNCTUATION to "",
+                    MULTIPLE_WHITESPACE to " "
+                )
+            )
     }
 
     private fun UniBiTrigramRelativeFrequencyLookup.getFrequency(ngram: PrimitiveNgram): Double {
@@ -290,15 +292,16 @@ class LanguageDetector internal constructor(
                         isJapaneseScript(script) -> wordLanguageCounts.increment(JAPANESE)
                         script == Character.UnicodeScript.LATIN ||
                             script == Character.UnicodeScript.CYRILLIC ||
+                            // TODO: ktlint incorrectly indents lambda below; might be fixed in newer version
                             script == Character.UnicodeScript.DEVANAGARI -> {
-                                // Note: Don't use any `filter` or `forEach` here because it might end up creating
-                                // a lot of objects
-                                for (language in languagesWithUniqueCharacters) {
-                                    if (language.uniqueCharacters?.contains(character) == true) {
-                                        wordLanguageCounts.increment(language)
-                                    }
+                            // Note: Don't use any `filter` or `forEach` here because it might end up creating
+                            // a lot of objects
+                            for (language in languagesWithUniqueCharacters) {
+                                if (language.uniqueCharacters?.contains(character) == true) {
+                                    wordLanguageCounts.increment(language)
                                 }
                             }
+                        }
                     }
                 }
             }
