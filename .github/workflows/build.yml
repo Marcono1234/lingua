@@ -4,40 +4,9 @@ on: [push, pull_request]
 
 jobs:
   build:
-    name: Java ${{ matrix.java-version }} on ${{ matrix.os }}
-
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        java-version: [ 8, 11, 16 ]
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
-
-      - name: Set up Java
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'adopt'
-          java-version: ${{ matrix.java-version }}
-          cache: 'gradle'
-
-      - name: Build and test on Ubuntu and macOS
-        if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
-        run: ./gradlew check
-
-      - name: Build and test on Windows
-        if: ${{ matrix.os == 'windows-latest' }}
-        run: gradlew.bat check
-        shell: cmd
-
-  check-accuracy-reports:
-    name: Check accuracy reports
-    needs: build
+    name: Build project
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
@@ -47,27 +16,28 @@ jobs:
         with:
           distribution: 'adopt'
           java-version: 11
+          cache: 'gradle'
 
-      - name: Store or retrieve Gradle caches
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: ${{ runner.os }}-gradle-
+      - name: Build and test
+        run: ./gradlew build
 
-      - name: Check accuracy reports
+      - name: Check accuracy reports regression
         id: check-accuracy-reports
         run: |
-          ./gradlew clean accuracyReport -Pdetectors=Lingua
+          ./gradlew accuracyReport -Pdetectors=Lingua
+          echo "Checking for diff"
           # --exit-code causes exit code 1 if difference is detected
           git diff --output=accuracy-reports.diff --exit-code
 
       - name: Upload accuracy reports diff
         uses: actions/upload-artifact@v3
         # Only run if accuracy reports differ
-        if: steps.check-accuracy-reports.outcome == 'failure'
+        if: failure() && steps.check-accuracy-reports.outcome == 'failure'
         with:
           name: accuracy-reports-diff
           path: accuracy-reports.diff
+
+      # Stop Gradle daemon to avoid having it cause issues for workflow cache creation
+      - name: Stop Gradle daemon
+        run: |
+          ./gradlew --stop

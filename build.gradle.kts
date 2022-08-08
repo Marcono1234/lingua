@@ -20,6 +20,9 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import ru.vyarus.gradle.plugin.python.task.PythonTask
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
 import java.util.Locale
 
 val linguaTaskGroup: String by project
@@ -62,6 +65,22 @@ plugins {
 
 jacoco.toolVersion = "0.8.8"
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.jdk.get()))
+    }
+}
+
+val targetJdkVersion = libs.versions.targetJdk.get()
+tasks.withType<KotlinCompile> {
+    kotlinOptions {
+        // TODO: Does not work yet due to https://youtrack.jetbrains.com/issue/KT-52823
+        // @Suppress("SuspiciousCollectionReassignment")
+        // freeCompilerArgs += listOf("-Xjdk-release=$targetJdkVersion")
+        jvmTarget = targetJdkVersion
+    }
+}
+
 sourceSets {
     main {
         resources {
@@ -79,12 +98,6 @@ val accuracyReportImplementation by configurations.getting {
 }
 
 configurations["accuracyReportRuntimeOnly"].extendsFrom(configurations.runtimeOnly.get())
-
-compileTestKotlin.kotlinOptions.jvmTarget = JavaVersion.VERSION_1_8.toString()
-
-tasks.named("compileAccuracyReportKotlin", KotlinCompile::class) {
-    kotlinOptions.jvmTarget = JavaVersion.VERSION_1_8.toString()
-}
 
 tasks.withType<Test> {
     useJUnitPlatform { failFast = true }
@@ -107,12 +120,9 @@ testing {
     }
 }
 
-// Module tests require Java 9 or newer to compile and execute
-if (JavaVersion.current().isJava9Compatible) {
-    tasks.check {
-        @Suppress("UnstableApiUsage")
-        dependsOn(testing.suites.named("testJavaModule"))
-    }
+tasks.check {
+    @Suppress("UnstableApiUsage")
+    dependsOn(testing.suites.named("testJavaModule"))
 }
 
 tasks.jacocoTestReport {
@@ -358,8 +368,53 @@ val modelOutputDir_ = buildDir.resolve("generated").resolve("language-models")
 val createLanguageModels by tasks.registering(GenerateLanguageModelsTask::class) {
     linguaArtifact.set(lingua.singleFile)
     modelOutputDir.set(modelOutputDir_)
+
+    finalizedBy(checkLanguageModelsChecksum)
 }
 sourceSets.main.get().output.dir(mutableMapOf<String, Any>("builtBy" to createLanguageModels), modelOutputDir_)
+
+// Check whether generated models match expected checksum; this is done mainly to verify that model
+// generation is deterministic
+val expectedModelsChecksum = "40b984db2677430e3a341796eaecab1cfee605dafd99d6fc5d56c731803e23fb"
+// Note: This is a separate task to not cause model generation task to fail, which would require regenerating
+// models a second time when checksum becomes outdated
+val checkLanguageModelsChecksum by tasks.registering {
+    doLast {
+        val messageDigest = MessageDigest.getInstance("SHA-256")
+        val startDir = modelOutputDir_.toPath()
+        Files.walk(startDir).use { files ->
+            // Sort files because the iteration order is important for checksum creation
+            files.filter(Files::isRegularFile).sorted(
+                Comparator { a, b ->
+                    // Create path strings in OS independent way
+                    fun Path.createPathString(): String {
+                        return startDir.relativize(this).iterator().asSequence().map(Path::toString).joinToString("/")
+                    }
+
+                    val pathA = a.createPathString()
+                    val pathB = b.createPathString()
+                    return@Comparator pathA.compareTo(pathB)
+                }
+            ).forEach {
+                messageDigest.update(Files.readAllBytes(it))
+            }
+        }
+
+        val actualChecksum = messageDigest.digest().joinToString("") {
+            it.toInt().and(0xFF).toString(16).padStart(2, '0')
+        }
+
+        if (actualChecksum != expectedModelsChecksum) {
+            throw Exception(
+                """
+                Language model checksums differ:
+                  Expected: $expectedModelsChecksum
+                  Actual:   $actualChecksum
+                """.trimIndent()
+            )
+        }
+    }
+}
 
 dependencies {
     lingua("com.github.pemistahl:lingua:$linguaVersion")

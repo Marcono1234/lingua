@@ -1,6 +1,11 @@
 [versions]
-kotlinPlugin = "1.6.21"
-kotlin = "1.6.21"
+# Note: When changing this also update the GitHub workflow to avoid having it download a
+# separate JDK due to version mismatch
+jdk = "11"
+targetJdk = "1.8"
+
+kotlinPlugin = "1.7.10"
+kotlin = "1.7.10"
 
 [libraries]
 fastutil = { module = "it.unimi.dsi:fastutil", version = "8.5.8" }

@@ -30,7 +30,7 @@ internal interface KeyIndexer<K> {
         /** Creates an indexer for a subset of all enum constants. */
         @JvmStatic
         fun <E : Enum<E>> fromEnumConstants(constants: Set<E>): KeyIndexer<E> {
-            val enumClass = constants.first().declaringClass
+            val enumClass = constants.first().declaringJavaClass
             val allConstants = enumClass.enumConstants
             if (allConstants.size == constants.size) return forAllEnumConstants(enumClass)
 

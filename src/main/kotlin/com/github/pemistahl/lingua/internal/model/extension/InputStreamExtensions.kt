@@ -27,8 +27,18 @@ internal fun InputStream.readInt(): Int {
 
 internal fun InputStream.readByteArray(length: Int): ByteArray {
     val array = ByteArray(length)
-    val read = readNBytes(array, 0, array.size)
-    if (read < length) throw EOFException()
+    var readTotal = 0
+    while (readTotal < length) {
+        val read = read(array, readTotal, length - readTotal)
+        if (read == -1) {
+            break
+        } else {
+            readTotal += read
+        }
+    }
+    // Check != to also detect case where too many bytes have been read (though that might indicate
+    // a broken InputStream implementation)
+    if (readTotal != length) throw EOFException()
     return array
 }
 
