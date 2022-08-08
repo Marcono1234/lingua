@@ -35,7 +35,6 @@ import com.github.pemistahl.lingua.internal.util.EnumIntMap
 import com.github.pemistahl.lingua.internal.util.KeyIndexer
 import com.github.pemistahl.lingua.internal.util.ResettableLazy
 import com.github.pemistahl.lingua.internal.util.WordList
-import com.github.pemistahl.lingua.internal.util.extension.containsAnyOf
 import com.github.pemistahl.lingua.internal.util.extension.enumMapOf
 import com.github.pemistahl.lingua.internal.util.extension.filter
 import com.github.pemistahl.lingua.internal.util.extension.intersect
@@ -280,8 +279,8 @@ class LanguageDetector internal constructor(
             // Reuse same map to avoid creating new objects
             wordLanguageCounts.clear()
 
-            for (character in word) {
-                val script = Character.UnicodeScript.of(character.code)
+            for (char in word) {
+                val script = Character.UnicodeScript.of(char.code)
 
                 val alphabetLanguage = alphabetsSupportingExactlyOneLanguage[script]
                 if (alphabetLanguage != null) {
@@ -297,7 +296,7 @@ class LanguageDetector internal constructor(
                             // Note: Don't use any `filter` or `forEach` here because it might end up creating
                             // a lot of objects
                             for (language in languagesWithUniqueCharacters) {
-                                if (language.uniqueCharacters?.contains(character) == true) {
+                                if (language.uniqueCharacters?.contains(char) == true) {
                                     wordLanguageCounts.increment(language)
                                 }
                             }
@@ -412,13 +411,17 @@ class LanguageDetector internal constructor(
         }
         val languageCounts = EnumIntMap.newMap(languagesWithCharsIndexer)
 
-        for ((characters, languages) in CHARS_TO_LANGUAGES_MAPPING) {
-            // Uses array to reduce object creation during iteration
-            val relevantLanguages = languages.intersect(filteredLanguages).toTypedArray()
+        // Reuse same EnumSet to avoid creating new instances per word
+        val languagesToCount = EnumSet.noneOf(Language::class.java)
+        wordList.forEach { word ->
+            languagesToCount.clear()
+            languagesToCount.addAll(filteredLanguages)
 
-            wordList.forEach { word ->
-                if (word.containsAnyOf(characters)) {
-                    for (language in relevantLanguages) {
+            for (char in word) {
+                val languages = CHARS_TO_LANGUAGES_MAPPING.get(char)
+                languages?.forEach { language ->
+                    // Use `remove` to only count a language at most once per word
+                    if (languagesToCount.remove(language)) {
                         languageCounts.increment(language)
                     }
                 }
@@ -590,7 +593,7 @@ class LanguageDetector internal constructor(
     internal companion object {
         private const val HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH = 120
 
-        internal var languageModels: Map<Language, ResettableLazy<LanguageModelHolder>> = EnumMap(
+        internal val languageModels: Map<Language, ResettableLazy<LanguageModelHolder>> = EnumMap(
             Language.all().asSequence()
                 .associateWith {
                     val languageCode = it.isoCode639_1.toString()
