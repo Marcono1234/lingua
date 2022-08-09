@@ -1,7 +1,7 @@
 package com.github.pemistahl.lingua.internal.model
 
 import it.unimi.dsi.fastutil.chars.Char2ShortMaps
-import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2FloatLinkedOpenHashMap
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -67,9 +67,9 @@ internal class UniBiTrigramRelativeFrequencyLookup private constructor(
         @Suppress("unused") // used by buildSrc for model generation
         @JvmStatic
         fun fromJson(
-            unigrams: Object2FloatOpenHashMap<String>,
-            bigrams: Object2FloatOpenHashMap<String>,
-            trigrams: Object2FloatOpenHashMap<String>
+            unigrams: Object2FloatLinkedOpenHashMap<String>,
+            bigrams: Object2FloatLinkedOpenHashMap<String>,
+            trigrams: Object2FloatLinkedOpenHashMap<String>
         ): UniBiTrigramRelativeFrequencyLookup {
             val ngrams = unigrams.keys.asSequence().plus(bigrams.keys).plus(trigrams.keys)
             val charOffsetsData = CharOffsetsData.createCharOffsetsData(ngrams)
@@ -269,8 +269,8 @@ internal class QuadriFivegramRelativeFrequencyLookup private constructor(
         @Suppress("unused") // used by buildSrc for model generation
         @JvmStatic
         fun fromJson(
-            quadrigrams: Object2FloatOpenHashMap<String>,
-            fivegrams: Object2FloatOpenHashMap<String>
+            quadrigrams: Object2FloatLinkedOpenHashMap<String>,
+            fivegrams: Object2FloatLinkedOpenHashMap<String>
         ): QuadriFivegramRelativeFrequencyLookup {
             val ngrams = quadrigrams.keys.asSequence().plus(fivegrams.keys)
             val charOffsetsData = CharOffsetsData.createCharOffsetsData(ngrams)
