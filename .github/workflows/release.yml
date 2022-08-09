@@ -17,7 +17,7 @@ jobs:
         uses: actions/setup-java@v2
         with:
           distribution: 'adopt'
-          java-version: 8
+          java-version: 11
           cache: 'gradle'
 
       - name: Get tag version
@@ -30,7 +30,7 @@ jobs:
       - name: Create release and upload artifacts
         uses: softprops/action-gh-release@v1
         with:
-          name: Lingua ${{ steps.get_version.outputs.version-without-v }}
+          name: Tiny Lingua ${{ steps.get_version.outputs.version-without-v }}
           files: build/libs/*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

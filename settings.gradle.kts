@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-rootProject.name = "lingua"
+rootProject.name = "tiny-lingua"
 
 dependencyResolutionManagement {
     @Suppress("UnstableApiUsage")

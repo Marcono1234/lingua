@@ -3,14 +3,9 @@
 <br>
 
 [![ci build status][ci badge]][ci url]
-[![codecov][codecov badge]][codecov url]
 [![supported languages][supported languages badge]](#supported-languages)
 [![Kotlin platforms badge][Kotlin platforms badge]][Kotlin platforms url]
 [![license badge][license badge]][license url]
-
-[![javadoc][javadoc badge]][javadoc url]
-[![Maven Central][Maven Central badge]][Maven Central]
-[![Download][lingua version badge]][lingua download url]
 
 ---
 
@@ -2517,8 +2512,8 @@ Take a look at the [planned issues](https://github.com/pemistahl/lingua/mileston
 
 [javadoc badge]: https://javadoc.io/badge2/com.github.pemistahl/lingua/javadoc.svg
 [javadoc url]: https://javadoc.io/doc/com.github.pemistahl/lingua
-[ci badge]: https://github.com/pemistahl/lingua/actions/workflows/build.yml/badge.svg
-[ci url]: https://github.com/pemistahl/lingua/actions/workflows/build.yml
+[ci badge]: https://github.com/Marcono1234/tiny-lingua/actions/workflows/build.yml/badge.svg
+[ci url]: https://github.com/Marcono1234/tiny-lingua/actions/workflows/build.yml
 [codecov badge]: https://codecov.io/gh/pemistahl/lingua/branch/main/graph/badge.svg
 [codecov url]: https://codecov.io/gh/pemistahl/lingua
 [supported languages badge]: https://img.shields.io/badge/supported%20languages-75-green.svg
