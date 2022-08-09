@@ -23,13 +23,12 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import org.junit.jupiter.api.Test
 import java.util.EnumSet
-import java.util.concurrent.ForkJoinPool
 
 class LanguageDetectorBuilderTest {
 
     private val minimumLanguagesErrorMessage = "LanguageDetector needs at least 2 languages to choose from"
 
-    private val executor = ForkJoinPool.commonPool()
+    private val expectedExecutor = LanguageDetectorBuilder.defaultExecutor
 
     @Test
     fun `assert that LanguageDetector can be built from all languages`() {
@@ -45,7 +44,7 @@ class LanguageDetectorBuilderTest {
                 minimumRelativeDistance = 0.0,
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = false,
-                executor,
+                expectedExecutor,
             )
         )
 
@@ -56,7 +55,7 @@ class LanguageDetectorBuilderTest {
                 minimumRelativeDistance = 0.2,
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = false,
-                executor,
+                expectedExecutor,
             )
         )
     }
@@ -75,7 +74,7 @@ class LanguageDetectorBuilderTest {
                 minimumRelativeDistance = 0.0,
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = false,
-                executor,
+                expectedExecutor,
             )
         )
 
@@ -86,7 +85,7 @@ class LanguageDetectorBuilderTest {
                 minimumRelativeDistance = 0.2,
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = false,
-                executor,
+                expectedExecutor,
             )
         )
     }
@@ -136,7 +135,7 @@ class LanguageDetectorBuilderTest {
                     minimumRelativeDistance = 0.0,
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
-                    executor,
+                    expectedExecutor,
                 )
             )
 
@@ -147,7 +146,7 @@ class LanguageDetectorBuilderTest {
                     minimumRelativeDistance = 0.2,
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
-                    executor,
+                    expectedExecutor,
                 )
             )
         }
@@ -175,7 +174,7 @@ class LanguageDetectorBuilderTest {
                     minimumRelativeDistance = 0.0,
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
-                    executor,
+                    expectedExecutor,
                 )
             )
 
@@ -186,7 +185,7 @@ class LanguageDetectorBuilderTest {
                     minimumRelativeDistance = 0.2,
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
-                    executor,
+                    expectedExecutor,
                 )
             )
         }
@@ -213,7 +212,7 @@ class LanguageDetectorBuilderTest {
                     minimumRelativeDistance = 0.0,
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
-                    executor,
+                    expectedExecutor,
                 )
             )
 
@@ -224,7 +223,7 @@ class LanguageDetectorBuilderTest {
                     minimumRelativeDistance = 0.2,
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
-                    executor,
+                    expectedExecutor,
                 )
             )
 
@@ -234,7 +233,7 @@ class LanguageDetectorBuilderTest {
                     minimumRelativeDistance = 0.2,
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
-                    executor,
+                    expectedExecutor,
                 )
             )
         }
@@ -275,7 +274,7 @@ class LanguageDetectorBuilderTest {
                 minimumRelativeDistance = 0.0,
                 isEveryLanguageModelPreloaded = true,
                 isLowAccuracyModeEnabled = false,
-                executor,
+                expectedExecutor,
             )
         )
     }
@@ -295,7 +294,7 @@ class LanguageDetectorBuilderTest {
                 minimumRelativeDistance = 0.0,
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = true,
-                executor,
+                expectedExecutor,
             )
         )
 
@@ -309,7 +308,7 @@ class LanguageDetectorBuilderTest {
                 minimumRelativeDistance = 0.0,
                 isEveryLanguageModelPreloaded = true,
                 isLowAccuracyModeEnabled = true,
-                executor,
+                expectedExecutor,
             )
         )
     }

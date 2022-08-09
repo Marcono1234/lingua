@@ -28,7 +28,7 @@ class LanguageDetectorBuilder private constructor(
     internal var minimumRelativeDistance: Double = 0.0,
     internal var isEveryLanguageModelPreloaded: Boolean = false,
     internal var isLowAccuracyModeEnabled: Boolean = false,
-    private var executor: Executor = ForkJoinPool.commonPool(),
+    private var executor: Executor = defaultExecutor,
 ) {
     /**
      * Creates and returns the configured instance of [LanguageDetector].
@@ -113,6 +113,13 @@ class LanguageDetectorBuilder private constructor(
     }
 
     companion object {
+        // Workaround for https://bugs.openjdk.org/browse/JDK-8213115
+        // If common pool parallelism is 1, CompletableFuture uses an executor which creates
+        // a new thread per task; this drastically decreases performance
+        internal val defaultExecutor = if (ForkJoinPool.getCommonPoolParallelism() > 1) ForkJoinPool.commonPool()
+        // Run in calling thread
+        else Executor { r -> r.run() }
+
         /**
          * Creates and returns an instance of LanguageDetectorBuilder
          * with all built-in languages.
