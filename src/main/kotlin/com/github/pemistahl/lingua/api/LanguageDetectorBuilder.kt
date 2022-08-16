@@ -18,7 +18,9 @@ package com.github.pemistahl.lingua.api
 
 import java.util.EnumSet
 import java.util.concurrent.Executor
-import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Configures and creates an instance of [LanguageDetector].
@@ -104,7 +106,17 @@ class LanguageDetectorBuilder private constructor(
 
     /**
      * Specifies the [Executor] to use for language model loading and for language
-     * detection. By default [ForkJoinPool.commonPool] is used.
+     * detection. By default, an internal executor is shared for all language
+     * detection requests. This executor:
+     * - Has one less worker threads than the number of CPU cores, or if the number
+     *   of CPU cores is <= 2 directly executes tasks in the submitting thread
+     * - Uses daemon threads which do not prevent JVM exit
+     *
+     * **Important:** The specified executor must not be used to call any of the functions
+     * of the created [LanguageDetector]. Otherwise, a deadlock can occur where all worker
+     * threads of the executor are busy calling `LanguageDetector` functions, but those
+     * functions cannot make any progress because the tasks they submit to the executor
+     * are not executed because all workers are busy waiting.
      */
     @Suppress("unused") // public API
     fun withExecutor(executor: Executor): LanguageDetectorBuilder {
@@ -113,12 +125,28 @@ class LanguageDetectorBuilder private constructor(
     }
 
     companion object {
-        // Workaround for https://bugs.openjdk.org/browse/JDK-8213115
-        // If common pool parallelism is 1, CompletableFuture uses an executor which creates
-        // a new thread per task; this drastically decreases performance
-        internal val defaultExecutor = if (ForkJoinPool.getCommonPoolParallelism() > 1) ForkJoinPool.commonPool()
-        // Run in calling thread
-        else Executor { r -> r.run() }
+        // Does not use ForkJoinPool.commonPool() because that could lead to deadlock issues
+        // when user also calls LanguageDetector functions from commonPool(), preventing tasks
+        // submitted by those functions from being executed
+        internal val defaultExecutor: Executor
+        init {
+            // Similar to ForkJoinPool.commonPool() use one worker less than available cores
+            // to leave one core for OS
+            val cpuCoresToUse = Runtime.getRuntime().availableProcessors() - 1
+            if (cpuCoresToUse <= 1) {
+                // Run in calling thread
+                defaultExecutor = Executor { r -> r.run() }
+            } else {
+                val threadNumber = AtomicInteger(1)
+                val threadFactory = ThreadFactory { runnable ->
+                    val thread = Thread(runnable, "tiny-lingua-worker-${threadNumber.getAndIncrement()}")
+                    // Don't prevent JVM exit
+                    thread.isDaemon = true
+                    return@ThreadFactory thread
+                }
+                defaultExecutor = Executors.newFixedThreadPool(cpuCoresToUse, threadFactory)
+            }
+        }
 
         /**
          * Creates and returns an instance of LanguageDetectorBuilder

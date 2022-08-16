@@ -2403,7 +2403,7 @@ LanguageDetectorBuilder.fromIsoCodes639_3(IsoCode639_3.ENG, IsoCode639_3.DEU)
 
 Internally, *Lingua* efficiently uses all cores of your CPU in order to speed up loading the language
 models and language detection itself. For this purpose, an internal
-[ForkJoinPool](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ForkJoinPool.html)
+thread pool
 is used. If the library is used within an application server, the consumed memory will not be freed
 automatically when the application is undeployed.
 
