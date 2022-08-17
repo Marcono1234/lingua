@@ -3,9 +3,9 @@ package com.github.pemistahl.lingua.internal.util
 import it.unimi.dsi.fastutil.objects.Object2DoubleAVLTreeMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleLinkedOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
-import java.util.Collections
+import it.unimi.dsi.fastutil.objects.Object2DoubleSortedMap
+import it.unimi.dsi.fastutil.objects.Object2DoubleSortedMaps
 import java.util.EnumSet
-import java.util.SortedMap
 import java.util.StringJoiner
 
 private const val NO_INDEX = -1
@@ -88,8 +88,8 @@ internal class EnumDoubleMap<E : Enum<E>>(
         return copy
     }
 
-    fun sortedByNonZeroDescendingValue(): SortedMap<E, Double> {
-        val map = Object2DoubleAVLTreeMap<E> { a, b ->
+    fun sortedByNonZeroDescendingValue(): Object2DoubleSortedMap<E> {
+        var map: Object2DoubleSortedMap<E> = Object2DoubleAVLTreeMap { a, b ->
             // Highest first
             val diff = getOrZero(b).compareTo(getOrZero(a))
             when {
@@ -104,8 +104,19 @@ internal class EnumDoubleMap<E : Enum<E>>(
             }
         }
 
-        // Make unmodifiable because comparator defined above only works for language with value
-        return Collections.unmodifiableSortedMap(map)
+        /*
+         * Wrap in LinkedOpenHashMap; this has the following advantages:
+         * - LinkedOpenHashMap implements SortedMap, but only to provide the SortedMap convenience methods for
+         *   obtaining entries in insertion order (exactly what is needed here)
+         * - Hash map is most likely faster for lookup
+         * - Properly handles the case where map is checked for languages which are not part of the keyIndexer;
+         *   directly accessing the Object2DoubleAVLTreeMap with its custom comparator above would lead to
+         *   ArrayIndexOutOfBoundsException
+         */
+        map = Object2DoubleLinkedOpenHashMap(map)
+
+        // Make unmodifiable because map is not a proper SortedMap
+        return Object2DoubleSortedMaps.unmodifiable(map)
     }
 
     override fun toString(): String {

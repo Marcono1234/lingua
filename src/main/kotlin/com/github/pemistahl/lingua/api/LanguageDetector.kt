@@ -132,6 +132,10 @@ class LanguageDetector internal constructor(
      * detector's languages for the given input text, the returned map will be empty. The confidence value for
      * each language not being part of the returned map is assumed to be 0.0.
      *
+     * The returned map is a [SortedMap] instead of a regular [Map] to provide convenience functions such as
+     * [SortedMap.firstKey] (note however that the returned map might be empty). The map might not implement
+     * submap functions such as [SortedMap.tailMap], and [SortedMap.comparator] might return `null`.
+     *
      * @param text The input text to detect the language for.
      * @return A map of all possible languages, sorted by their confidence value in descending order.
      */
