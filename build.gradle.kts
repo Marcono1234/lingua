@@ -102,7 +102,7 @@ val accuracyReportImplementation by configurations.getting {
 configurations["accuracyReportRuntimeOnly"].extendsFrom(configurations.runtimeOnly.get())
 
 tasks.withType<Test> {
-    useJUnitPlatform { failFast = true }
+    useJUnitPlatform { failFast = false }
 }
 
 tasks.test {
