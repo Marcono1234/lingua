@@ -20,6 +20,7 @@ import com.github.pemistahl.lingua.api.IsoCode639_1
 import com.github.pemistahl.lingua.api.LanguageDetectorBuilder
 import com.github.pemistahl.lingua.api.LanguageDetectorBuilder.Companion.fromAllLanguages
 import com.github.pemistahl.lingua.api.LanguageDetectorBuilder.Companion.fromIsoCodes639_1
+import com.github.pemistahl.lingua.app.multilanguage.openMultiLanguageDetectionGui
 import java.io.Console
 import java.util.Scanner
 
@@ -31,11 +32,12 @@ private fun runApp() {
 
     println(
         """
-        This is Lingua.
-        Select the language models to load.
+        This is Tiny Lingua, a fork of Lingua.
+        Select the action you want to perform:
 
-        1: enter language iso codes manually
-        2: all supported languages
+        1: detect language with chosen languages
+        2: detect language with all supported languages
+        3: launch multi-language detection GUI (Java 11+)
 
         Type a number and press <Enter>.
         Type :quit to exit.
@@ -60,8 +62,8 @@ private fun runApp() {
             continue
         }
 
-        if (number !in 1..2) {
-            println("This selection is out of range.\nEnter number 1 or 2.\n")
+        if (number !in 1..3) {
+            println("This selection is out of range.\nEnter number 1, 2 or 3.\n")
             number = null
             continue
         }
@@ -82,7 +84,7 @@ private fun runApp() {
         while (true) {
             println(
                 """
-                List some language iso 639-1 codes separated by spaces and press <Enter>.
+                List some language ISO 639-1 codes separated by spaces and press <Enter>.
                 Type :quit to exit.
 
                 """.trimIndent()
@@ -105,7 +107,7 @@ private fun runApp() {
                         isoCodes.add(IsoCode639_1.valueOf(isoCode.uppercase()))
                     } catch (e: IllegalArgumentException) {
                         isoCodes.clear()
-                        println("Iso code '$isoCode' is not supported. Try again.\n")
+                        println("ISO code '$isoCode' is not supported. Try again.\n")
                         break
                     }
                 }
@@ -121,15 +123,21 @@ private fun runApp() {
                     break
                 } catch (e: IllegalArgumentException) {
                     isoCodesList.clear()
-                    println("At least one iso code you've entered is not supported. Try again.\n")
+                    println("At least one ISO code you've entered is not supported. Try again.\n")
                 }
             } else {
                 break
             }
         }
-    } else {
+    } else if (number == 2) {
         println("Loading language models...")
         detectorBuilder = fromAllLanguages()
+    } else if (number == 3) {
+        println("Starting GUI...")
+        openMultiLanguageDetectionGui()
+        return
+    } else {
+        throw AssertionError()
     }
 
     if (detectorBuilder != null) {

@@ -28,6 +28,7 @@ import com.github.pemistahl.lingua.internal.Constant.languagesWithCharsIndexer
 import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.ReusableObjectNgram
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
+import com.github.pemistahl.lingua.internal.internalDetectMultiLanguageOf
 import com.github.pemistahl.lingua.internal.model.QuadriFivegramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.model.UniBiTrigramRelativeFrequencyLookup
 import com.github.pemistahl.lingua.internal.util.EnumDoubleMap
@@ -35,16 +36,20 @@ import com.github.pemistahl.lingua.internal.util.EnumIntMap
 import com.github.pemistahl.lingua.internal.util.KeyIndexer
 import com.github.pemistahl.lingua.internal.util.ResettableLazy
 import com.github.pemistahl.lingua.internal.util.WordList
+import com.github.pemistahl.lingua.internal.util.extension.allOfToList
 import com.github.pemistahl.lingua.internal.util.extension.enumMapOf
 import com.github.pemistahl.lingua.internal.util.extension.filter
 import com.github.pemistahl.lingua.internal.util.extension.intersect
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
 import com.github.pemistahl.lingua.internal.util.extension.replaceAll
+import it.unimi.dsi.fastutil.objects.Object2DoubleSortedMap
+import it.unimi.dsi.fastutil.objects.Object2DoubleSortedMaps
+import java.lang.Character.UnicodeScript
 import java.util.EnumMap
 import java.util.EnumSet
 import java.util.SortedMap
-import java.util.TreeMap
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletableFuture.completedFuture
 import java.util.concurrent.Executor
 import kotlin.math.ln
 
@@ -102,7 +107,10 @@ class LanguageDetector internal constructor(
      */
     fun detectLanguageOf(text: String): Language {
         val confidenceValues = computeLanguageConfidenceValues(text)
+        return getLanguageFromConfidenceValues(confidenceValues)
+    }
 
+    internal fun getLanguageFromConfidenceValues(confidenceValues: SortedMap<Language, Double>): Language {
         if (confidenceValues.isEmpty()) return UNKNOWN
 
         val mostLikelyLanguage = confidenceValues.firstKey()
@@ -116,6 +124,59 @@ class LanguageDetector internal constructor(
             (mostLikelyLanguageProbability - secondMostLikelyLanguageProbability) < minimumRelativeDistance -> UNKNOWN
             else -> mostLikelyLanguage
         }
+    }
+
+    /**
+     * Language detection result for a section of the input text.
+     *
+     * The start and end indices are estimates and might not be completely accurate. They usually
+     * mark the first and the last letter of the section.
+     *
+     * **Important:** For short sections (about [< 25 letters][lettersCount]) the accuracy of the detected
+     * language and the [confidence values][confidenceValues] might not be very good; unless the confidence
+     * values only contain a single entry. Such short sections can occur when the language detector detected
+     * that a section is in a different language (for example because a different script is used), but it
+     * was unable to tell which language exactly is used.
+     */
+    data class LanguageSection(
+        /** Start index (inclusive, starting at 0) of this section within the complete text. */
+        val start: Int,
+        /** End index (exclusive, starting at 0) of this section within the complete text. */
+        val end: Int,
+        /** Numbers of letters in this section. */
+        val lettersCount: Int,
+        /** Text of this section (from [start] to [end] of the complete input text). */
+        val sectionText: String,
+        /**
+         * The identified language or [Language.UNKNOWN]. This is affected by the
+         * [minimum relative distance][LanguageDetectorBuilder.withMinimumRelativeDistance].
+         *
+         * @see LanguageDetector.detectLanguageOf
+         */
+        val language: Language,
+        /**
+         * The relative confidence values for every language considered possible for this section.
+         * Can be empty if no language was considered possible.
+         *
+         * @see LanguageDetector.computeLanguageConfidenceValues
+         */
+        val confidenceValues: SortedMap<Language, Double>,
+    )
+
+    /**
+     * Detects the languages of text which is potentially written in multiple languages.
+     *
+     * The result is a list of sections from the original text which were detected as being written
+     * in a certain language. The list can be empty if no languages were detected (this is usually
+     * the case when the text contains no letters). The sections might not cover the complete input
+     * text, text pieces which consist of non-letters might not be part of any of the returned sections.
+     * The accuracy of this function is greatly reduced when the
+     * [low accuracy mode][LanguageDetectorBuilder.withLowAccuracyMode] is used.
+     */
+    fun detectMultiLanguageOf(text: String): List<LanguageSection> {
+        // Note: The implementation is extracted to a separate file to avoid reducing readability of this class
+        // too much, and to making merging in changes from original Lingua easier
+        return internalDetectMultiLanguageOf(text)
     }
 
     /**
@@ -141,28 +202,38 @@ class LanguageDetector internal constructor(
      */
     @Suppress("unused") // public API
     fun computeLanguageConfidenceValues(text: String): SortedMap<Language, Double> {
+        return computeLanguageConfidenceValuesFuture(text).join()
+    }
+
+    private fun singleLanguageConfidenceMap(language: Language): Object2DoubleSortedMap<Language> {
+        return Object2DoubleSortedMaps.singleton(language, 1.0)
+    }
+
+    internal fun computeLanguageConfidenceValuesFuture(text: String):
+        CompletableFuture<Object2DoubleSortedMap<Language>> {
+
         val cleanedUpText = cleanUpInputText(text)
 
         if (cleanedUpText.isEmpty() || !cleanedUpText.codePoints().anyMatch(Character::isLetter)) {
-            return TreeMap()
+            return completedFuture(Object2DoubleSortedMaps.emptyMap())
         }
 
         val wordList = WordList.build(text)
         val languageDetectedByRules = detectLanguageWithRules(wordList)
 
         if (languageDetectedByRules != UNKNOWN) {
-            return sortedMapOf(languageDetectedByRules to 1.0)
+            return completedFuture(singleLanguageConfidenceMap(languageDetectedByRules))
         }
 
         val filteredLanguages = filterLanguagesByRules(wordList)
 
         if (filteredLanguages.size == 1) {
             val filteredLanguage = filteredLanguages.iterator().next()
-            return sortedMapOf(filteredLanguage to 1.0)
+            return completedFuture(singleLanguageConfidenceMap(filteredLanguage))
         }
 
         if (isLowAccuracyModeEnabled && cleanedUpText.length < 3) {
-            return TreeMap()
+            return completedFuture(Object2DoubleSortedMaps.emptyMap())
         }
 
         val isLongText = cleanedUpText.length >= HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH
@@ -171,7 +242,7 @@ class LanguageDetector internal constructor(
         } else {
             (1..5)
         }
-        val allProbabilitiesAndUnigramCounts = ngramSizeRange.filter { i -> cleanedUpText.length >= i }
+        return ngramSizeRange.filter { i -> cleanedUpText.length >= i }
             .map { ngramLength ->
                 val testDataModel = TestDataLanguageModel.fromText(cleanedUpText, ngramLength)
                 computeLanguageProbabilities(testDataModel, filteredLanguages)
@@ -192,14 +263,17 @@ class LanguageDetector internal constructor(
                         return@thenApply Pair(probabilities, unigramCounts)
                     }
             }
-            .map { it.join() }
-
-        val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
-        val unigramCounts = allProbabilitiesAndUnigramCounts[0].second ?: EnumIntMap.newMap(languagesSubsetIndexer)
-        val summedUpProbabilities = sumUpProbabilities(allProbabilities, unigramCounts, filteredLanguages)
-        val highestProbability = summedUpProbabilities.maxValueOrNull() ?: return TreeMap()
-        val confidenceValues = summedUpProbabilities.mapNonZeroValues { highestProbability / it }
-        return confidenceValues.sortedByNonZeroDescendingValue()
+            .allOfToList()
+            .thenApply { allProbabilitiesAndUnigramCounts ->
+                val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
+                val unigramCounts = allProbabilitiesAndUnigramCounts[0].second
+                    ?: EnumIntMap.newMap(languagesSubsetIndexer)
+                val summedUpProbabilities = sumUpProbabilities(allProbabilities, unigramCounts, filteredLanguages)
+                val highestProbability = summedUpProbabilities.maxValueOrNull()
+                    ?: return@thenApply Object2DoubleSortedMaps.emptyMap()
+                val confidenceValues = summedUpProbabilities.mapNonZeroValues { highestProbability / it }
+                return@thenApply confidenceValues.sortedByNonZeroDescendingValue()
+            }
     }
 
     /**
@@ -273,7 +347,10 @@ class LanguageDetector internal constructor(
         return summedUpProbabilities
     }
 
-    private fun detectLanguageWithRules(wordList: WordList): Language {
+    /**
+     * @return [Language.UNKNOWN] if language could not be detected
+     */
+    internal fun detectLanguageWithRules(wordList: WordList): Language {
         // Using Double because logograms are not counted as full word
         var adjustedWordCount = 0.0
         val totalLanguageCounts = EnumDoubleMap.newMap(wordLanguagesSubsetIndexer)
@@ -284,19 +361,19 @@ class LanguageDetector internal constructor(
             wordLanguageCounts.clear()
 
             for (char in word) {
-                val script = Character.UnicodeScript.of(char.code)
+                val script = UnicodeScript.of(char.code)
 
                 val alphabetLanguage = alphabetsSupportingExactlyOneLanguage[script]
                 if (alphabetLanguage != null) {
                     wordLanguageCounts.increment(alphabetLanguage)
                 } else {
                     when {
-                        script == Character.UnicodeScript.HAN -> wordLanguageCounts.increment(CHINESE)
+                        script == UnicodeScript.HAN -> wordLanguageCounts.increment(CHINESE)
                         isJapaneseScript(script) -> wordLanguageCounts.increment(JAPANESE)
-                        script == Character.UnicodeScript.LATIN ||
-                            script == Character.UnicodeScript.CYRILLIC ||
+                        script == UnicodeScript.LATIN ||
+                            script == UnicodeScript.CYRILLIC ||
                             // TODO: ktlint incorrectly indents lambda below; might be fixed in newer version
-                            script == Character.UnicodeScript.DEVANAGARI -> {
+                            script == UnicodeScript.DEVANAGARI -> {
                             // Note: Don't use any `filter` or `forEach` here because it might end up creating
                             // a lot of objects
                             for (language in languagesWithUniqueCharacters) {
@@ -372,7 +449,7 @@ class LanguageDetector internal constructor(
         }
     }
 
-    private fun filterLanguagesByRules(wordList: WordList): Set<Language> {
+    internal fun filterLanguagesByRules(wordList: WordList): EnumSet<Language> {
         // Using Double because logograms are not counted as full word
         var adjustedWordCount = 0.0
         val detectedAlphabets = EnumDoubleMap.newMap(Language.allScriptsIndexer)
@@ -380,7 +457,7 @@ class LanguageDetector internal constructor(
         wordList.forEach { word ->
             var wordValue = FULL_WORD_VALUE
             for (unicodeScript in Language.allScripts) {
-                if (word.all { Character.UnicodeScript.of(it.code) == unicodeScript }) {
+                if (word.all { UnicodeScript.of(it.code) == unicodeScript }) {
                     if (word.isLogogram()) {
                         wordValue = LOGOGRAM_WORD_VALUE
                     }
@@ -445,52 +522,46 @@ class LanguageDetector internal constructor(
         testDataModel: TestDataLanguageModel,
         filteredLanguages: Set<Language>,
     ): CompletableFuture<EnumDoubleMap<Language>> {
-        val probabilityFutures = filteredLanguages.map { language ->
-            CompletableFuture.supplyAsync(
-                {
-                    val modelHolder = languageModels[language]!!.value()
-                    val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
-                    val quadriFivegramLookup = when {
-                        // When model only contains primitives don't have to load quadriFivegramLookup
-                        testDataModel.hasOnlyPrimitives() -> QuadriFivegramRelativeFrequencyLookup.empty
-                        else -> modelHolder.quadriFivegramLookup.value
-                    }
+        return filteredLanguages
+            .map { language ->
+                CompletableFuture.supplyAsync(
+                    {
+                        val modelHolder = languageModels[language]!!.value()
+                        val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
+                        val quadriFivegramLookup = when {
+                            // When model only contains primitives don't have to load quadriFivegramLookup
+                            testDataModel.hasOnlyPrimitives() -> QuadriFivegramRelativeFrequencyLookup.empty
+                            else -> modelHolder.quadriFivegramLookup.value
+                        }
 
-                    return@supplyAsync language to computeSumOfNgramProbabilities(
-                        uniBiTrigramsLookup,
-                        quadriFivegramLookup,
-                        testDataModel
-                    )
-                },
-                executor
-            )
-        }.toTypedArray()
-
-        /*
-         * Uses CompletableFuture.allOf instead of submitting another future with supplyAsync to executor
-         * and having it wait for all previous futures to avoid deadlock: Executor might choose to first
-         * run this combined future (instead of probability futures), and depending on free number of workers
-         * probability futures might therefore wait for combined future to finish -> deadlock
-         */
-        return CompletableFuture.allOf(*probabilityFutures).thenApply {
-            val probabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
-            // These `join` calls should not block because `allOf` should have made sure all futures are completed
-            probabilityFutures.map { it.join() }.forEach { (language, p) ->
-                var probability = p
-                if (probability < 0.0) {
-                    // For languages with logograms increase probability since their words (=logograms)
-                    // consist only of a single char compared to other languages whose words consist
-                    // of multiple chars
-                    if (language in LANGUAGES_SUPPORTING_LOGOGRAMS) {
-                        // Multiply by value < 1.0 since a smaller probability is better
-                        probability *= 0.85
-                    }
-                    probabilities.set(language, probability)
-                }
+                        return@supplyAsync language to computeSumOfNgramProbabilities(
+                            uniBiTrigramsLookup,
+                            quadriFivegramLookup,
+                            testDataModel
+                        )
+                    },
+                    executor
+                )
             }
+            .allOfToList()
+            .thenApply { languageProbabilities ->
+                val probabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
+                languageProbabilities.forEach { (language, p) ->
+                    var probability = p
+                    if (probability < 0.0) {
+                        // For languages with logograms increase probability since their words (=logograms)
+                        // consist only of a single char compared to other languages whose words consist
+                        // of multiple chars
+                        if (language in LANGUAGES_SUPPORTING_LOGOGRAMS) {
+                            // Multiply by value < 1.0 since a smaller probability is better
+                            probability *= 0.85
+                        }
+                        probabilities.set(language, probability)
+                    }
+                }
 
-            return@thenApply probabilities
-        }
+                return@thenApply probabilities
+            }
     }
 
     private fun computeSumOfNgramProbabilities(
