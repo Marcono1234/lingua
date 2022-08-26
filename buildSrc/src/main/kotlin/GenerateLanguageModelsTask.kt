@@ -67,7 +67,7 @@ abstract class GenerateLanguageModelsTask : DefaultTask() {
                     }
                     map
                 }
-                .forEach { languageCode, entries ->
+                .forEach { (languageCode, entries) ->
                     fun readModel(fileName: String): Object2FloatLinkedOpenHashMap<String> {
                         // If model file does not exist return empty map; some languages such as Chinese don't
                         // have model files for all ngram lengths, see

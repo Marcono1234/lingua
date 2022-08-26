@@ -166,12 +166,14 @@ internal class EnumDoubleMap<E : Enum<E>>(
 
             // No other constant found with `value == lastMax`, now check all constants
             values.forEachIndexed { index, value ->
+                @Suppress("ConvertTwoComparisonsToRangeCheck")
                 if (value < lastMax && value > maxValue) {
                     maxIndex = index
                     maxValue = value
                 }
             }
 
+            @Suppress("LiftReturnOrAssignment")
             if (maxIndex != NO_INDEX) {
                 next = keyIndexer.indexToKey(maxIndex)
                 nextValue = maxValue

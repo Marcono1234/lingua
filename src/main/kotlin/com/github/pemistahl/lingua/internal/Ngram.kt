@@ -121,11 +121,11 @@ internal value class ReusableObjectNgram(
     fun toLowerOrderNgram(): Boolean {
         val length = length()
         // Switch to PrimitiveNgram if possible
-        if (length <= PrimitiveNgram.MAX_NGRAM_LENGTH + 1) {
-            return false
+        return if (length <= PrimitiveNgram.MAX_NGRAM_LENGTH + 1) {
+            false
         } else {
             value[0] = (length - 1).toChar()
-            return true
+            true
         }
     }
 

@@ -369,6 +369,7 @@ val lingua by configurations.creating {
     isTransitive = false
 }
 
+@Suppress("PropertyName")
 val modelOutputDir_ = buildDir.resolve("generated").resolve("language-models")
 val createLanguageModels by tasks.registering(GenerateLanguageModelsTask::class) {
     linguaArtifact.set(lingua.singleFile)

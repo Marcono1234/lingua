@@ -162,7 +162,7 @@ private open class PotentialSection(
 }
 
 private fun UnicodeScript.belongsToSameLanguageAs(other: UnicodeScript): Boolean {
-    return isJapaneseScript(this) && isJapaneseScript(other) || this == other
+    return this == other || isJapaneseScript(this) && isJapaneseScript(other)
 }
 
 private fun splitPotentialSections(text: String): MutableList<PotentialSection> {
