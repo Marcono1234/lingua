@@ -89,6 +89,11 @@ class LanguageDetector_Test {
                         "  Hallo das ist ein Test mit ein paar Wörtern\n" +
                         "45-112 (55): ENGLISH; ENGLISH (100%), TAGALOG (79%), GERMAN (77%), FRENCH (76%), YORUBA (75%), ESPERANTO (75%), LATIN (75%), DUTCH (75%), ALBANIAN (74%), WELSH (74%), PORTUGUESE (74%), DANISH (73%), SPANISH (73%), SOTHO (73%), BOKMAL (72%), SWAHILI (72%), ITALIAN (72%), SWEDISH (72%), XHOSA (72%), CATALAN (72%), ROMANIAN (71%), TURKISH (71%), TSONGA (71%), ZULU (70%) \n" +
                         "  But what if the text also contained English as part of the sentence",
+                "He turned around and asked: \"Entschuldigen Sie, sprechen Sie Deutsch?\""
+                    to "0-26 (22): ENGLISH; ENGLISH (100%), DANISH (78%), SWEDISH (73%), TAGALOG (73%), BOKMAL (72%), NYNORSK (72%), WELSH (71%), YORUBA (71%) \n" +
+                        "  He turned around and asked\n" +
+                        "29-68 (34): GERMAN; GERMAN (100%), DUTCH (76%) \n" +
+                        "  Entschuldigen Sie, sprechen Sie Deutsch",
                 "When he came into the room, he greeted the others with \"Hallo zusammen, wie geht es euch?\" and sat down on a free chair."
                     to "0-54 (43): ENGLISH; ENGLISH (100%), TAGALOG (78%), XHOSA (77%), WELSH (76%), DUTCH (76%), GANDA (75%), YORUBA (75%), TSONGA (74%), AFRIKAANS (74%), LATIN (74%), ZULU (74%), BOKMAL (74%), DANISH (73%), TSWANA (73%), SOMALI (72%), ESPERANTO (72%), SLOVAK (71%), HUNGARIAN (71%), SPANISH (71%), ALBANIAN (71%), SWAHILI (71%), FRENCH (71%), INDONESIAN (71%), SHONA (70%), SWEDISH (70%), GERMAN (70%) \n" +
                         "  When he came into the room, he greeted the others with\n" +
@@ -121,6 +126,11 @@ class LanguageDetector_Test {
                         "  выдает такую ошибку \n" +
                         "20-56 (30): ENGLISH; ENGLISH (100%), TAGALOG (84%), POLISH (83%), WELSH (82%), LATIN (81%), GERMAN (81%), ESPERANTO (81%), BOKMAL (80%), DUTCH (79%), ALBANIAN (78%), INDONESIAN (78%), SPANISH (78%), DANISH (78%), BASQUE (78%), SWEDISH (77%), YORUBA (77%), NYNORSK (77%), MAORI (76%), FRENCH (76%), ZULU (76%), MALAY (75%), IRISH (75%), ITALIAN (74%), AFRIKAANS (74%), XHOSA (74%), SOTHO (74%), CROATIAN (74%), PORTUGUESE (74%), ROMANIAN (74%), CATALAN (74%), HUNGARIAN (73%), TSONGA (73%), FINNISH (73%), SOMALI (73%), SLOVENE (72%), BOSNIAN (72%), ESTONIAN (71%), TURKISH (71%), CZECH (71%), ICELANDIC (70%), SLOVAK (70%) \n" +
                         "  Error Code: UNKNOWN code: Deep Ocean",
+                "it is a pity that a moderator does not know that the 1.6.1 is not beta, but official, or read \"minimum requirements\". I say in any version of minecraft in the oneplus 6 of 8 of ram, it presents performance flaws \"lag or delays\".\nes una lástima que un moderador no sepa que la vercion 1.6.1 no es beta, sino oficial, ni sepa leer \"requisitos mínimos\". digo en cualquier versión de minecraft en el oneplus 6 de 8 de ram, presenta fallas de rendimiento \"lag o retrasos\"."
+                    to "0-226 (169): ENGLISH; ENGLISH (100%), TAGALOG (86%), LATIN (79%), GERMAN (76%), FRENCH (76%), ESPERANTO (76%), INDONESIAN (75%), ITALIAN (75%), DUTCH (74%), DANISH (74%), PORTUGUESE (74%), CATALAN (74%), ALBANIAN (72%), MALAY (72%), SWEDISH (72%), NYNORSK (72%), ROMANIAN (72%), XHOSA (72%), BOKMAL (71%), SPANISH (71%), CZECH (71%), TURKISH (71%), POLISH (71%), WELSH (71%), SLOVAK (70%) \n" +
+                        "  it is a pity that a moderator does not know that the 1.6.1 is not beta, but official, or read \"minimum requirements\". I say in any version of minecraft in the oneplus 6 of 8 of ram, it presents performance flaws \"lag or delays\n" +
+                        "229-465 (180): SPANISH; SPANISH (100%), PORTUGUESE (88%), ITALIAN (86%), CATALAN (84%), TAGALOG (83%), ALBANIAN (82%), LATIN (82%), ESPERANTO (81%), ENGLISH (79%), NYNORSK (79%), BOSNIAN (78%), LITHUANIAN (78%), BASQUE (77%), LATVIAN (76%), INDONESIAN (76%), GERMAN (76%), SLOVAK (76%), SWEDISH (75%), WELSH (75%), DUTCH (75%), BOKMAL (75%), SHONA (75%), YORUBA (74%), DANISH (74%), FRENCH (74%), CROATIAN (74%), SWAHILI (74%), HUNGARIAN (74%), SLOVENE (74%), ROMANIAN (73%), MALAY (72%), AFRIKAANS (72%), CZECH (71%), FINNISH (71%), TURKISH (70%) \n" +
+                        "  es una lástima que un moderador no sepa que la vercion 1.6.1 no es beta, sino oficial, ni sepa leer \"requisitos mínimos\". digo en cualquier versión de minecraft en el oneplus 6 de 8 de ram, presenta fallas de rendimiento \"lag o retrasos",
             ).map { Arguments.of(it.first, it.second) }
         }
     }

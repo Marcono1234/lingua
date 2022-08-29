@@ -413,7 +413,6 @@ private fun createSectionsWithConfidenceValues(
     return confidenceSections
 }
 
-@Suppress("LiftReturnOrAssignment")
 internal fun LanguageDetector.internalDetectMultiLanguageOf(text: String): List<LanguageDetector.LanguageSection> {
     val sections = createSectionsWithConfidenceValues(text, this)
 
@@ -505,8 +504,7 @@ private fun canMergeConfidenceSection(
     val previousRelevantLanguages = previous.getLanguagesWithMinConfidence()
 
     // Check if both sections share languages with high confidence
-    val previousCurrentOverlap = EnumSet.copyOf(currentRelevantLanguages)
-    previousCurrentOverlap.retainAll(previousRelevantLanguages)
+    val previousCurrentOverlap = EnumSet.copyOf(currentRelevantLanguages).apply { retainAll(previousRelevantLanguages) }
 
     if (previousCurrentOverlap.isEmpty()) {
         return false
@@ -518,27 +516,23 @@ private fun canMergeConfidenceSection(
     // Else make sure that section does not belong more closely to next section than to previous one
 
     val nextRelevantLanguages = next.getLanguagesWithMinConfidence()
+    val currentNextOverlap = EnumSet.copyOf(currentRelevantLanguages).apply { retainAll(nextRelevantLanguages) }
 
-    val previousNextOverlap = EnumSet.copyOf(previousRelevantLanguages)
-    previousNextOverlap.retainAll(nextRelevantLanguages)
-
-    // If previous and next can probably be merged, then it is not an issue if previous and current
-    // are merged, and in the next step (previous + current) + next
-    // Otherwise need to avoid merging current with previous if it belongs stronger to next
-    if (previousNextOverlap.isEmpty()) {
-        val previousConfidenceValues = previous.getConfidenceValues()
-        val nextConfidenceValues = next.getConfidenceValues()
-
-        val languagesToCheck = current.getConfidenceValues().object2DoubleEntrySet()
-            .filter { it.doubleValue >= 0.95 }
-            .map { it.key }
-        val belongsToNext = languagesToCheck.all {
-            previousConfidenceValues.getDouble(it) < nextConfidenceValues.getDouble(it)
-        }
-        if (belongsToNext) {
-            // Don't merge if current belongs closer to next section than to previous one
-            return false
-        }
+    if (currentNextOverlap.isEmpty()) {
+        // Can merge current and previous if there is no overlap between current and next
+        return true
     }
-    return true
+
+    val previousNextOverlap = EnumSet.copyOf(previousRelevantLanguages).apply { retainAll(nextRelevantLanguages) }
+    if (previousNextOverlap.isNotEmpty()) {
+        // Can merge if previous and next can probably be merged, then it is not an issue if previous and current
+        // are merged, and in the next step (previous + current) + next
+        return true
+    }
+
+    val currentConfidenceValues = current.getConfidenceValues()
+    val previousCurrentConfidence = previousCurrentOverlap.map(currentConfidenceValues::getDouble).average()
+    val nextCurrentConfidence = currentNextOverlap.map(currentConfidenceValues::getDouble).average()
+
+    return previousCurrentConfidence > nextCurrentConfidence
 }
