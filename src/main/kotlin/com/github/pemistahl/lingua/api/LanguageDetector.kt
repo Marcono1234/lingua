@@ -172,6 +172,9 @@ class LanguageDetector internal constructor(
      * text, text pieces which consist of non-letters might not be part of any of the returned sections.
      * The accuracy of this function is greatly reduced when the
      * [low accuracy mode][LanguageDetectorBuilder.withLowAccuracyMode] is used.
+     *
+     * **Warning:** This feature is experimental. The performance of this function might not be
+     * good, especially for long texts.
      */
     fun detectMultiLanguageOf(text: String): List<LanguageSection> {
         // Note: The implementation is extracted to a separate file to avoid reducing readability of this class
