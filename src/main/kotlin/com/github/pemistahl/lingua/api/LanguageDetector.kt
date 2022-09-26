@@ -288,6 +288,11 @@ class LanguageDetector internal constructor(
      * web application, the language models are removed and memory is freed.
      * This prevents exceptions such as [OutOfMemoryError] when the web application
      * is redeployed multiple times.
+     *
+     * This function should be used with care. Loaded language models are shared
+     * between all language detector instances. Unloading models which are still
+     * used by other language detector instances requires them to load these
+     * models again which will decrease their performance.
      */
     @Suppress("unused") // public API
     fun unloadLanguageModels() {
