@@ -1,4 +1,4 @@
-package com.github.pemistahl.lingua.internal.model
+package com.github.pemistahl.lingua.internal.model.floatmap
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -32,6 +32,26 @@ class ImmutableInt2FloatTrieMapTest {
             val expectedValue = key.toFloat()
             val value = map.get(key)
             assertEquals(expectedValue, value, "Failed: $key, $value")
+        }
+    }
+
+    @Test
+    fun asHashMap() {
+        // Use JDK Random to produce deterministic set of keys
+        val keys = Random(2).ints(79999).toArray()
+        val builder = ImmutableInt2FloatTrieMap.Builder()
+
+        keys.forEach {
+            builder.add(it, it.toFloat())
+        }
+
+        val map = builder.build()
+        val hashMap = map.asHashMap()
+
+        assertEquals(keys.size, map.size())
+        assertEquals(map.size(), hashMap.size)
+        hashMap.int2FloatEntrySet().fastForEach {
+            assertEquals(map.get(it.intKey), it.floatValue)
         }
     }
 }

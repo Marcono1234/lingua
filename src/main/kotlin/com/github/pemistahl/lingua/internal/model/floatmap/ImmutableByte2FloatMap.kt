@@ -1,10 +1,12 @@
-package com.github.pemistahl.lingua.internal.model
+package com.github.pemistahl.lingua.internal.model.floatmap
 
 import com.github.pemistahl.lingua.internal.model.extension.readByteArray
 import com.github.pemistahl.lingua.internal.model.extension.readFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.readShort
 import com.github.pemistahl.lingua.internal.model.extension.writeFloatArray
 import it.unimi.dsi.fastutil.bytes.Byte2FloatAVLTreeMap
+import it.unimi.dsi.fastutil.bytes.Byte2FloatFunction
+import it.unimi.dsi.fastutil.bytes.Byte2FloatOpenHashMap
 import it.unimi.dsi.fastutil.bytes.Byte2FloatSortedMap
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -13,7 +15,7 @@ import java.io.OutputStream
 internal class ImmutableByte2FloatMap private constructor(
     private val keys: ByteArray,
     private val values: FloatArray
-) {
+) : Byte2FloatFunction {
     companion object {
         @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableByte2FloatMap {
@@ -38,9 +40,17 @@ internal class ImmutableByte2FloatMap private constructor(
         }
     }
 
-    fun get(key: Byte): Float {
+    override fun get(key: Byte): Float {
         val index = keys.binarySearch(key)
         return if (index >= 0) values[index] else 0f
+    }
+
+    override fun size(): Int = keys.size
+
+    fun asHashMap(): Byte2FloatOpenHashMap {
+        val map = Byte2FloatOpenHashMap(size())
+        keys.forEachIndexed { index, key -> map.put(key, values[index]) }
+        return map
     }
 
     fun writeBinary(outputStream: OutputStream) {

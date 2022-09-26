@@ -4,6 +4,7 @@ import com.github.pemistahl.lingua.internal.model.extension.readCharArray
 import com.github.pemistahl.lingua.internal.model.extension.readShortArray
 import com.github.pemistahl.lingua.internal.model.extension.writeCharArray
 import com.github.pemistahl.lingua.internal.model.extension.writeShortArray
+import it.unimi.dsi.fastutil.Hash
 import it.unimi.dsi.fastutil.chars.Char2IntMap
 import it.unimi.dsi.fastutil.chars.Char2IntOpenHashMap
 import it.unimi.dsi.fastutil.chars.Char2ShortLinkedOpenHashMap
@@ -44,7 +45,7 @@ internal class CharOffsetsData(
             val chars = dataIn.readCharArray(charsCount)
             val charOffsets = dataIn.readShortArray(charsCount)
 
-            val map = Char2ShortOpenHashMap(charsCount)
+            val map = Char2ShortOpenHashMap(charsCount, Hash.VERY_FAST_LOAD_FACTOR)
             map.defaultReturnValue(NO_VALUE)
             chars.forEachIndexed { index, c ->
                 map.put(c, charOffsets[index])

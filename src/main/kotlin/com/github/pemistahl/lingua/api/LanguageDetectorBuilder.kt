@@ -31,6 +31,7 @@ class LanguageDetectorBuilder private constructor(
     internal var isEveryLanguageModelPreloaded: Boolean = false,
     internal var isLowAccuracyModeEnabled: Boolean = false,
     private var executor: Executor = defaultExecutor,
+    private var increasedDetectionSpeed: Boolean = false,
 ) {
     /**
      * Creates and returns the configured instance of [LanguageDetector].
@@ -41,6 +42,7 @@ class LanguageDetectorBuilder private constructor(
         isEveryLanguageModelPreloaded,
         isLowAccuracyModeEnabled,
         executor,
+        increasedDetectionSpeed,
     )
 
     /**
@@ -121,6 +123,22 @@ class LanguageDetectorBuilder private constructor(
     @Suppress("unused") // public API
     fun withExecutor(executor: Executor): LanguageDetectorBuilder {
         this.executor = executor
+        return this
+    }
+
+    /**
+     * Configures the language detector to load models in a format which increases language
+     * detection speed, but on the other hand also increases memory usage. To decide whether
+     * this configuration is appropriate for an application, the performance of it should be
+     * measured, possibly also in combination with [withPreloadedLanguageModels] to determine
+     * the maximum memory usage.
+     *
+     * Note that loaded language models are shared between all language detector instances.
+     * Therefore, this configuration might also affect language detector instances for
+     * which this was not enabled.
+     */
+    fun withIncreasedDetectionSpeed(): LanguageDetectorBuilder {
+        this.increasedDetectionSpeed = true
         return this
     }
 

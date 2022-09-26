@@ -1,5 +1,5 @@
-import com.github.pemistahl.lingua.internal.model.QuadriFivegramRelativeFrequencyLookup
-import com.github.pemistahl.lingua.internal.model.UniBiTrigramRelativeFrequencyLookup
+import com.github.pemistahl.lingua.internal.model.lookup.QuadriFivegramBinarySearchLookup
+import com.github.pemistahl.lingua.internal.model.lookup.UniBiTrigramBinarySearchLookup
 import com.squareup.moshi.JsonReader
 import it.unimi.dsi.fastutil.objects.Object2FloatLinkedOpenHashMap
 import okio.buffer
@@ -77,14 +77,14 @@ abstract class GenerateLanguageModelsTask : DefaultTask() {
                         } ?: Object2FloatLinkedOpenHashMap<String>()
                     }
 
-                    val uniBiTrigramFile = UniBiTrigramRelativeFrequencyLookup.fromJson(
+                    val uniBiTrigramFile = UniBiTrigramBinarySearchLookup.fromJson(
                         readModel("unigrams.json"),
                         readModel("bigrams.json"),
                         readModel("trigrams.json")
                     ).writeBinary(modelOutputDir, languageCode, printingSizeChange(languageCode, "uni-bi-trigram"))
                     filesToDelete.remove(uniBiTrigramFile.toAbsolutePath())
 
-                    val quadriFivegramFile = QuadriFivegramRelativeFrequencyLookup.fromJson(
+                    val quadriFivegramFile = QuadriFivegramBinarySearchLookup.fromJson(
                         readModel("quadrigrams.json"),
                         readModel("fivegrams.json")
                     ).writeBinary(modelOutputDir, languageCode, printingSizeChange(languageCode, "quadri-fivegram"))

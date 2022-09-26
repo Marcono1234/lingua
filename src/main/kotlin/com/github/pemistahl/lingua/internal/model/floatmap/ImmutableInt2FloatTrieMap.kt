@@ -1,4 +1,4 @@
-package com.github.pemistahl.lingua.internal.model
+package com.github.pemistahl.lingua.internal.model.floatmap
 
 import com.github.pemistahl.lingua.internal.model.extension.readByte
 import com.github.pemistahl.lingua.internal.model.extension.readByteArray
@@ -14,6 +14,8 @@ import it.unimi.dsi.fastutil.bytes.Byte2ObjectFunction
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectSortedMap
 import it.unimi.dsi.fastutil.floats.FloatArrayList
 import it.unimi.dsi.fastutil.floats.FloatConsumer
+import it.unimi.dsi.fastutil.ints.Int2FloatFunction
+import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
 import it.unimi.dsi.fastutil.shorts.Short2FloatAVLTreeMap
 import it.unimi.dsi.fastutil.shorts.Short2FloatSortedMap
 import java.io.DataOutputStream
@@ -63,7 +65,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
      */
     private val indValuesIndices: ShortArray,
     private val values: FloatArray
-) {
+) : Int2FloatFunction {
     companion object {
         @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableInt2FloatTrieMap {
@@ -236,23 +238,19 @@ internal class ImmutableInt2FloatTrieMap private constructor(
         }
     }
 
-    fun get(key: Int): Float {
-        val firstKey = key.toByte()
-        val firstKeyIndex = firstKeyLayer.binarySearch(firstKey)
-        if (firstKeyIndex < 0) return 0f
-
-        val secondKey = key.shr(8).toByte()
-        val secondKeyLayer = secondKeyLayers[firstKeyIndex]
-        val secondKeyIndex = secondKeyLayer.binarySearch(secondKey)
-        if (secondKeyIndex < 0) return 0f
-
+    private inline fun <T> useRemainderLayerRange(
+        firstKeyIndex: Int,
+        secondKeyIndex: Int,
+        secondKeyLayerSize: Int,
+        function: (startIndex: Int, endIndex: Int) -> T
+    ): T {
         // Determine where to search within keyRemainderLayer
         val estimatedRemainderIndex = calculateEstimatedRemainderIndex(
             size,
             firstKeyGlobalIndices[firstKeyIndex],
             firstKeyLayer.size,
             secondKeyIndex,
-            secondKeyLayer.size
+            secondKeyLayerSize
         )
         val remainderLayerSearchData = keyRemainderLayerSearchData[firstKeyIndex][secondKeyIndex]
 
@@ -264,19 +262,62 @@ internal class ImmutableInt2FloatTrieMap private constructor(
         val remainderSearchSize = remainderLayerSearchData
             .and(1.shl(SEARCH_DATA_SIZE_BITS_COUNT) - 1) + 1 // + 1 because size cannot be 0
 
-        val keyRemainder = key.shr(16).toShort()
+        return function(remainderSearchStartIndex, remainderSearchStartIndex + remainderSearchSize)
+    }
 
-        val index = keyRemainderLayer.binarySearch(
-            keyRemainder,
-            remainderSearchStartIndex,
-            remainderSearchStartIndex + remainderSearchSize
-        )
+    private fun getValue(index: Int): Float {
+        return if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
+        else if (indValuesIndices.isEmpty()) values[index]
+        else values[index - indValuesIndices.size + maxIndirectionIndices]
+    }
 
-        return if (index < 0) 0f else {
-            if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
-            else if (indValuesIndices.isEmpty()) values[index]
-            else values[index - indValuesIndices.size + maxIndirectionIndices]
+    override fun get(key: Int): Float {
+        val firstKey = key.toByte()
+        val firstKeyIndex = firstKeyLayer.binarySearch(firstKey)
+        if (firstKeyIndex < 0) return 0f
+
+        val secondKey = key.shr(8).toByte()
+        val secondKeyLayer = secondKeyLayers[firstKeyIndex]
+        val secondKeyIndex = secondKeyLayer.binarySearch(secondKey)
+        if (secondKeyIndex < 0) return 0f
+
+        val index = useRemainderLayerRange(firstKeyIndex, secondKeyIndex, secondKeyLayer.size) { startIndex, endIndex ->
+            val keyRemainder = key.shr(16).toShort()
+
+            keyRemainderLayer.binarySearch(
+                keyRemainder,
+                startIndex,
+                endIndex
+            )
         }
+
+        return if (index < 0) 0f else getValue(index)
+    }
+
+    override fun size(): Int = size
+
+    fun asHashMap(): Int2FloatOpenHashMap {
+        val map = Int2FloatOpenHashMap(size())
+
+        firstKeyLayer.forEachIndexed { firstKeyIndex, firstKey ->
+            val secondKeyLayer = secondKeyLayers[firstKeyIndex]
+            secondKeyLayer.forEachIndexed { secondKeyIndex, secondKey ->
+                useRemainderLayerRange(
+                    firstKeyIndex,
+                    secondKeyIndex,
+                    secondKeyLayer.size
+                ) { startIndex, endIndex ->
+                    for (index in startIndex until endIndex) {
+                        val key = firstKey.toInt().and(0xFF)
+                            .or(secondKey.toInt().and(0xFF).shl(8))
+                            .or(keyRemainderLayer[index].toInt().shl(16))
+                        map.put(key, getValue(index))
+                    }
+                }
+            }
+        }
+
+        return map
     }
 
     fun writeBinary(outputStream: OutputStream) {

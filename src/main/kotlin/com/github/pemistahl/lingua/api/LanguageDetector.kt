@@ -29,8 +29,10 @@ import com.github.pemistahl.lingua.internal.PrimitiveNgram
 import com.github.pemistahl.lingua.internal.ReusableObjectNgram
 import com.github.pemistahl.lingua.internal.TestDataLanguageModel
 import com.github.pemistahl.lingua.internal.internalDetectMultiLanguageOf
-import com.github.pemistahl.lingua.internal.model.QuadriFivegramRelativeFrequencyLookup
-import com.github.pemistahl.lingua.internal.model.UniBiTrigramRelativeFrequencyLookup
+import com.github.pemistahl.lingua.internal.model.lookup.QuadriFivegramBinarySearchLookup
+import com.github.pemistahl.lingua.internal.model.lookup.QuadriFivegramLookup
+import com.github.pemistahl.lingua.internal.model.lookup.UniBiTrigramBinarySearchLookup
+import com.github.pemistahl.lingua.internal.model.lookup.UniBiTrigramLookup
 import com.github.pemistahl.lingua.internal.util.EnumDoubleMap
 import com.github.pemistahl.lingua.internal.util.EnumIntMap
 import com.github.pemistahl.lingua.internal.util.KeyIndexer
@@ -72,6 +74,7 @@ class LanguageDetector internal constructor(
     isEveryLanguageModelPreloaded: Boolean,
     internal val isLowAccuracyModeEnabled: Boolean,
     private val executor: Executor,
+    private val increasedDetectionSpeed: Boolean,
     internal val numberOfLoadedLanguages: Int = languages.size,
 ) {
     // Stored as Array to reduce object creation during iteration
@@ -94,6 +97,9 @@ class LanguageDetector internal constructor(
     )
 
     init {
+        languages.forEach {
+            languageModels[it]!!.updateParameter(increasedDetectionSpeed)
+        }
         if (isEveryLanguageModelPreloaded) {
             preloadLanguageModels()
         }
@@ -311,7 +317,7 @@ class LanguageDetector internal constructor(
             )
     }
 
-    private fun UniBiTrigramRelativeFrequencyLookup.getFrequency(ngram: PrimitiveNgram): Double {
+    private fun UniBiTrigramLookup.getFrequency(ngram: PrimitiveNgram): Double {
         val (length, char0, char1, char2) = ngram
         return getFrequency(length, char0, char1, char2)
     }
@@ -538,7 +544,7 @@ class LanguageDetector internal constructor(
                         val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
                         val quadriFivegramLookup = when {
                             // When model only contains primitives don't have to load quadriFivegramLookup
-                            testDataModel.hasOnlyPrimitives() -> QuadriFivegramRelativeFrequencyLookup.empty
+                            testDataModel.hasOnlyPrimitives() -> QuadriFivegramLookup.empty
                             else -> modelHolder.quadriFivegramLookup.value
                         }
 
@@ -573,8 +579,8 @@ class LanguageDetector internal constructor(
     }
 
     private fun computeSumOfNgramProbabilities(
-        uniBiTrigramsLookup: UniBiTrigramRelativeFrequencyLookup,
-        quadriFivegramLookup: QuadriFivegramRelativeFrequencyLookup,
+        uniBiTrigramsLookup: UniBiTrigramLookup,
+        quadriFivegramLookup: QuadriFivegramLookup,
         testDataModel: TestDataLanguageModel
     ): Double {
         var probabilitySum = 0.0
@@ -659,32 +665,45 @@ class LanguageDetector internal constructor(
         minimumRelativeDistance != other.minimumRelativeDistance -> false
         isLowAccuracyModeEnabled != other.isLowAccuracyModeEnabled -> false
         executor != other.executor -> false
+        increasedDetectionSpeed != other.increasedDetectionSpeed -> false
         else -> true
     }
 
     override fun hashCode() =
         31 * languages.hashCode() + minimumRelativeDistance.hashCode() + isLowAccuracyModeEnabled.hashCode() +
-            executor.hashCode()
+            executor.hashCode() + increasedDetectionSpeed.hashCode()
 
+    /**
+     * Has two types of lookups (uni-, bi- and trigrams, and quadri- and fivegrams)
+     * since that is how LanguageDetector currently uses the lookups; for short texts
+     * it creates ngrams of all lengths (1 - 5), for long texts it only creates trigrams
+     * and then lower order ngrams. Therefore these two lookup types allow lazily loading
+     * the required models into memory.
+     */
     internal data class LanguageModelHolder(
-        val uniBiTrigramsLookup: UniBiTrigramRelativeFrequencyLookup,
+        val uniBiTrigramsLookup: UniBiTrigramLookup,
         // Lookup for quadrigrams and fivegrams is lazy since it won't be used when
         // large texts are analyzed
-        val quadriFivegramLookup: Lazy<QuadriFivegramRelativeFrequencyLookup>
+        val quadriFivegramLookup: Lazy<QuadriFivegramLookup>
     )
 
     internal companion object {
         private const val HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH = 120
 
-        internal val languageModels: Map<Language, ResettableLazy<LanguageModelHolder>> = EnumMap(
+        internal val languageModels: Map<Language, ResettableLazy<LanguageModelHolder, Boolean>> = EnumMap(
             Language.all().asSequence()
                 .associateWith {
                     val languageCode = it.isoCode639_1.toString()
-                    ResettableLazy {
+                    // Initially create without increased detection speed (false)
+                    ResettableLazy(false) { increasedDetectionSpeed ->
                         LanguageModelHolder(
-                            UniBiTrigramRelativeFrequencyLookup.fromBinary(languageCode),
+                            UniBiTrigramBinarySearchLookup.fromBinary(languageCode).let { lookup ->
+                                if (increasedDetectionSpeed) lookup.asHashMapLookup() else lookup
+                            },
                             lazy {
-                                QuadriFivegramRelativeFrequencyLookup.fromBinary(languageCode)
+                                QuadriFivegramBinarySearchLookup.fromBinary(languageCode).let { lookup ->
+                                    if (increasedDetectionSpeed) lookup.asHashMapLookup() else lookup
+                                }
                             }
                         )
                     }

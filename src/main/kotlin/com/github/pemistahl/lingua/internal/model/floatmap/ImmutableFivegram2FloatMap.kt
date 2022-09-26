@@ -1,4 +1,4 @@
-package com.github.pemistahl.lingua.internal.model
+package com.github.pemistahl.lingua.internal.model.floatmap
 
 import com.github.pemistahl.lingua.internal.model.extension.readFivegramArray
 import com.github.pemistahl.lingua.internal.model.extension.readFloatArray
@@ -7,6 +7,8 @@ import com.github.pemistahl.lingua.internal.model.extension.readShortArray
 import com.github.pemistahl.lingua.internal.model.extension.writeFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.writeShortArray
 import it.unimi.dsi.fastutil.objects.Object2FloatAVLTreeMap
+import it.unimi.dsi.fastutil.objects.Object2FloatFunction
+import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2FloatSortedMap
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -32,7 +34,7 @@ internal class ImmutableFivegram2FloatMap private constructor(
      */
     private val indValuesIndices: ShortArray,
     private val values: FloatArray,
-) {
+) : Object2FloatFunction<String> {
     companion object {
         @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableFivegram2FloatMap {
@@ -62,13 +64,23 @@ internal class ImmutableFivegram2FloatMap private constructor(
         }
     }
 
-    fun get(key: String): Float {
+    private fun getValue(index: Int): Float {
+        return if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
+        else if (indValuesIndices.isEmpty()) values[index]
+        else values[index - indValuesIndices.size + maxIndirectionIndices]
+    }
+
+    override fun getFloat(key: Any): Float {
         val index = keys.binarySearch(key)
-        return if (index < 0) 0f else {
-            if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
-            else if (indValuesIndices.isEmpty()) values[index]
-            else values[index - indValuesIndices.size + maxIndirectionIndices]
-        }
+        return if (index < 0) 0f else getValue(index)
+    }
+
+    override fun size(): Int = keys.size
+
+    fun asHashMap(): Object2FloatOpenHashMap<String> {
+        val map = Object2FloatOpenHashMap<String>(size())
+        keys.forEachIndexed { index, key -> map.put(key, getValue(index)) }
+        return map
     }
 
     fun writeBinary(outputStream: OutputStream) {

@@ -328,12 +328,14 @@ abstract class AbstractLanguageDetectionAccuracyReport(
             LanguageDetectorBuilder
                 .fromIsoCodes639_1(*languageIsoCodesToTest)
                 .withLowAccuracyMode()
+                .withIncreasedDetectionSpeed()
                 .build()
         }
 
         internal val linguaDetectorWithHighAccuracy by lazy {
             LanguageDetectorBuilder
                 .fromIsoCodes639_1(*languageIsoCodesToTest)
+                .withIncreasedDetectionSpeed()
                 .build()
         }
 

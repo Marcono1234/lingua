@@ -1,4 +1,4 @@
-package com.github.pemistahl.lingua.internal.model
+package com.github.pemistahl.lingua.internal.model.floatmap
 
 import com.github.pemistahl.lingua.internal.model.extension.readFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.readInt
@@ -7,6 +7,8 @@ import com.github.pemistahl.lingua.internal.model.extension.readShortArray
 import com.github.pemistahl.lingua.internal.model.extension.writeFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.writeShortArray
 import it.unimi.dsi.fastutil.shorts.Short2FloatAVLTreeMap
+import it.unimi.dsi.fastutil.shorts.Short2FloatFunction
+import it.unimi.dsi.fastutil.shorts.Short2FloatOpenHashMap
 import it.unimi.dsi.fastutil.shorts.Short2FloatSortedMap
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -25,7 +27,7 @@ internal class ImmutableShort2FloatMap private constructor(
      */
     private val indValuesIndices: ShortArray,
     private val values: FloatArray
-) {
+) : Short2FloatFunction {
     companion object {
         @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableShort2FloatMap {
@@ -61,12 +63,22 @@ internal class ImmutableShort2FloatMap private constructor(
         }
     }
 
-    fun get(key: Short): Float {
+    private fun getValue(index: Int): Float {
+        return if (indValuesIndices.isEmpty()) values[index]
+        else values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
+    }
+
+    override fun get(key: Short): Float {
         val index = keys.binarySearch(key)
-        return if (index < 0) 0f else {
-            if (indValuesIndices.isEmpty()) values[index]
-            else values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
-        }
+        return if (index < 0) 0f else getValue(index)
+    }
+
+    override fun size(): Int = keys.size
+
+    fun asHashMap(): Short2FloatOpenHashMap {
+        val map = Short2FloatOpenHashMap(size())
+        keys.forEachIndexed { index, key -> map.put(key, getValue(index)) }
+        return map
     }
 
     fun writeBinary(outputStream: OutputStream) {

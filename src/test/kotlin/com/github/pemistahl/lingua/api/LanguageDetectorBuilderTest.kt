@@ -45,6 +45,7 @@ class LanguageDetectorBuilderTest {
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
+                increasedDetectionSpeed = false,
             )
         )
 
@@ -56,6 +57,7 @@ class LanguageDetectorBuilderTest {
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
+                increasedDetectionSpeed = false,
             )
         )
     }
@@ -75,6 +77,7 @@ class LanguageDetectorBuilderTest {
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
+                increasedDetectionSpeed = false,
             )
         )
 
@@ -86,6 +89,7 @@ class LanguageDetectorBuilderTest {
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
+                increasedDetectionSpeed = false,
             )
         )
     }
@@ -136,6 +140,7 @@ class LanguageDetectorBuilderTest {
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
+                    increasedDetectionSpeed = false,
                 )
             )
 
@@ -147,6 +152,7 @@ class LanguageDetectorBuilderTest {
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
+                    increasedDetectionSpeed = false,
                 )
             )
         }
@@ -175,6 +181,7 @@ class LanguageDetectorBuilderTest {
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
+                    increasedDetectionSpeed = false,
                 )
             )
 
@@ -186,6 +193,7 @@ class LanguageDetectorBuilderTest {
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
+                    increasedDetectionSpeed = false,
                 )
             )
         }
@@ -213,6 +221,7 @@ class LanguageDetectorBuilderTest {
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
+                    increasedDetectionSpeed = false,
                 )
             )
 
@@ -224,6 +233,7 @@ class LanguageDetectorBuilderTest {
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
+                    increasedDetectionSpeed = false,
                 )
             )
 
@@ -234,6 +244,7 @@ class LanguageDetectorBuilderTest {
                     isEveryLanguageModelPreloaded = false,
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
+                    increasedDetectionSpeed = false,
                 )
             )
         }
@@ -275,6 +286,7 @@ class LanguageDetectorBuilderTest {
                 isEveryLanguageModelPreloaded = true,
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
+                increasedDetectionSpeed = false,
             )
         )
     }
@@ -295,6 +307,7 @@ class LanguageDetectorBuilderTest {
                 isEveryLanguageModelPreloaded = false,
                 isLowAccuracyModeEnabled = true,
                 expectedExecutor,
+                increasedDetectionSpeed = false,
             )
         )
 
@@ -309,6 +322,7 @@ class LanguageDetectorBuilderTest {
                 isEveryLanguageModelPreloaded = true,
                 isLowAccuracyModeEnabled = true,
                 expectedExecutor,
+                increasedDetectionSpeed = false,
             )
         )
     }

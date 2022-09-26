@@ -17,9 +17,13 @@ import java.util.stream.Stream
 
 // Different class name to avoid clashes with original Lingua test class when merging upstream changes
 @Suppress("ClassName")
-class LanguageDetector_Test {
+abstract class LanguageDetector_Test {
     private lateinit var executor: ExecutorService
     private lateinit var languageDetector: LanguageDetector
+
+    // Workaround because JUnit 5 does not support class level parameterization yet, see
+    // https://github.com/junit-team/junit5/issues/878
+    abstract fun LanguageDetectorBuilder.configureForTest(): LanguageDetectorBuilder
 
     @BeforeEach
     fun setupLanguageDetector() {
@@ -35,6 +39,7 @@ class LanguageDetector_Test {
         )
         languageDetector = LanguageDetectorBuilder.fromAllLanguages()
             .withExecutor(executor)
+            .configureForTest()
             .build()
     }
 
@@ -164,5 +169,17 @@ class LanguageDetector_Test {
             "${it.start}-${it.end} (${it.lettersCount}): ${it.language}; $confidenceValueString $sectionText"
         }
         assertEquals(expectedSectionsString, sectionsString)
+    }
+
+    internal class RegularSpeed : LanguageDetector_Test() {
+        override fun LanguageDetectorBuilder.configureForTest(): LanguageDetectorBuilder {
+            return this
+        }
+    }
+
+    internal class IncreasedSpeed : LanguageDetector_Test() {
+        override fun LanguageDetectorBuilder.configureForTest(): LanguageDetectorBuilder {
+            return withIncreasedDetectionSpeed()
+        }
     }
 }

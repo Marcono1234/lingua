@@ -13,7 +13,7 @@
  * Indirect mode is only used where it results in memory reduction compared to _direct_ mode.
  */
 
-package com.github.pemistahl.lingua.internal.model
+package com.github.pemistahl.lingua.internal.model.floatmap
 
 import it.unimi.dsi.fastutil.floats.FloatCollection
 import it.unimi.dsi.fastutil.floats.FloatLinkedOpenHashSet
