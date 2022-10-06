@@ -90,7 +90,6 @@ internal class QuadriFivegramBinarySearchLookup private constructor(
 ) {
     companion object {
         @Suppress("unused") // used by buildSrc for model generation
-        @JvmStatic
         fun fromJson(
             quadrigrams: Object2FloatLinkedOpenHashMap<String>,
             fivegrams: Object2FloatLinkedOpenHashMap<String>
@@ -108,12 +107,10 @@ internal class QuadriFivegramBinarySearchLookup private constructor(
             return builder.finishCreation()
         }
 
-        @JvmStatic
         private fun getBinaryModelResourceName(languageCode: String): String {
             return getBinaryModelResourceName(languageCode, "quadri-fivegrams.bin")
         }
 
-        @JvmStatic
         fun fromBinary(languageCode: String): QuadriFivegramBinarySearchLookup {
             openBinaryDataInput(getBinaryModelResourceName(languageCode)).use {
                 val charOffsetsData = CharOffsetsData.fromBinary(it)

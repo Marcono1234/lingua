@@ -36,7 +36,6 @@ internal class ImmutableFivegram2FloatMap private constructor(
     private val values: FloatArray,
 ) : Object2FloatFunction<String> {
     companion object {
-        @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableFivegram2FloatMap {
             val keys = inputStream.readFivegramArray(inputStream.readInt())
             val indValuesIndices = inputStream.readShortArray(inputStream.readInt())

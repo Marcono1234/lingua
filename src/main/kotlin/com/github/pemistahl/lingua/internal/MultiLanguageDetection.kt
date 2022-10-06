@@ -5,6 +5,7 @@ import com.github.pemistahl.lingua.api.LanguageDetector
 import com.github.pemistahl.lingua.internal.Constant.isJapaneseScript
 import com.github.pemistahl.lingua.internal.util.WordList
 import com.github.pemistahl.lingua.internal.util.extension.isLogogram
+import com.github.pemistahl.lingua.internal.util.lazyAssert
 import it.unimi.dsi.fastutil.objects.Object2DoubleLinkedOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleSortedMap
 import java.lang.Character.UnicodeScript
@@ -341,7 +342,7 @@ private class ConfidenceValuesPotentialSection(
 
     fun toResultSection(): LanguageDetector.LanguageSection {
         val confidenceValues = getConfidenceValues()
-        assert(!confidenceValues.contains(Language.UNKNOWN))
+        lazyAssert { !confidenceValues.contains(Language.UNKNOWN) }
 
         return LanguageDetector.LanguageSection(
             getStart(),

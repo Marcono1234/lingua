@@ -28,7 +28,6 @@ internal class ImmutableInt2FloatMap private constructor(
     private val values: FloatArray
 ) : Int2FloatFunction {
     companion object {
-        @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableInt2FloatMap {
             val keys = inputStream.readIntArray(inputStream.readInt())
             val indValuesIndices = inputStream.readShortArray(inputStream.readInt())

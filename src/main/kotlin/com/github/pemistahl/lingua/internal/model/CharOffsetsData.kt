@@ -20,7 +20,6 @@ internal class CharOffsetsData(
     private val offsetMap: Char2ShortMap
 ) {
     companion object {
-        @JvmStatic
         fun createCharOffsetsData(ngrams: Sequence<String>): CharOffsetsData {
             val charCounts = Char2IntOpenHashMap()
             ngrams.forEach { ngram -> ngram.chars().forEach { charCounts.addTo(it.toChar(), 1) } }
@@ -39,7 +38,6 @@ internal class CharOffsetsData(
             return CharOffsetsData(charsToOffset)
         }
 
-        @JvmStatic
         fun fromBinary(dataIn: DataInputStream): CharOffsetsData {
             val charsCount = dataIn.readUnsignedShort()
             val chars = dataIn.readCharArray(charsCount)

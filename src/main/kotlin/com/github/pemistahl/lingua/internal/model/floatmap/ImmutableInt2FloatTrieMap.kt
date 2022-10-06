@@ -67,7 +67,6 @@ internal class ImmutableInt2FloatTrieMap private constructor(
     private val values: FloatArray
 ) : Int2FloatFunction {
     companion object {
-        @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableInt2FloatTrieMap {
             val size = inputStream.readInt()
 
@@ -115,7 +114,6 @@ internal class ImmutableInt2FloatTrieMap private constructor(
          * @param totalSize [ImmutableInt2FloatTrieMap.size]
          * @param firstLayerGlobalIndex [firstKeyGlobalIndices]`[firstLayerIndex]`
          */
-        @JvmStatic
         private fun calculateEstimatedRemainderIndex(
             totalSize: Int,
             firstLayerGlobalIndex: Int,

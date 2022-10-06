@@ -69,7 +69,7 @@ import it.unimi.dsi.fastutil.chars.Char2ObjectOpenHashMap
 internal object Constant {
     // Is stored as Char2ObjectMap for faster lookup; uses Array<Language> as value to allow
     // iteration without creating objects
-    @JvmStatic
+    @JvmField
     val CHARS_TO_LANGUAGES_MAPPING: Char2ObjectMap<Array<Language>>
 
     init {
@@ -144,11 +144,13 @@ internal object Constant {
     }
 
     /** Indexer for all Languages which are the values of [CHARS_TO_LANGUAGES_MAPPING] */
-    @JvmStatic
+    @JvmField
     val languagesWithCharsIndexer = KeyIndexer.fromEnumConstants(
         CHARS_TO_LANGUAGES_MAPPING.values.flatMap { it.toList() }
     )
 
+    // Note: Interestingly @JvmStatic turns the function into a static one instead of adding an additional
+    // static function; not sure if that is intended or a bug in the Kotlin compiler
     @JvmStatic
     fun isJapaneseScript(script: Character.UnicodeScript): Boolean {
         return script == Character.UnicodeScript.HIRAGANA ||
@@ -156,10 +158,10 @@ internal object Constant {
             script == Character.UnicodeScript.HAN
     }
 
-    @JvmStatic
+    @JvmField
     val LANGUAGES_SUPPORTING_LOGOGRAMS = enumSetOf(CHINESE, JAPANESE, KOREAN)
-    @JvmStatic
+    @JvmField
     val MULTIPLE_WHITESPACE = Regex("\\s+")
-    @JvmStatic
+    @JvmField
     val NUMBERS_AND_PUNCTUATION = Regex("\\p{N}|\\p{P}")
 }

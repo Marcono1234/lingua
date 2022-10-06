@@ -16,6 +16,8 @@
 
 package com.github.pemistahl.lingua.internal
 
+import com.github.pemistahl.lingua.internal.util.lazyAssert
+
 /**
  * Ngram encoded as primitive [Long]. Ngrams which cannot be encoded as
  * primitive are represented as String and can be processed as [ReusableObjectNgram].
@@ -54,7 +56,6 @@ internal value class PrimitiveNgram(val value: Long) {
         const val MAX_NGRAM_LENGTH = 3
         const val NONE = 0L
 
-        @JvmStatic
         fun of(string: CharSequence, startIndex: Int, length: Int): PrimitiveNgram {
             return when (length) {
                 1 -> PrimitiveNgram(
@@ -78,7 +79,6 @@ internal value class PrimitiveNgram(val value: Long) {
             }
         }
 
-        @JvmStatic
         fun of(char0: Char, char1: Char, char2: Char): PrimitiveNgram {
             return PrimitiveNgram(
                 3L
@@ -135,7 +135,7 @@ internal value class ReusableObjectNgram(
      * Must only be called if [toLowerOrderNgram] returned `false`.
      */
     fun getLowerOrderPrimitiveNgram(): PrimitiveNgram {
-        assert(length() == PrimitiveNgram.MAX_NGRAM_LENGTH + 1 && PrimitiveNgram.MAX_NGRAM_LENGTH == 3)
+        lazyAssert { length() == PrimitiveNgram.MAX_NGRAM_LENGTH + 1 && PrimitiveNgram.MAX_NGRAM_LENGTH == 3 }
         return PrimitiveNgram.of(value[1], value[2], value[3])
     }
 

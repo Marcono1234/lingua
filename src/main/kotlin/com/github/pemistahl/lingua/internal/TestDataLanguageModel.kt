@@ -31,7 +31,6 @@ internal class TestDataLanguageModel(
     }
 
     companion object {
-        @JvmStatic
         fun fromText(text: CharSequence, ngramLength: Int): TestDataLanguageModel {
             require(ngramLength in 1..5) {
                 "ngram length $ngramLength is not in range 1..5"

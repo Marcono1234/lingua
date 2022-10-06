@@ -29,7 +29,6 @@ internal class ImmutableShort2FloatMap private constructor(
     private val values: FloatArray
 ) : Short2FloatFunction {
     companion object {
-        @JvmStatic
         fun fromBinary(inputStream: InputStream): ImmutableShort2FloatMap {
             val keys = inputStream.readShortArray(inputStream.readInt())
             // Don't need to check for overflow here; if the map contains the maximum of 65536 unique values,

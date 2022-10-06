@@ -76,7 +76,6 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
 ) {
     companion object {
         @Suppress("unused") // used by buildSrc for model generation
-        @JvmStatic
         fun fromJson(
             unigrams: Object2FloatLinkedOpenHashMap<String>,
             bigrams: Object2FloatLinkedOpenHashMap<String>,
@@ -98,12 +97,10 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
             return builder.finishCreation()
         }
 
-        @JvmStatic
         private fun getBinaryModelResourceName(languageCode: String): String {
             return getBinaryModelResourceName(languageCode, "uni-bi-trigrams.bin")
         }
 
-        @JvmStatic
         fun fromBinary(languageCode: String): UniBiTrigramBinarySearchLookup {
             openBinaryDataInput(getBinaryModelResourceName(languageCode)).use {
                 val charOffsetsData = CharOffsetsData.fromBinary(it)

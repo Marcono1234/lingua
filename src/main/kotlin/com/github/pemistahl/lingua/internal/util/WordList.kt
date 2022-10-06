@@ -15,7 +15,6 @@ internal class WordList private constructor(
     private val positions: ByteArray,
 ) {
     companion object {
-        @JvmStatic
         fun build(text: CharSequence): WordList {
             var currentPositionsIndex = 0
             var positions = ByteArray(min(text.length / 2, 32))
