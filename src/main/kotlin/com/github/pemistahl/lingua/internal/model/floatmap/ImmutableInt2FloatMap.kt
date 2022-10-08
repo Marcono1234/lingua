@@ -7,9 +7,9 @@ import com.github.pemistahl.lingua.internal.model.extension.readShortArray
 import com.github.pemistahl.lingua.internal.model.extension.writeFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.writeIntArray
 import com.github.pemistahl.lingua.internal.model.extension.writeShortArray
-import it.unimi.dsi.fastutil.ints.Int2FloatAVLTreeMap
 import it.unimi.dsi.fastutil.ints.Int2FloatFunction
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
+import it.unimi.dsi.fastutil.ints.Int2FloatRBTreeMap
 import it.unimi.dsi.fastutil.ints.Int2FloatSortedMap
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -38,7 +38,8 @@ internal class ImmutableInt2FloatMap private constructor(
     }
 
     class Builder {
-        private val map: Int2FloatSortedMap = Int2FloatAVLTreeMap()
+        // Uses a red-black tree map because that should have faster insertion times than AVL map
+        private val map: Int2FloatSortedMap = Int2FloatRBTreeMap()
 
         fun add(key: Int, value: Float) {
             val old = map.put(key, value)

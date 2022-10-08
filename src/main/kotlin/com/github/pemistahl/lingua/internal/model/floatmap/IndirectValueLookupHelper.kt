@@ -35,14 +35,18 @@ internal const val maxIndirectionIndices = 65536 // number of values representab
 internal inline fun <T> createValueArrays(
     floatValues: FloatCollection,
     resultHandler: (indValuesIndices: ShortArray, values: FloatArray) -> T
+) = createValueArrays(floatValues.toFloatArray(), resultHandler)
+
+// Uses FloatArray to avoid boxing and for faster lookup
+internal inline fun <T> createValueArrays(
+    floatValues: FloatArray,
+    resultHandler: (indValuesIndices: ShortArray, values: FloatArray) -> T
 ): T {
     val indirectValues = FloatLinkedOpenHashSet()
     var indirectLookupEndIndex = 0
 
-    // Use int array to avoid boxing, and for faster lookup
-    val floatValuesArray = floatValues.toFloatArray()
     run indirectlyAccessibleValues@{
-        floatValuesArray.forEach {
+        floatValues.forEach {
             // Only have to break the loop if value is not contained and max size is reached
             if (!indirectValues.contains(it)) {
                 if (indirectValues.size >= maxIndirectionIndices) {
@@ -62,20 +66,20 @@ internal inline fun <T> createValueArrays(
     val shortWeight = 1 // 16bit
     val intWeight = 2 // 32bit = 2 * short
 
-    val directLookupCount = floatValuesArray.size - indirectLookupEndIndex
+    val directLookupCount = floatValues.size - indirectLookupEndIndex
     val indirectCost = indirectLookupEndIndex * shortWeight + (indirectValuesCount + directLookupCount) * intWeight
 
-    val directCost = floatValuesArray.size * intWeight
+    val directCost = floatValues.size * intWeight
 
     return if (indirectCost < directCost) {
         val values = indirectValuesArray.copyOf(indirectValuesCount + directLookupCount)
 
-        floatValuesArray.forEachIndexedStartingAt(indirectLookupEndIndex) { index, f ->
+        floatValues.forEachIndexedStartingAt(indirectLookupEndIndex) { index, f ->
             values[indirectValuesCount + index] = f
         }
 
         val indValuesIndices = ShortArray(indirectLookupEndIndex)
-        floatValuesArray.forEachIndexedUntil(indirectLookupEndIndex) { index, f ->
+        floatValues.forEachIndexedUntil(indirectLookupEndIndex) { index, f ->
             val indirectIndex = indirectValuesArray.indexOfFirst { it == f }
             assert(indirectIndex != -1)
             indValuesIndices[index] = indirectIndex.toShort()
@@ -83,6 +87,6 @@ internal inline fun <T> createValueArrays(
 
         resultHandler(indValuesIndices, values)
     } else {
-        resultHandler(ShortArray(0), floatValuesArray)
+        resultHandler(ShortArray(0), floatValues)
     }
 }

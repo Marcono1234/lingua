@@ -21,8 +21,9 @@ internal class CharOffsetsData(
 ) {
     companion object {
         fun createCharOffsetsData(ngrams: Sequence<String>): CharOffsetsData {
-            val charCounts = Char2IntOpenHashMap()
-            ngrams.forEach { ngram -> ngram.chars().forEach { charCounts.addTo(it.toChar(), 1) } }
+            // Uses slightly higher capacity than default because languages often use large number of different chars
+            val charCounts = Char2IntOpenHashMap(64)
+            ngrams.forEach { ngram -> ngram.forEach { charCounts.addTo(it, 1) } }
 
             // Sort by occurrence count; most frequent chars first
             val charRanks = TreeSet(
@@ -32,7 +33,7 @@ internal class CharOffsetsData(
             charCounts.char2IntEntrySet().forEach(charRanks::add)
 
             // Use linked map here to make sure `writeBinary` uses consistent order
-            val charsToOffset = Char2ShortLinkedOpenHashMap()
+            val charsToOffset = Char2ShortLinkedOpenHashMap(charRanks.size)
             charRanks.forEachIndexed { index, entry -> charsToOffset.put(entry.charKey, index.toShort()) }
 
             return CharOffsetsData(charsToOffset)

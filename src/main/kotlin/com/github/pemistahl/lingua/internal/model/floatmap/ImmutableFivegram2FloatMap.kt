@@ -6,9 +6,9 @@ import com.github.pemistahl.lingua.internal.model.extension.readInt
 import com.github.pemistahl.lingua.internal.model.extension.readShortArray
 import com.github.pemistahl.lingua.internal.model.extension.writeFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.writeShortArray
-import it.unimi.dsi.fastutil.objects.Object2FloatAVLTreeMap
 import it.unimi.dsi.fastutil.objects.Object2FloatFunction
 import it.unimi.dsi.fastutil.objects.Object2FloatOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2FloatRBTreeMap
 import it.unimi.dsi.fastutil.objects.Object2FloatSortedMap
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -46,7 +46,8 @@ internal class ImmutableFivegram2FloatMap private constructor(
     }
 
     class Builder {
-        private val map: Object2FloatSortedMap<String> = Object2FloatAVLTreeMap()
+        // Uses a red-black tree map because that should have faster insertion times than AVL map
+        private val map: Object2FloatSortedMap<String> = Object2FloatRBTreeMap()
 
         fun add(key: String, value: Float) {
             check(key.length == 5)

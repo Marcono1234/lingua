@@ -1,8 +1,8 @@
 package com.github.pemistahl.lingua.internal.util
 
-import it.unimi.dsi.fastutil.objects.Object2DoubleAVLTreeMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleLinkedOpenHashMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap
+import it.unimi.dsi.fastutil.objects.Object2DoubleRBTreeMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleSortedMap
 import it.unimi.dsi.fastutil.objects.Object2DoubleSortedMaps
 import java.util.EnumSet
@@ -89,7 +89,8 @@ internal class EnumDoubleMap<E : Enum<E>>(
     }
 
     fun sortedByNonZeroDescendingValue(): Object2DoubleSortedMap<E> {
-        var map: Object2DoubleSortedMap<E> = Object2DoubleAVLTreeMap { a, b ->
+        // Uses a red-black tree map because that should have faster insertion times than AVL map
+        var map: Object2DoubleSortedMap<E> = Object2DoubleRBTreeMap { a, b ->
             // Highest first
             val diff = getOrZero(b).compareTo(getOrZero(a))
             when {
@@ -110,7 +111,7 @@ internal class EnumDoubleMap<E : Enum<E>>(
          *   obtaining entries in insertion order (exactly what is needed here)
          * - Hash map is most likely faster for lookup
          * - Properly handles the case where map is checked for languages which are not part of the keyIndexer;
-         *   directly accessing the Object2DoubleAVLTreeMap with its custom comparator above would lead to
+         *   directly accessing the Object2DoubleRBTreeMap with its custom comparator above would lead to
          *   ArrayIndexOutOfBoundsException
          */
         map = Object2DoubleLinkedOpenHashMap(map)

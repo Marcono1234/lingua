@@ -12,12 +12,12 @@ import com.github.pemistahl.lingua.internal.model.extension.writeShortArray
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectAVLTreeMap
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectFunction
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectSortedMap
-import it.unimi.dsi.fastutil.floats.FloatArrayList
 import it.unimi.dsi.fastutil.floats.FloatConsumer
 import it.unimi.dsi.fastutil.ints.Int2FloatFunction
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
-import it.unimi.dsi.fastutil.shorts.Short2FloatAVLTreeMap
+import it.unimi.dsi.fastutil.shorts.Short2FloatRBTreeMap
 import it.unimi.dsi.fastutil.shorts.Short2FloatSortedMap
+import it.unimi.dsi.fastutil.shorts.ShortConsumer
 import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
@@ -140,6 +140,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
     }
 
     class Builder {
+        private var size = 0
         private val map: Byte2ObjectSortedMap<Byte2ObjectSortedMap<Short2FloatSortedMap>> = Byte2ObjectAVLTreeMap()
 
         fun add(key: Int, value: Float) {
@@ -148,29 +149,31 @@ internal class ImmutableInt2FloatTrieMap private constructor(
             val keyRemainder = key.shr(16).toShort()
 
             val old = map.computeIfAbsent(firstKey, Byte2ObjectFunction { Byte2ObjectAVLTreeMap() })
-                .computeIfAbsent(secondKey, Byte2ObjectFunction { Short2FloatAVLTreeMap() })
+                // Uses a red-black tree map because that should have faster insertion times than AVL map
+                .computeIfAbsent(secondKey, Byte2ObjectFunction { Short2FloatRBTreeMap() })
                 .put(keyRemainder, value)
             check(old == 0f)
+            size++
         }
 
         fun build(): ImmutableInt2FloatTrieMap {
-            val allValues = FloatArrayList()
+            val allValues = FloatArray(size)
+            var valueIndex = 0
             map.values.stream()
                 .flatMap { map -> map.values.stream() }
                 .forEach { map ->
                     map.values.forEach(
                         FloatConsumer {
-                            allValues.add(it)
+                            allValues[valueIndex++] = it
                         }
                     )
                 }
 
-            val totalSize = allValues.size
             val firstKeyLayer = ByteArray(map.size)
             val firstKeyGlobalIndices = IntArray(map.size)
             val secondKeyLayers = Array(map.size) { ByteArray(0) }
             val keyRemainderLayerSearchData = Array(map.size) { IntArray(0) }
-            val keyRemainderLayer = ShortArray(totalSize)
+            val keyRemainderLayer = ShortArray(size)
 
             var globalIndex = 0
 
@@ -193,7 +196,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
                     secondKeyLayer[secondKeyIndex] = secondKey
 
                     val estimatedRemainderIndex = calculateEstimatedRemainderIndex(
-                        totalSize,
+                        size,
                         firstKeyGlobalIndex,
                         firstKeyLayer.size,
                         secondKeyIndex,
@@ -214,16 +217,18 @@ internal class ImmutableInt2FloatTrieMap private constructor(
                         .or(keyRemainderMap.size - 1)
                     searchData[secondKeyIndex] = encodedSearchData
 
-                    keyRemainderMap.keys.forEach { keyRemainder ->
-                        keyRemainderLayer[globalIndex] = keyRemainder
-                        globalIndex++
-                    }
+                    keyRemainderMap.keys.forEach(
+                        ShortConsumer { keyRemainder ->
+                            keyRemainderLayer[globalIndex] = keyRemainder
+                            globalIndex++
+                        }
+                    )
                 }
             }
 
             return createValueArrays(allValues) { indValuesIndices, values ->
                 return@createValueArrays ImmutableInt2FloatTrieMap(
-                    totalSize,
+                    size,
                     firstKeyLayer,
                     firstKeyGlobalIndices,
                     secondKeyLayers,

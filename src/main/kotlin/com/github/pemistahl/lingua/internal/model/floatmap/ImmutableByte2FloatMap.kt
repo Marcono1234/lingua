@@ -4,9 +4,9 @@ import com.github.pemistahl.lingua.internal.model.extension.readByteArray
 import com.github.pemistahl.lingua.internal.model.extension.readFloatArray
 import com.github.pemistahl.lingua.internal.model.extension.readShort
 import com.github.pemistahl.lingua.internal.model.extension.writeFloatArray
-import it.unimi.dsi.fastutil.bytes.Byte2FloatAVLTreeMap
 import it.unimi.dsi.fastutil.bytes.Byte2FloatFunction
 import it.unimi.dsi.fastutil.bytes.Byte2FloatOpenHashMap
+import it.unimi.dsi.fastutil.bytes.Byte2FloatRBTreeMap
 import it.unimi.dsi.fastutil.bytes.Byte2FloatSortedMap
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -27,7 +27,8 @@ internal class ImmutableByte2FloatMap private constructor(
     }
 
     class Builder {
-        private val map: Byte2FloatSortedMap = Byte2FloatAVLTreeMap()
+        // Uses a red-black tree map because that should have faster insertion times than AVL map
+        private val map: Byte2FloatSortedMap = Byte2FloatRBTreeMap()
 
         fun add(key: Byte, value: Float) {
             val old = map.put(key, value)
