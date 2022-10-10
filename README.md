@@ -21,7 +21,7 @@ In general you should notice the following improvements when using this library:
   This is especially noticeable when configuring Tiny Lingua to preload the models for all languages.
 - Reduced memory usage for language models  
   With all language models loaded the original Lingua library requires > 1.2 GB of memory whereas this
-  library requires ~150 MB. (Though in most uses cases detection of all supported languages is not
+  library requires ~150 MB. (Though in most use cases detection of all supported languages is not
   necessary and a subset of these languages suffices.)
 - Reduced memory consumption during language detection  
   The original Lingua library can require multiple MBs of temporary memory during language detection,
@@ -49,6 +49,13 @@ returned by the original Lingua library. However, the differences should be negl
   compared against the previous report to detect any regression regarding detection accuracy.
 - The code may not be easily maintainable and integrating future upstream Lingua changes might be
   difficult.
+
+The versioning scheme is `<version>-L<upstream-lingua-version>`. For example `1.0.0-L1.2.2` means:
+- Tiny Lingua version 1.0.0
+- based on upstream Lingua version 1.2.2
+
+Note that the upstream Lingua version number does not guarantee that all of the APIs and functionality
+are supported. Some features might be omitted (or replaced) in this library.
 
 The original README description (possibly with some adjustments) follows below:
 

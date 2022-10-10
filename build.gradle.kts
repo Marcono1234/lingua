@@ -28,7 +28,9 @@ import java.util.Locale
 val linguaTaskGroup: String by project
 val linguaGroupId: String by project
 val linguaArtifactId: String by project
-val linguaVersion: String by project
+val projectVersion: String by project
+// Version of the upstream Lingua project on which this project is based
+val upstreamProjectVersion: String by project
 val linguaName: String by project
 val linguaDescription: String by project
 val linguaLicenseName: String by project
@@ -45,7 +47,7 @@ val linguaCsvHeader: String by project
 val compileTestKotlin: KotlinCompile by tasks
 
 group = linguaGroupId
-version = linguaVersion
+version = "$projectVersion-L$upstreamProjectVersion"
 description = linguaDescription
 
 plugins {
@@ -417,7 +419,7 @@ val checkLanguageModelsChecksum by tasks.registering {
 }
 
 dependencies {
-    lingua("com.github.pemistahl:lingua:$linguaVersion")
+    lingua("com.github.pemistahl:lingua:$upstreamProjectVersion")
 
     implementation(kotlin("stdlib"))
     implementation(libs.fastutil)
@@ -445,7 +447,7 @@ publishing {
         create<MavenPublication>("lingua") {
             groupId = linguaGroupId
             artifactId = linguaArtifactId
-            version = linguaVersion
+            version = version
 
             from(components["kotlin"])
 
