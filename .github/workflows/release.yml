@@ -25,7 +25,7 @@ jobs:
         uses: battila7/get-version-action@v2
 
       - name: Create release artifacts
-        run: ./gradlew jar sourcesJar jarWithDependencies dokkaJavadocJar
+        run: ./gradlew jar sourcesJar jarWithDependencies dokkaJavadocJar dokkaHtmlJar
 
       - name: Create release and upload artifacts
         uses: softprops/action-gh-release@v1

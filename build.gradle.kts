@@ -55,7 +55,7 @@ plugins {
     id("org.jlleitschuh.gradle.ktlint") version "10.3.0"
     id("com.adarshr.test-logger") version "3.2.0"
     id("com.asarkar.gradle.build-time-tracker") version "3.0.1"
-    id("org.jetbrains.dokka") version "1.6.21"
+    id("org.jetbrains.dokka") version "1.7.20"
     id("ru.vyarus.use-python") version "2.3.0"
     id("org.moditect.gradleplugin") version "1.0.0-rc3"
     id("com.github.johnrengelman.shadow") version "7.1.2"
@@ -314,7 +314,7 @@ project.afterEvaluate {
 
 tasks.withType<DokkaTask>().configureEach {
     dokkaSourceSets.configureEach {
-        jdkVersion.set(6)
+        jdkVersion.set(11) // link against Java 11 documentation
         reportUndocumented.set(false)
         perPackageOption {
             matchingRegex.set(".*\\.(app|internal).*")
@@ -329,6 +329,13 @@ tasks.register<Jar>("dokkaJavadocJar") {
     description = "Assembles a jar archive containing Javadoc documentation."
     classifier = "javadoc"
     from("$buildDir/dokka/javadoc")
+}
+tasks.register<Jar>("dokkaHtmlJar") {
+    dependsOn("dokkaHtml")
+    group = "Build"
+    description = "Assembles a jar archive containing Dokka HTML documentation."
+    classifier = "dokka-html"
+    from("$buildDir/dokka/html")
 }
 
 tasks.register<Jar>("sourcesJar") {
@@ -458,6 +465,7 @@ publishing {
             artifact(tasks["sourcesJar"])
             artifact(tasks["jarWithDependencies"])
             artifact(tasks["dokkaJavadocJar"])
+            artifact(tasks["dokkaHtmlJar"])
 
             pom {
                 name.set(linguaName)
