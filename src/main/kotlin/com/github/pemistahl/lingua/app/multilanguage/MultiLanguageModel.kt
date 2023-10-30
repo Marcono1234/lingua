@@ -83,6 +83,8 @@ internal class MultiLanguageModel(
         if (languageDetector != null) {
             val currentWorkerCancelled = AtomicBoolean(false)
             this.currentWorkerCancelled = currentWorkerCancelled
+            // Store property value in local variable to safely access it from worker thread
+            val text = text
             currentWorker = object : SwingWorker<List<LanguageDetector.LanguageSection>, Unit>() {
                 override fun doInBackground(): List<LanguageDetector.LanguageSection> {
                     return languageDetector.detectMultiLanguageOf(text)
