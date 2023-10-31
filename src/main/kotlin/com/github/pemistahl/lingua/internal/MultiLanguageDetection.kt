@@ -96,6 +96,13 @@ private open class PotentialSection(
     // Cache text to reduce number of created substrings
     private var cachedText: String? = null,
 ) {
+    init {
+        check(start < end)
+        check(lettersCount > 0)
+        // Should have at most as many letters as there are chars in section
+        check(lettersCount <= end - start)
+    }
+
     fun getStart() = start
     fun getEnd() = end
     fun getLettersCount() = lettersCount
@@ -182,23 +189,25 @@ private fun splitPotentialSections(text: String): MutableList<PotentialSection> 
         if (char.isLetter()) {
             val script = UnicodeScript.of(char.code)
 
-            if (start != -1 && (hasLogograms || lettersCount >= minSectionLength) &&
+            if (start == -1) {
+                // Start a new section
+                start = index
+            }
+            // Or check if current section should end
+            else if ((hasLogograms || lettersCount >= minSectionLength) &&
                 lastScript != null && !lastScript!!.belongsToSameLanguageAs(script)
             ) {
                 sections.add(PotentialSection(start, index, lettersCount, text))
 
                 // Current letter is start of new section
                 start = index
-                lettersCount = 1
+                // Set to 0 instead of 1 because it is directly incremented below
+                lettersCount = 0
                 hasLogograms = false
-            } else {
-                if (start == -1) {
-                    start = index
-                }
-
-                // Mark current letter as potential last letter
-                end = index + 1
             }
+
+            // Mark current letter as potential last letter
+            end = index + 1
 
             lastScript = script
             lettersCount++

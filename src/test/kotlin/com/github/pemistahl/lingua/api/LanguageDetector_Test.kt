@@ -46,6 +46,8 @@ abstract class LanguageDetector_Test {
     @AfterEach
     fun shutDownExecutor() {
         executor.shutdown()
+        // Unload language models to not affect subsequent test executions
+        languageDetector.unloadLanguageModels()
     }
 
     /* ktlint-disable max-line-length */
@@ -89,6 +91,18 @@ abstract class LanguageDetector_Test {
                 "this is a test"
                     to "0-14 (11): ENGLISH; ENGLISH (100%), LATIN (97%), ESPERANTO (90%), ESTONIAN (88%), GERMAN (83%), PORTUGUESE (83%), FRENCH (83%), NYNORSK (83%), TAGALOG (82%), BOKMAL (82%), SPANISH (81%), DUTCH (81%), DANISH (81%), CATALAN (81%), FINNISH (81%), ROMANIAN (80%), WELSH (79%), POLISH (79%), ITALIAN (79%), XHOSA (79%), BOSNIAN (78%), SLOVAK (78%), ALBANIAN (78%), SWAHILI (78%), ZULU (78%), SWEDISH (77%), CZECH (76%), BASQUE (76%), SOTHO (76%), TURKISH (74%), AFRIKAANS (74%), SLOVENE (74%), CROATIAN (74%), HUNGARIAN (74%), YORUBA (72%), IRISH (72%), TSONGA (71%), SOMALI (71%), LITHUANIAN (71%), LATVIAN (70%), SHONA (70%), INDONESIAN (70%) \n" +
                         "  this is a test",
+                "日本語1a"
+                    to "0-4 (3): CHINESE; CHINESE (100%) \n" +
+                        "  日本語1\n" +
+                        // Exact confidence values for "a" here don't matter
+                        "4-5 (1): SOMALI; SOMALI (100%), SWAHILI (87%), TAGALOG (86%), MALAY (83%), INDONESIAN (80%), MAORI (79%), SHONA (77%), GANDA (77%), TSONGA (75%), TSWANA (74%), SOTHO (73%), IRISH (72%), BASQUE (72%) \n" +
+                        "  a",
+                "हिन्दीa"
+                    to "0-6 (3): HINDI; HINDI (100%), MARATHI (93%) \n" +
+                        "  हिन्दी\n" +
+                        // Exact confidence values for "a" here don't matter
+                        "6-7 (1): SOMALI; SOMALI (100%), SWAHILI (87%), TAGALOG (86%), MALAY (83%), INDONESIAN (80%), MAORI (79%), SHONA (77%), GANDA (77%), TSONGA (75%), TSWANA (74%), SOTHO (73%), IRISH (72%), BASQUE (72%) \n" +
+                        "  a",
                 "Hallo das ist ein Test mit ein paar Wörtern: But what if the text also contained English as part of the sentence?"
                     to "0-43 (35): GERMAN; GERMAN (100%), SWEDISH (86%), ESPERANTO (85%), DUTCH (85%), ALBANIAN (85%), FINNISH (84%), LATIN (84%), WELSH (84%), ESTONIAN (84%), NYNORSK (83%), YORUBA (82%), SOTHO (80%), CATALAN (80%), SPANISH (79%), PORTUGUESE (79%), HUNGARIAN (79%), ITALIAN (79%), TSONGA (77%), SHONA (76%), FRENCH (76%), CROATIAN (76%), POLISH (76%), CZECH (76%), SLOVAK (76%), ZULU (75%), XHOSA (75%), ROMANIAN (74%), SLOVENE (74%), TURKISH (72%), MAORI (72%), GANDA (70%), MALAY (70%), INDONESIAN (70%) \n" +
                         "  Hallo das ist ein Test mit ein paar Wörtern\n" +
@@ -129,7 +143,7 @@ abstract class LanguageDetector_Test {
                 "выдает такую ошибку Error Code: UNKNOWN code: Deep Ocean"
                     to "0-20 (17): RUSSIAN; RUSSIAN (100%), BELARUSIAN (75%), UKRAINIAN (73%) \n" +
                         "  выдает такую ошибку \n" +
-                        "20-56 (30): ENGLISH; ENGLISH (100%), TAGALOG (84%), POLISH (83%), WELSH (82%), LATIN (81%), GERMAN (81%), ESPERANTO (81%), BOKMAL (80%), DUTCH (79%), ALBANIAN (78%), INDONESIAN (78%), SPANISH (78%), DANISH (78%), BASQUE (78%), SWEDISH (77%), YORUBA (77%), NYNORSK (77%), MAORI (76%), FRENCH (76%), ZULU (76%), MALAY (75%), IRISH (75%), ITALIAN (74%), AFRIKAANS (74%), XHOSA (74%), SOTHO (74%), CROATIAN (74%), PORTUGUESE (74%), ROMANIAN (74%), CATALAN (74%), HUNGARIAN (73%), TSONGA (73%), FINNISH (73%), SOMALI (73%), SLOVENE (72%), BOSNIAN (72%), ESTONIAN (71%), TURKISH (71%), CZECH (71%), ICELANDIC (70%), SLOVAK (70%) \n" +
+                        "20-56 (29): ENGLISH; ENGLISH (100%), TAGALOG (84%), POLISH (83%), WELSH (82%), LATIN (81%), GERMAN (81%), ESPERANTO (81%), BOKMAL (80%), DUTCH (79%), ALBANIAN (78%), INDONESIAN (78%), SPANISH (78%), DANISH (78%), BASQUE (78%), SWEDISH (77%), YORUBA (77%), NYNORSK (77%), MAORI (76%), FRENCH (76%), ZULU (76%), MALAY (75%), IRISH (75%), ITALIAN (74%), AFRIKAANS (74%), XHOSA (74%), SOTHO (74%), CROATIAN (74%), PORTUGUESE (74%), ROMANIAN (74%), CATALAN (74%), HUNGARIAN (73%), TSONGA (73%), FINNISH (73%), SOMALI (73%), SLOVENE (72%), BOSNIAN (72%), ESTONIAN (71%), TURKISH (71%), CZECH (71%), ICELANDIC (70%), SLOVAK (70%) \n" +
                         "  Error Code: UNKNOWN code: Deep Ocean",
                 "it is a pity that a moderator does not know that the 1.6.1 is not beta, but official, or read \"minimum requirements\". I say in any version of minecraft in the oneplus 6 of 8 of ram, it presents performance flaws \"lag or delays\".\nes una lástima que un moderador no sepa que la vercion 1.6.1 no es beta, sino oficial, ni sepa leer \"requisitos mínimos\". digo en cualquier versión de minecraft en el oneplus 6 de 8 de ram, presenta fallas de rendimiento \"lag o retrasos\"."
                     to "0-226 (169): ENGLISH; ENGLISH (100%), TAGALOG (86%), LATIN (79%), GERMAN (76%), FRENCH (76%), ESPERANTO (76%), INDONESIAN (75%), ITALIAN (75%), DUTCH (74%), DANISH (74%), PORTUGUESE (74%), CATALAN (74%), ALBANIAN (72%), MALAY (72%), SWEDISH (72%), NYNORSK (72%), ROMANIAN (72%), XHOSA (72%), BOKMAL (71%), SPANISH (71%), CZECH (71%), TURKISH (71%), POLISH (71%), WELSH (71%), SLOVAK (70%) \n" +

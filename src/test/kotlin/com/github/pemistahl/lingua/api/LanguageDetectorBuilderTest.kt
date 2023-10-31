@@ -21,6 +21,7 @@ import com.github.pemistahl.lingua.api.Language.GERMAN
 import com.github.pemistahl.lingua.api.Language.SWEDISH
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatIllegalArgumentException
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
 import java.util.EnumSet
 
@@ -29,6 +30,15 @@ class LanguageDetectorBuilderTest {
     private val minimumLanguagesErrorMessage = "LanguageDetector needs at least 2 languages to choose from"
 
     private val expectedExecutor = LanguageDetectorBuilder.defaultExecutor
+
+    // For correctness would have to call `LanguageDetector.unloadLanguageModels()` after each test, however these
+    // tests mainly check that the builder works correctly, so for better efficiency don't unload models every time
+    // To be safe just unload them once after all tests are done to not affect other test classes
+    @AfterAll
+    fun unloadModels() {
+        val languageDetector = LanguageDetectorBuilder.fromAllLanguages().build()
+        languageDetector.unloadLanguageModels()
+    }
 
     @Test
     fun `assert that LanguageDetector can be built from all languages`() {
