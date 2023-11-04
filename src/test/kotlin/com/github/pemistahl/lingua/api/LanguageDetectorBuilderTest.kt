@@ -135,7 +135,7 @@ class LanguageDetectorBuilderTest {
                 Language.TURKISH,
                 Language.ROMANIAN
             )
-            val expectedLanguages = Language.values().toSet().minus(
+            val expectedLanguages = Language.entries.toSet().minus(
                 arrayOf(Language.TURKISH, Language.ROMANIAN, Language.UNKNOWN)
             ).toList()
 
@@ -167,7 +167,7 @@ class LanguageDetectorBuilderTest {
             )
         }
         run {
-            val languages = Language.values().toSet().minus(arrayOf(GERMAN, ENGLISH)).toTypedArray()
+            val languages = Language.entries.toSet().minus(arrayOf(GERMAN, ENGLISH)).toTypedArray()
             assertThatIllegalArgumentException().isThrownBy {
                 LanguageDetectorBuilder.fromAllLanguagesWithout(GERMAN, *languages)
             }.withMessage(minimumLanguagesErrorMessage)

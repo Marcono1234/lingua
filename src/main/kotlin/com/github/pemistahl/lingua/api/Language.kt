@@ -287,7 +287,7 @@ enum class Language(
 
     companion object {
         private val allScriptsSet: Set<UnicodeScript> =
-            EnumSet.copyOf(values().asSequence().flatMap(Language::unicodeScripts).toSet())
+            EnumSet.copyOf(entries.asSequence().flatMap(Language::unicodeScripts).toSet())
         // Is stored as Array to reduce object creation during iteration
         internal val allScripts = allScriptsSet.toTypedArray()
         internal val allScriptsIndexer = KeyIndexer.fromEnumConstants(allScriptsSet)
@@ -296,7 +296,7 @@ enum class Language(
         init {
             val encounteredScripts = EnumSet.noneOf(UnicodeScript::class.java)
             val scriptsMap = EnumMap<UnicodeScript, Language>(UnicodeScript::class.java)
-            for (language in values()) {
+            for (language in entries) {
                 language.unicodeScripts.forEach {
                     // If not encountered yet, add mapping
                     if (encounteredScripts.add(it)) {
@@ -327,40 +327,40 @@ enum class Language(
          * Returns a list of all built-in languages supporting the Arabic script.
          */
         @JvmStatic
-        fun allWithArabicScript() = values().filter { it.unicodeScripts.contains(UnicodeScript.ARABIC) }
+        fun allWithArabicScript() = entries.filter { it.unicodeScripts.contains(UnicodeScript.ARABIC) }
 
         /**
          * Returns a list of all built-in languages supporting the Cyrillic script.
          */
         @JvmStatic
-        fun allWithCyrillicScript() = values().filter { it.unicodeScripts.contains(UnicodeScript.CYRILLIC) }
+        fun allWithCyrillicScript() = entries.filter { it.unicodeScripts.contains(UnicodeScript.CYRILLIC) }
 
         /**
          * Returns a list of all built-in languages supporting the Devanagari script.
          */
         @JvmStatic
-        fun allWithDevanagariScript() = values().filter { it.unicodeScripts.contains(UnicodeScript.DEVANAGARI) }
+        fun allWithDevanagariScript() = entries.filter { it.unicodeScripts.contains(UnicodeScript.DEVANAGARI) }
 
         /**
          * Returns a list of all built-in languages supporting the Latin script.
          */
         @JvmStatic
-        fun allWithLatinScript() = values().filter { it.unicodeScripts.contains(UnicodeScript.LATIN) }
+        fun allWithLatinScript() = entries.filter { it.unicodeScripts.contains(UnicodeScript.LATIN) }
 
         /**
          * Returns the language for the given ISO 639-1 code.
          */
         @Suppress("FunctionName")
         @JvmStatic
-        fun getByIsoCode639_1(isoCode: IsoCode639_1) = values().find { it.isoCode639_1 == isoCode }!!
+        fun getByIsoCode639_1(isoCode: IsoCode639_1) = entries.find { it.isoCode639_1 == isoCode }!!
 
         /**
          * Returns the language for the given ISO 639-3 code.
          */
         @Suppress("FunctionName")
         @JvmStatic
-        fun getByIsoCode639_3(isoCode: IsoCode639_3) = values().find { it.isoCode639_3 == isoCode }!!
+        fun getByIsoCode639_3(isoCode: IsoCode639_3) = entries.find { it.isoCode639_3 == isoCode }!!
 
-        private fun filterOutLanguages(vararg languages: Language) = values().filterNot { it in languages }
+        private fun filterOutLanguages(vararg languages: Language) = entries.filterNot { it in languages }
     }
 }

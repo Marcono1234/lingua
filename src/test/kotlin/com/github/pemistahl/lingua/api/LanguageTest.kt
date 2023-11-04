@@ -170,7 +170,7 @@ class LanguageTest {
         expectedLanguages: List<Language>
     ) {
         assertThat(
-            Language.values().filter { it.unicodeScripts.contains(alphabet) }
+            Language.entries.filter { it.unicodeScripts.contains(alphabet) }
         ).`as`(
             "alphabet '$alphabet'"
         ).containsExactlyElementsOf(

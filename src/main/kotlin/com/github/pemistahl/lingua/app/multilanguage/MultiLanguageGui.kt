@@ -15,7 +15,7 @@ import javax.swing.WindowConstants
 
 internal fun openMultiLanguageDetectionGui() {
     SwingUtilities.invokeAndWait {
-        val languages = Language.values().toMutableList()
+        val languages = Language.entries.toMutableList()
         languages.remove(Language.UNKNOWN)
 
         val model = MultiLanguageModel(languages)

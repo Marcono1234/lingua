@@ -316,7 +316,7 @@ abstract class AbstractLanguageDetectionAccuracyReport(
     }
 
     companion object {
-        private val languageIsoCodesToTest = Language.values().toSet().minus(arrayOf(UNKNOWN)).map {
+        private val languageIsoCodesToTest = Language.entries.toSet().minus(arrayOf(UNKNOWN)).map {
             it.isoCode639_1
         }.toTypedArray()
 
