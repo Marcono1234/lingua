@@ -4,8 +4,7 @@
 jdk = "11"
 targetJdk = "1.8"
 
-kotlinPlugin = "1.7.10"
-kotlin = "1.7.10"
+kotlinPlugin = "1.9.10"
 
 [libraries]
 fastutil = { module = "it.unimi.dsi:fastutil", version = "8.5.8" }

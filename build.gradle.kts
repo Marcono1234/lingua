@@ -23,7 +23,6 @@ import ru.vyarus.gradle.plugin.python.task.PythonTask
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
-import java.util.Locale
 
 val linguaTaskGroup: String by project
 val linguaGroupId: String by project
@@ -67,17 +66,21 @@ plugins {
 
 jacoco.toolVersion = "0.8.8"
 
+val targetJdkVersion = libs.versions.targetJdk.get()
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(libs.versions.jdk.get()))
     }
 }
+tasks.compileJava {
+    options.release = targetJdkVersion.removePrefix("1.").toInt()
+}
 
-val targetJdkVersion = libs.versions.targetJdk.get()
-tasks.withType<KotlinCompile> {
+// Don't use `withType<KotlinCompile>` to not affect `compileTestKotlin` task
+tasks.compileKotlin {
     kotlinOptions {
-        // TODO: Does not work yet due to https://youtrack.jetbrains.com/issue/KT-52823
-        // @Suppress("SuspiciousCollectionReassignment")
+        // TODO: Cannot use this yet because the multi-language detection GUI uses Java 9 API
         // freeCompilerArgs += listOf("-Xjdk-release=$targetJdkVersion")
         jvmTarget = targetJdkVersion
     }
@@ -116,7 +119,7 @@ testing {
         // Separate test suite for module testing
         val testJavaModule by registering(JvmTestSuite::class) {
             dependencies {
-                implementation(project)
+                implementation(project())
             }
         }
     }
@@ -130,9 +133,9 @@ tasks.check {
 tasks.jacocoTestReport {
     dependsOn("test")
     reports {
-        xml.isEnabled = true
-        csv.isEnabled = false
-        html.isEnabled = true
+        xml.required.set(true)
+        csv.required.set(false)
+        html.required.set(true)
     }
     classDirectories.setFrom(
         files(
@@ -199,8 +202,8 @@ tasks.register<Test>("accuracyReport") {
 
     maxHeapSize = "4096m"
     maxParallelForks = cpuCores
-    reports.html.isEnabled = false
-    reports.junitXml.isEnabled = false
+    reports.html.required.set(false)
+    reports.junitXml.required.set(false)
 
     testlogger {
         theme = ThemeType.STANDARD_PARALLEL
@@ -213,7 +216,7 @@ tasks.register<Test>("accuracyReport") {
             languages.forEach { language ->
                 includeTestsMatching(
                     "com.github.pemistahl.lingua.report" +
-                        ".${detector.toLowerCase(Locale.ROOT)}.${language}DetectionAccuracyReport"
+                        ".${detector.lowercase()}.${language}DetectionAccuracyReport"
                 )
             }
         }
@@ -247,7 +250,7 @@ tasks.register("writeAggregatedAccuracyReport") {
 
             for (detector in detectors) {
                 val languageReportFileName =
-                    "$accuracyReportsDirectoryName/${detector.toLowerCase(Locale.ROOT)}/$language.txt"
+                    "$accuracyReportsDirectoryName/${detector.lowercase()}/$language.txt"
                 val languageReportFile = file(languageReportFileName)
                 val sliceLength = if (detector == "Lingua") (1..8) else (1..4)
 
@@ -327,21 +330,21 @@ tasks.register<Jar>("dokkaJavadocJar") {
     dependsOn("dokkaJavadoc")
     group = "Build"
     description = "Assembles a jar archive containing Javadoc documentation."
-    classifier = "javadoc"
-    from("$buildDir/dokka/javadoc")
+    archiveClassifier = "javadoc"
+    from(layout.buildDirectory.dir("dokka/javadoc"))
 }
 tasks.register<Jar>("dokkaHtmlJar") {
     dependsOn("dokkaHtml")
     group = "Build"
     description = "Assembles a jar archive containing Dokka HTML documentation."
-    classifier = "dokka-html"
-    from("$buildDir/dokka/html")
+    archiveClassifier = "dokka-html"
+    from(layout.buildDirectory.dir("dokka/html"))
 }
 
 tasks.register<Jar>("sourcesJar") {
     group = "Build"
     description = "Assembles a jar archive containing the main source code."
-    classifier = "sources"
+    archiveClassifier = "sources"
     from("src/main/kotlin")
 }
 
@@ -355,7 +358,7 @@ tasks.register<ShadowJar>("jarWithDependencies") {
     dependsOn("relocateDependencies")
     group = "Build"
     description = "Assembles a jar archive containing the main classes and all external dependencies."
-    classifier = "with-dependencies"
+    archiveClassifier = "with-dependencies"
     from(sourceSets.main.get().output)
     configurations = listOf(project.configurations.runtimeClasspath.get())
     manifest { attributes("Main-Class" to linguaMainClass) }
@@ -364,7 +367,7 @@ tasks.register<ShadowJar>("jarWithDependencies") {
 tasks.register<JavaExec>("runLinguaOnConsole") {
     group = linguaTaskGroup
     description = "Starts a REPL (read-evaluate-print loop) to try Lingua on the command line."
-    main = linguaMainClass
+    mainClass = linguaMainClass
     standardInput = System.`in`
     classpath = sourceSets["main"].runtimeClasspath
 }
@@ -377,7 +380,7 @@ val lingua by configurations.creating {
 }
 
 @Suppress("PropertyName")
-val modelOutputDir_ = buildDir.resolve("generated").resolve("language-models")
+val modelOutputDir_ = layout.buildDirectory.dir("generated/language-models").get().asFile
 val createLanguageModels by tasks.registering(GenerateLanguageModelsTask::class) {
     linguaArtifact.set(lingua.singleFile)
     modelOutputDir.set(modelOutputDir_)
@@ -432,7 +435,6 @@ val checkLanguageModelsChecksum by tasks.registering {
 dependencies {
     lingua("com.github.pemistahl:lingua:$upstreamProjectVersion")
 
-    implementation(kotlin("stdlib"))
     implementation(libs.fastutil)
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.0")

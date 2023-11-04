@@ -174,7 +174,7 @@ abstract class GenerateLanguageModelsTask : DefaultTask() {
                             val frequencyString = jsonReader.nextName()
                             val separatorIndex = frequencyString.indexOf('/')
                             val numerator = Integer.parseInt(frequencyString, 0, separatorIndex, 10)
-                            val denominator = Integer.parseInt(frequencyString,separatorIndex + 1, frequencyString.length, 10)
+                            val denominator = Integer.parseInt(frequencyString, separatorIndex + 1, frequencyString.length, 10)
 
                             val frequency = numerator.toFloat() / denominator
                             // Note: Specifies delimiter as String `" "` instead of Char `' '` because currently
