@@ -7,6 +7,6 @@ targetJdk = "1.8"
 kotlinPlugin = "1.9.10"
 
 [libraries]
-fastutil = { module = "it.unimi.dsi:fastutil", version = "8.5.8" }
+fastutil = { module = "it.unimi.dsi:fastutil", version = "8.5.12" }
 
-# TODO: Maybe add all versions here
+# TODO: Maybe specify all versions here

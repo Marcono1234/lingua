@@ -15,9 +15,10 @@ java.sourceSets["main"].java {
     srcDir("$rootDir/../src/main/kotlin/com/github/pemistahl/lingua/internal/model")
 }
 
+val moshiVersion = "1.15.0"
 dependencies {
-    implementation("com.squareup.moshi:moshi:1.13.0")
-    implementation("com.squareup.moshi:moshi-kotlin:1.13.0")
+    implementation("com.squareup.moshi:moshi:$moshiVersion")
+    implementation("com.squareup.moshi:moshi-kotlin:$moshiVersion")
     implementation(libs.fastutil)
 }
 

@@ -15,7 +15,6 @@
  */
 
 import com.adarshr.gradle.testlogger.theme.ThemeType
-import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -54,10 +53,10 @@ plugins {
     id("org.jlleitschuh.gradle.ktlint") version "10.3.0"
     id("com.adarshr.test-logger") version "3.2.0"
     id("com.asarkar.gradle.build-time-tracker") version "3.0.1"
-    id("org.jetbrains.dokka") version "1.7.20"
+    id("org.jetbrains.dokka") version "1.9.10"
     id("ru.vyarus.use-python") version "2.3.0"
     id("org.moditect.gradleplugin") version "1.0.0-rc3"
-    id("com.github.johnrengelman.shadow") version "7.1.2"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
     id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
     `maven-publish`
     signing
@@ -348,19 +347,13 @@ tasks.register<Jar>("sourcesJar") {
     from("src/main/kotlin")
 }
 
-tasks.register<ConfigureShadowRelocation>("relocateDependencies") {
-    group = "shadow"
-    description = "Specifies the ShadowJar task for which to relocate the dependencies."
-    target = tasks["jarWithDependencies"] as ShadowJar
-}
-
 tasks.register<ShadowJar>("jarWithDependencies") {
-    dependsOn("relocateDependencies")
     group = "Build"
     description = "Assembles a jar archive containing the main classes and all external dependencies."
     archiveClassifier = "with-dependencies"
     from(sourceSets.main.get().output)
     configurations = listOf(project.configurations.runtimeClasspath.get())
+    setEnableRelocation(true)
     manifest { attributes("Main-Class" to linguaMainClass) }
 }
 
@@ -437,9 +430,9 @@ dependencies {
 
     implementation(libs.fastutil)
 
-    testImplementation("org.junit.jupiter:junit-jupiter:5.9.0")
-    testImplementation("org.assertj:assertj-core:3.23.1")
-    testImplementation("io.mockk:mockk:1.12.5")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testImplementation("org.assertj:assertj-core:3.24.2")
+    testImplementation("io.mockk:mockk:1.13.8")
 
     accuracyReportImplementation("com.optimaize.languagedetector:language-detector:0.6")
     accuracyReportImplementation("org.apache.opennlp:opennlp-tools:1.9.4")
