@@ -36,7 +36,6 @@ import com.github.pemistahl.lingua.internal.model.lookup.UniBiTrigramLookup
 import com.github.pemistahl.lingua.internal.util.EnumDoubleMap
 import com.github.pemistahl.lingua.internal.util.EnumIntMap
 import com.github.pemistahl.lingua.internal.util.KeyIndexer
-import com.github.pemistahl.lingua.internal.util.ResettableLazy
 import com.github.pemistahl.lingua.internal.util.WordList
 import com.github.pemistahl.lingua.internal.util.extension.allOfToList
 import com.github.pemistahl.lingua.internal.util.extension.enumMapOf
@@ -97,9 +96,6 @@ class LanguageDetector internal constructor(
     )
 
     init {
-        languages.forEach {
-            languageModels[it]!!.updateParameter(increasedDetectionSpeed)
-        }
         if (isEveryLanguageModelPreloaded) {
             preloadLanguageModels()
         }
@@ -328,7 +324,7 @@ class LanguageDetector internal constructor(
     ): EnumIntMap<Language> {
         val unigramCounts = EnumIntMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
-            val lookup = languageModels[language]!!.value().uniBiTrigramsLookup
+            val lookup = languageModels[language]!!.value(increasedDetectionSpeed).uniBiTrigramsLookup
 
             // Only have to check primitiveNgrams since unigrams are always encoded as primitive
             unigramLanguageModel.primitiveNgrams.forEach {
@@ -540,7 +536,7 @@ class LanguageDetector internal constructor(
             .map { language ->
                 CompletableFuture.supplyAsync(
                     {
-                        val modelHolder = languageModels[language]!!.value()
+                        val modelHolder = languageModels[language]!!.value(increasedDetectionSpeed)
                         val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
                         val quadriFivegramLookup = when {
                             // When model only contains primitives don't have to load quadriFivegramLookup
@@ -646,7 +642,7 @@ class LanguageDetector internal constructor(
             CompletableFuture.runAsync(
                 {
                     // Initialize values of Lazy objects
-                    val modelHolder = languageModels[it]!!.value()
+                    val modelHolder = languageModels[it]!!.value(increasedDetectionSpeed)
                     if (!isLowAccuracyModeEnabled) {
                         modelHolder.quadriFivegramLookup.value
                     }
@@ -687,15 +683,46 @@ class LanguageDetector internal constructor(
         val quadriFivegramLookup: Lazy<QuadriFivegramLookup>
     )
 
+    internal class LazyModelEntry(
+        private val modelFactory: (increasedDetectionSpeed: Boolean) -> LanguageModelHolder,
+    ) {
+        @Volatile
+        var increasedDetectionSpeed: Boolean = false
+        @Volatile
+        private var model: LanguageModelHolder? = null
+
+        fun value(increasedDetectionSpeed: Boolean): LanguageModelHolder {
+            // Double-checked locking
+            var model = this.model
+            // If increasedDetectionSpeed == true, then if necessary reload the model, but if it is false
+            // keep using the loaded model, regardless of its increasedDetectionSpeed setting to avoid reloading
+            // the models each time a detector with a different increasedDetectionSpeed setting is created
+            if (model == null || (increasedDetectionSpeed && !this.increasedDetectionSpeed)) {
+                synchronized(this) {
+                    model = this.model
+                    if (model == null || (increasedDetectionSpeed && !this.increasedDetectionSpeed)) {
+                        model = modelFactory(increasedDetectionSpeed)
+                        this.model = model
+                        this.increasedDetectionSpeed = increasedDetectionSpeed
+                    }
+                }
+            }
+            return model!!
+        }
+
+        fun reset() {
+            model = null
+        }
+    }
+
     internal companion object {
         private const val HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH = 120
 
-        internal val languageModels: Map<Language, ResettableLazy<LanguageModelHolder, Boolean>> = EnumMap(
+        internal val languageModels: Map<Language, LazyModelEntry> = EnumMap(
             Language.all().asSequence()
                 .associateWith {
                     val languageCode = it.isoCode639_1.toString()
-                    // Initially create without increased detection speed (false)
-                    ResettableLazy(false) { increasedDetectionSpeed ->
+                    LazyModelEntry { increasedDetectionSpeed ->
                         LanguageModelHolder(
                             UniBiTrigramBinarySearchLookup.fromBinary(languageCode).let { lookup ->
                                 if (increasedDetectionSpeed) lookup.asHashMapLookup() else lookup
