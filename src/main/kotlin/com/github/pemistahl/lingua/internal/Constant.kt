@@ -150,7 +150,7 @@ internal object Constant {
     )
 
     // Note: Interestingly @JvmStatic turns the function into a static one instead of adding an additional
-    // static function; not sure if that is intended or a bug in the Kotlin compiler
+    // static function (https://youtrack.jetbrains.com/issue/KT-54370), so using it here is probably an improvement
     @JvmStatic
     fun isJapaneseScript(script: Character.UnicodeScript): Boolean {
         return script == Character.UnicodeScript.HIRAGANA ||
