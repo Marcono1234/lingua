@@ -24,13 +24,14 @@ internal interface KeyIndexer<K> {
         const val NO_INDEX = -1
         private fun <E> Collection<E>.asSet() = (this as? Set) ?: this.toSet()
 
-        fun <E : Enum<E>> fromEnumConstants(constants: Collection<E>) = fromEnumConstants(constants.asSet())
+        inline fun <reified E : Enum<E>> fromEnumConstants(constants: Collection<E>) =
+            fromEnumConstants(constants.asSet())
 
         /** Creates an indexer for a subset of all enum constants. */
-        fun <E : Enum<E>> fromEnumConstants(constants: Set<E>): KeyIndexer<E> {
-            val enumClass = constants.first().declaringJavaClass
-            val allConstants = enumClass.enumConstants
-            if (allConstants.size == constants.size) return forAllEnumConstants(enumClass)
+        inline fun <reified E : Enum<E>> fromEnumConstants(constants: Set<E>): KeyIndexer<E> {
+            require(constants.isNotEmpty())
+            val allConstants = E::class.java.enumConstants
+            if (allConstants.size == constants.size) return forAllEnumConstants()
 
             val ordinalToIndex = IntArray(allConstants.size) { NO_INDEX }
 
@@ -40,26 +41,24 @@ internal interface KeyIndexer<K> {
                 index++
             }
 
-            val indexToConstant = arrayOfNulls<Any>(index)
+            val indexToConstant = arrayOfNulls<E>(index)
             constants.forEach {
                 indexToConstant[ordinalToIndex[it.ordinal]] = it
             }
+            val indicesCount = index
 
             return object : KeyIndexer<E> {
-                override fun indicesCount() = index
+                override fun indicesCount() = indicesCount
 
                 override fun keyToIndex(key: E) = ordinalToIndex[key.ordinal]
 
-                @Suppress("UNCHECKED_CAST")
-                override fun indexToKey(index: Int) = indexToConstant[index] as E
+                // Using `!!` is fine here, assuming KeyIndexer is used correctly and only valid indices are used
+                override fun indexToKey(index: Int) = indexToConstant[index]!!
             }
         }
 
-        inline fun <reified E : Enum<E>> forAllEnumConstants() = forAllEnumConstants(E::class.java)
-
-        @JvmStatic
-        fun <E : Enum<E>> forAllEnumConstants(enumClass: Class<E>): KeyIndexer<E> {
-            val enumConstants = enumClass.enumConstants
+        inline fun <reified E : Enum<E>> forAllEnumConstants(): KeyIndexer<E> {
+            val enumConstants = E::class.java.enumConstants
             return object : KeyIndexer<E> {
                 override fun indicesCount() = enumConstants.size
 
