@@ -57,6 +57,34 @@ The versioning scheme is `<version>-L<upstream-lingua-version>`. For example `1.
 Note that the upstream Lingua version number does not guarantee that all of the APIs and functionality
 are supported. Some features might be omitted (or replaced) in this library.
 
+## IntelliJ build issues
+
+IntelliJ IDEA currently has problems setting up the project when importing it from Gradle: The test
+code under `src/test/kotlin` is unable to find the classes from the main code.  
+(this only affects IntelliJ; `./gradlew` is not affected)
+
+A temporary workaround for this is:
+1. Right-click the top-level project folder in the "Project" tab and select "Open Module Settings"
+2. Remove the "buildSrc.main" module 
+3. Select the "main" module
+   1. Select the "Sources" tab
+   2. On the right remove all "Content Root" entries
+4. Safe and close the module settings
+5. Open the module settings again 
+6. Select the "main" module
+   1. Select the "Sources" tab
+   2. Click "Add Content Root"
+   3. Select `lingua/src/main` (it should automatically add the `kotlin` and `java-9` subdirectories as Source Folders)
+7. Safe and close the module settings
+
+However, when IntelliJ reloads the project from the Gradle build files this configuration change
+has to be done again.
+
+The reason for this might be the non-standard way `buildSrc/build.gradle.kts` includes source files from
+the main source code.
+
+---
+
 The original README description (possibly with some adjustments) follows below:
 
 ---
