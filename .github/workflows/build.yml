@@ -17,11 +17,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: 11
-          cache: 'gradle'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Build and test
         run: ./gradlew build
@@ -35,14 +37,9 @@ jobs:
           git diff --output=accuracy-reports.diff --exit-code
 
       - name: Upload accuracy reports diff
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         # Only run if accuracy reports differ
         if: failure() && steps.check-accuracy-reports.outcome == 'failure'
         with:
           name: accuracy-reports-diff
           path: accuracy-reports.diff
-
-      # Stop Gradle daemon to avoid having it cause issues for workflow cache creation
-      - name: Stop Gradle daemon
-        run: |
-          ./gradlew --stop
