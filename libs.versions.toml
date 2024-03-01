@@ -2,7 +2,7 @@
 # Note: When changing this also update the GitHub workflows to avoid having them download a
 # separate JDK due to version mismatch
 jdk = "11"
-targetJdk = "1.8"
+targetJdk = "11"
 
 kotlinPlugin = "1.9.10"
 

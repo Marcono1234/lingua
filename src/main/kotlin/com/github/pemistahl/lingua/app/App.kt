@@ -37,7 +37,7 @@ private fun runApp() {
 
         1: detect language with chosen languages
         2: detect language with all supported languages
-        3: launch multi-language detection GUI (Java 11+)
+        3: launch multi-language detection GUI
 
         Type a number and press <Enter>.
         Type :quit to exit.

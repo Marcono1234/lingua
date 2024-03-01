@@ -25,6 +25,7 @@ import static com.github.pemistahl.lingua.api.Language.ENGLISH;
 import static com.github.pemistahl.lingua.api.Language.FRENCH;
 import static com.github.pemistahl.lingua.api.Language.SPANISH;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Tests basic Lingua functionality. The main purpose of this test is to verify that the
@@ -37,5 +38,12 @@ class LinguaTest {
         LanguageDetector detector = LanguageDetectorBuilder.fromLanguages(ENGLISH, FRENCH, SPANISH).build();
         Language detectedLanguage = detector.detectLanguageOf("languages are awesome");
         assertEquals(ENGLISH, detectedLanguage);
+    }
+
+    @Test
+    void testKotlinStdlib() {
+        // Verify that code can access Kotlin stdlib classes (assuming some Lingua API is now or in the future
+        // exposing stdlib classes) without having to declared `requires` in `module-info`
+        assertNotNull(kotlin.KotlinVersion.CURRENT);
     }
 }

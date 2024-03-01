@@ -17,6 +17,12 @@
 module com.github.pemistahl.lingua {
     exports com.github.pemistahl.lingua.api;
 
-    requires kotlin.stdlib;
+    // 'transitive' because Lingua API might expose Kotlin stdlib types
+    // Note: This causes a spurious warning about "automatic module", even though it has an explicit
+    // module descriptor, see https://bugs.openjdk.org/browse/JDK-8235229
+    requires transitive kotlin.stdlib;
     requires it.unimi.dsi.fastutil;
+
+    // Optional; used by multi-language detection GUI
+    requires static java.desktop;
 }

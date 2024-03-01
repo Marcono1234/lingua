@@ -55,7 +55,6 @@ plugins {
     id("com.asarkar.gradle.build-time-tracker") version "3.0.1"
     id("org.jetbrains.dokka") version "1.9.10"
     id("ru.vyarus.use-python") version "2.3.0"
-    id("org.moditect.gradleplugin") version "1.0.0-rc3"
     id("com.github.johnrengelman.shadow") version "8.1.1"
     id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
     `maven-publish`
@@ -72,15 +71,22 @@ java {
         languageVersion.set(JavaLanguageVersion.of(libs.versions.jdk.get()))
     }
 }
+
+val javaModuleName = "com.github.pemistahl.lingua"
 tasks.compileJava {
-    options.release = targetJdkVersion.removePrefix("1.").toInt()
+    options.release = targetJdkVersion.toInt()
+
+    // Configure the Java compiler to see the compiled Kotlin class files
+    // Based on https://github.com/ilya-g/kotlin-jlink-examples/blob/342ccd3762aeea33ec56e2647f3e4ae96af45cf7/gradle/library/build.gradle.kts#L43-L45
+    options.compilerArgs = listOf(
+        "--patch-module", "$javaModuleName=${sourceSets.main.get().output.asPath}"
+    )
 }
 
 // Don't use `withType<KotlinCompile>` to not affect `compileTestKotlin` task
 tasks.compileKotlin {
     kotlinOptions {
-        // TODO: Cannot use this yet because the multi-language detection GUI uses Java 9 API
-        // freeCompilerArgs += listOf("-Xjdk-release=$targetJdkVersion")
+        freeCompilerArgs += listOf("-Xjdk-release=$targetJdkVersion")
         jvmTarget = targetJdkVersion
     }
 }
@@ -295,28 +301,9 @@ tasks.register<PythonTask>("writeAccuracyTable") {
     command = "src/python-scripts/write_accuracy_table.py"
 }
 
-tasks.addMainModuleInfo {
-    // Create Multi-Release JAR with Java 9 as lowest version
-    jvmVersion.set("9")
-    // Overwrite the output JAR file (if any) from a previous Gradle execution
-    overwriteExistingFiles.set(true)
-    module {
-        moduleInfoFile = File("$projectDir/src/main/java-9/module-info.java")
-    }
-
-    // Manually specify input; otherwise task seems to be erroneously considered UP-TO-DATE
-    // despite the JAR having changed, see https://github.com/moditect/moditect-gradle-plugin/pull/17
-    inputs.file(mainModule.get().inputJar)
-}
-// Workaround to avoid circular dependencies between tasks, see https://github.com/moditect/moditect-gradle-plugin/issues/14
-project.afterEvaluate {
-    val compileJavaTask = tasks.compileJava.get()
-    compileJavaTask.setDependsOn(compileJavaTask.dependsOn - tasks.addDependenciesModuleInfo.get())
-}
-
 tasks.withType<DokkaTask>().configureEach {
     dokkaSourceSets.configureEach {
-        jdkVersion.set(11) // link against Java 11 documentation
+        jdkVersion.set(17) // link against Java 17 documentation
         reportUndocumented.set(false)
         perPackageOption {
             matchingRegex.set(".*\\.(app|internal).*")
