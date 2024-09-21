@@ -24,6 +24,8 @@ import com.github.pemistahl.lingua.app.multilanguage.openMultiLanguageDetectionG
 import java.io.Console
 import java.util.Scanner
 
+// TODO: Move this and complete `app` package to separate subproject?
+
 fun main() {
     runApp()
 }
