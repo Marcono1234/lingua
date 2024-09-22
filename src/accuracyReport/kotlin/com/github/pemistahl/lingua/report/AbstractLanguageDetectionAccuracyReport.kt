@@ -405,6 +405,9 @@ abstract class AbstractLanguageDetectionAccuracyReport(
         }
 
         const val CSV_FILE_ENCODING = "UTF-8"
+
+        // Note: This seems to be misusing JUnit's @CsvFileSource a bit, assuming that no line of the language test
+        // data contains a '|', and therefore effectively treating every line as single value
         const val CSV_FILE_DELIMITER = '|'
     }
 }

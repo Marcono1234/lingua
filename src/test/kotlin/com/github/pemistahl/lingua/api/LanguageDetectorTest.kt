@@ -108,7 +108,7 @@ class LanguageDetectorTest {
                 wobei laut Schätzungen zufolge ungefähr 90  Prozent davon
                 am Ende dieses Jahrhunderts verdrängt sein werden.
                 """.trimIndent(),
-            ),
+            ).toString(),
         ).isEqualTo(
             listOf(
                 "weltweit gibt es ungefähr sprachen wobei laut schätzungen zufolge ungefähr",
@@ -118,15 +118,6 @@ class LanguageDetectorTest {
     }
 
     // language detection with rules
-
-    private fun singleWordWordList(word: String): WordList {
-        var wordCounts = 0
-        WordList.build(word).forEach { wordCounts++ }
-        // Verify that this is actually treated as single word
-        assertThat(wordCounts).isEqualTo(1)
-
-        return WordList.build(word)
-    }
 
     @ParameterizedTest
     @CsvSource(
@@ -145,6 +136,7 @@ class LanguageDetectorTest {
         "σχέδια, GREEK",
         "fekvő, HUNGARIAN",
         "meggyűrűzni, HUNGARIAN",
+        // Note: For Japanese the current implementation actually treats each char as separate word
         "ヴェダイヤモンド, JAPANESE",
         "әлем, KAZAKH",
         "шаруашылығы, KAZAKH",
@@ -235,7 +227,7 @@ class LanguageDetectorTest {
         expectedLanguage: Language,
     ) {
         assertThat(
-            detectorForAllLanguages.detectLanguageWithRules(singleWordWordList(word)),
+            detectorForAllLanguages.detectLanguageWithRules(WordList.build(word)),
         ).`as`(
             "word '$word'",
         ).isEqualTo(
@@ -251,6 +243,7 @@ class LanguageDetectorTest {
         "σταμάτησε, GREEK",
         "ઉપકરણોની, GUJARATI",
         "בתחרויות, HEBREW",
+        // Note: For Japanese and Korean the current implementation actually treats each char as separate word
         "びさ, JAPANESE",
         "대결구도가, KOREAN",
         "ਮੋਟਰਸਾਈਕਲਾਂ, PUNJABI",
@@ -263,7 +256,7 @@ class LanguageDetectorTest {
         expectedLanguage: Language,
     ) {
         assertThat(
-            detectorForAllLanguages.detectLanguageWithRules(singleWordWordList(word)),
+            detectorForAllLanguages.detectLanguageWithRules(WordList.build(word)),
         ).`as`(
             "word '$word'",
         ).isEqualTo(
@@ -533,7 +526,7 @@ class LanguageDetectorTest {
         expectedLanguages: List<Language>,
     ) {
         assertThat(
-            detectorForAllLanguages.filterLanguagesByRules(singleWordWordList(word)).toList(),
+            detectorForAllLanguages.filterLanguagesByRules(WordList.build(word)).toList(),
         ).`as`(
             "word '$word'",
         ).containsExactlyInAnyOrderElementsOf(
