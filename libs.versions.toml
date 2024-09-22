@@ -4,9 +4,20 @@
 jdk = "11"
 targetJdk = "11"
 
-kotlinPlugin = "1.9.22"
+moshi = "1.15.1"
+
+kotlinPlugin = "2.0.20"
+jacoco = "0.8.12"
 
 [libraries]
 fastutil = { module = "it.unimi.dsi:fastutil", version = "8.5.13" }
+moshi = { module = "com.squareup.moshi:moshi", version.ref = "moshi" }
+moshiKotlin = { module = "com.squareup.moshi:moshi-kotlin", version.ref = "moshi" }
 
-# TODO: Maybe specify all versions here
+junit = { module = "org.junit.jupiter:junit-jupiter", version = "5.11.0" }
+assertj = { module = "org.assertj:assertj-core", version = "3.26.3" }
+
+[plugins]
+dokka = { id = "org.jetbrains.dokka", version = "1.9.20" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version = "10.3.0" }
+shadow = { id = "com.gradleup.shadow", version = "8.3.2" }

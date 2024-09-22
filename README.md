@@ -60,7 +60,7 @@ Requirements:
 > [!NOTE]\
 > Tiny Lingua is not published to Maven Central yet, you either need to [build it yourself](#building) and
 > then for example run [`./gradlew publishToMavenLocal`](https://docs.gradle.org/8.10.1/userguide/publishing_maven.html#publishing_maven:install)
-> to install it to your local Maven repository, or use a service like [JitPack](https://jitpack.io/#Marcono1234/tiny-lingua).
+> to install it to your local Maven repository, or use a service like [JitPack](https://jitpack.io/#Marcono1234/tiny-lingua)[^1].
 
 ### Detect single language
 
@@ -166,3 +166,7 @@ has to be done again.
 
 The reason for this might be the non-standard way `buildSrc/build.gradle.kts` includes source files from
 the main source code.
+
+[^1]: Make sure that Maven Central is declared before JitPack, to make sure all other artifacts are downloaded
+from Maven Central. Additionally, for Gradle you can use [repository content filtering](https://docs.gradle.org/8.10.1/userguide/declaring_repositories_adv.html#declaring_content_exclusively_found_in_one_repository)
+to specify that JitPack is only used for Tiny Lingua.

@@ -176,7 +176,9 @@ import java.util.EnumSet
  * The supported detectable languages.
  */
 enum class Language(
+    @Suppress("PropertyName")
     val isoCode639_1: IsoCode639_1,
+    @Suppress("PropertyName")
     val isoCode639_3: IsoCode639_3,
     internal val unicodeScripts: Set<UnicodeScript>,
     /** Same as [unicodeScripts], except stored as Array */
@@ -273,14 +275,18 @@ enum class Language(
     UNKNOWN(IsoCode639_1.NONE, IsoCode639_3.NONE, emptySet());
 
     constructor (
+        @Suppress("LocalVariableName")
         isoCode639_1: IsoCode639_1,
+        @Suppress("LocalVariableName")
         isoCode639_3: IsoCode639_3,
         unicodeScripts: Set<UnicodeScript>,
         uniqueCharacters: String
     ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), uniqueCharacters)
 
     constructor (
+        @Suppress("LocalVariableName")
         isoCode639_1: IsoCode639_1,
+        @Suppress("LocalVariableName")
         isoCode639_3: IsoCode639_3,
         unicodeScripts: Set<UnicodeScript>
     ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), null)

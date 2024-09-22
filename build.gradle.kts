@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-import com.adarshr.gradle.testlogger.theme.ThemeType
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.dokka.gradle.DokkaTask
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import ru.vyarus.gradle.plugin.python.task.PythonTask
 import java.nio.file.Files
@@ -49,20 +50,16 @@ version = "$projectVersion-L$upstreamProjectVersion"
 description = linguaDescription
 
 plugins {
-    kotlin("jvm") version libs.versions.kotlinPlugin.get()
-    id("org.jlleitschuh.gradle.ktlint") version "10.3.0"
-    id("com.adarshr.test-logger") version "3.2.0"
-    id("com.asarkar.gradle.build-time-tracker") version "3.0.1"
-    id("org.jetbrains.dokka") version "1.9.10"
+    kotlin("jvm") version libs.versions.kotlinPlugin
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.dokka)
     id("ru.vyarus.use-python") version "2.3.0"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    alias(libs.plugins.shadow)
     id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
     `maven-publish`
     signing
     jacoco
 }
-
-jacoco.toolVersion = "0.8.8"
 
 val targetJdkVersion = libs.versions.targetJdk.get()
 
@@ -78,25 +75,19 @@ tasks.compileJava {
 
     // Configure the Java compiler to see the compiled Kotlin class files
     // Based on https://github.com/ilya-g/kotlin-jlink-examples/blob/342ccd3762aeea33ec56e2647f3e4ae96af45cf7/gradle/library/build.gradle.kts#L43-L45
-    options.compilerArgs = listOf(
-        "--patch-module", "$javaModuleName=${sourceSets.main.get().output.asPath}"
-    )
+    options.compilerArgs = listOf("--patch-module", "$javaModuleName=${sourceSets.main.get().output.asPath}")
 }
 
 // Don't use `withType<KotlinCompile>` to not affect `compileTestKotlin` task
 tasks.compileKotlin {
-    kotlinOptions {
-        freeCompilerArgs += listOf("-Xjdk-release=$targetJdkVersion")
-        jvmTarget = targetJdkVersion
+    compilerOptions {
+        // Prevent using newer JDK API by accident, see https://kotlinlang.org/docs/compiler-reference.html#xjdk-release-version
+        freeCompilerArgs.add("-Xjdk-release=$targetJdkVersion")
+        jvmTarget.set(JvmTarget.fromTarget(targetJdkVersion))
     }
 }
 
 sourceSets {
-    main {
-        resources {
-            exclude("training-data/**")
-        }
-    }
     create("accuracyReport") {
         compileClasspath += sourceSets.main.get().output
         runtimeClasspath += sourceSets.main.get().output
@@ -111,6 +102,15 @@ configurations["accuracyReportRuntimeOnly"].extendsFrom(configurations.runtimeOn
 
 tasks.withType<Test> {
     useJUnitPlatform { failFast = false }
+
+    testLogging {
+        events = setOf(TestLogEvent.SKIPPED, TestLogEvent.FAILED)
+
+        showExceptions = true
+        showStackTraces = true
+        showCauses = true
+        exceptionFormat = TestExceptionFormat.FULL
+    }
 }
 
 tasks.test {
@@ -135,8 +135,12 @@ tasks.check {
     dependsOn(testing.suites.named("testJavaModule"))
 }
 
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
+}
+// Note: Currently has to be executed manually, maybe run it by default in the future?
 tasks.jacocoTestReport {
-    dependsOn("test")
+    dependsOn(tasks.test)
     reports {
         xml.required.set(true)
         csv.required.set(false)
@@ -148,7 +152,7 @@ tasks.jacocoTestReport {
                 fileTree(it) {
                     exclude("**/app/**")
                 }
-            }
+            },
         )
     )
 }
@@ -160,34 +164,28 @@ tasks.register<Test>("accuracyReport") {
     classpath = sourceSets["accuracyReport"].runtimeClasspath
 
     val allowedDetectors = linguaSupportedDetectors.split(',')
-    val detectors = if (project.hasProperty("detectors"))
-        project.property("detectors").toString().split(Regex("\\s*,\\s*"))
-    else allowedDetectors
+    val detectors = project.findProperty("detectors")?.toString()?.split(Regex("\\s*,\\s*"))
+        ?: allowedDetectors
 
     detectors.filterNot { it in allowedDetectors }.forEach {
         throw GradleException(
             """
             detector '$it' does not exist
-            supported detectors: ${allowedDetectors.joinToString(
-                ", "
-            )}
+            supported detectors: ${allowedDetectors.joinToString(", ")}
             """.trimIndent()
         )
     }
 
     val allowedLanguages = linguaSupportedLanguages.split(',')
-    val languages = if (project.hasProperty("languages"))
-        project.property("languages").toString().split(Regex("\\s*,\\s*"))
-    else allowedLanguages
+    val languages = project.findProperty("languages")?.toString()?.split(Regex("\\s*,\\s*"))
+        ?: allowedLanguages
 
     languages.filterNot { it in allowedLanguages }.forEach {
         throw GradleException("language '$it' is not supported")
     }
 
     val availableCpuCores = Runtime.getRuntime().availableProcessors()
-    val cpuCoresRepr = if (project.hasProperty("cpuCores"))
-        project.property("cpuCores").toString()
-    else "1"
+    val cpuCoresRepr = project.findProperty("cpuCores")?.toString() ?: "1"
 
     val cpuCores = try {
         cpuCoresRepr.toInt()
@@ -210,12 +208,6 @@ tasks.register<Test>("accuracyReport") {
     reports.html.required.set(false)
     reports.junitXml.required.set(false)
 
-    testlogger {
-        theme = ThemeType.STANDARD_PARALLEL
-        showPassed = false
-        showSkipped = false
-    }
-
     filter {
         detectors.forEach { detector ->
             languages.forEach { language ->
@@ -228,7 +220,7 @@ tasks.register<Test>("accuracyReport") {
     }
 }
 
-tasks.register("writeAggregatedAccuracyReport") {
+val writeAggregatedAccuracyReport by tasks.registering {
     group = linguaTaskGroup
     description = "Creates a table from all accuracy detection reports and writes it to a CSV file."
 
@@ -288,14 +280,14 @@ tasks.register("writeAggregatedAccuracyReport") {
 }
 
 tasks.register<PythonTask>("drawAccuracyPlots") {
-    dependsOn("writeAggregatedAccuracyReport")
+    dependsOn(writeAggregatedAccuracyReport)
     group = linguaTaskGroup
     description = "Draws plots showing the results of the accuracy detection reports."
     command = "src/python-scripts/draw_accuracy_plots.py"
 }
 
 tasks.register<PythonTask>("writeAccuracyTable") {
-    dependsOn("writeAggregatedAccuracyReport")
+    dependsOn(writeAggregatedAccuracyReport)
     group = linguaTaskGroup
     description = "Creates HTML table from all accuracy detection results and writes it to a markdown file."
     command = "src/python-scripts/write_accuracy_table.py"
@@ -312,44 +304,47 @@ tasks.withType<DokkaTask>().configureEach {
     }
 }
 
-tasks.register<Jar>("dokkaJavadocJar") {
-    dependsOn("dokkaJavadoc")
+val dokkaJavadocJar by tasks.registering(Jar::class) {
     group = "Build"
     description = "Assembles a jar archive containing Javadoc documentation."
     archiveClassifier = "javadoc"
-    from(layout.buildDirectory.dir("dokka/javadoc"))
+    from(tasks.dokkaHtml.flatMap { it.outputDirectory })
 }
-tasks.register<Jar>("dokkaHtmlJar") {
-    dependsOn("dokkaHtml")
+val dokkaHtmlJar by tasks.registering(Jar::class) {
     group = "Build"
     description = "Assembles a jar archive containing Dokka HTML documentation."
     archiveClassifier = "dokka-html"
-    from(layout.buildDirectory.dir("dokka/html"))
+    from(tasks.dokkaJavadoc.flatMap { it.outputDirectory })
 }
 
-tasks.register<Jar>("sourcesJar") {
+val sourcesJar by tasks.registering(Jar::class) {
     group = "Build"
     description = "Assembles a jar archive containing the main source code."
     archiveClassifier = "sources"
-    from("src/main/kotlin")
+    // This also seems to include `module-info.java`, as desired
+    from(sourceSets.main.get().kotlin)
 }
 
-tasks.register<ShadowJar>("jarWithDependencies") {
+tasks.shadowJar {
     group = "Build"
     description = "Assembles a jar archive containing the main classes and all external dependencies."
     archiveClassifier = "with-dependencies"
-    from(sourceSets.main.get().output)
-    configurations = listOf(project.configurations.runtimeClasspath.get())
-    setEnableRelocation(true)
-    manifest { attributes("Main-Class" to linguaMainClass) }
-}
+    isEnableRelocation = true
+    duplicatesStrategy = DuplicatesStrategy.FAIL
 
-tasks.register<JavaExec>("runLinguaOnConsole") {
-    group = linguaTaskGroup
-    description = "Starts a REPL (read-evaluate-print loop) to try Lingua on the command line."
-    mainClass = linguaMainClass
-    standardInput = System.`in`
-    classpath = sourceSets["main"].runtimeClasspath
+    manifest {
+        attributes(
+            "Main-Class" to linguaMainClass,
+
+            // Note: Depending on the dependencies, might have to set `Multi-Release: true`, see https://github.com/johnrengelman/shadow/issues/449
+        )
+    }
+    // Exclude `module-info` from dependencies, see also https://github.com/johnrengelman/shadow/issues/729
+    exclude("**/module-info.class")
+}
+// Build JAR with dependencies by default
+tasks.assemble {
+    dependsOn(tasks.shadowJar)
 }
 
 val lingua by configurations.creating {
@@ -360,24 +355,25 @@ val lingua by configurations.creating {
 }
 
 @Suppress("PropertyName")
-val modelOutputDir_ = layout.buildDirectory.dir("generated/language-models").get().asFile
+val modelOutputDir_ = layout.buildDirectory.dir("generated/language-models")
 val createLanguageModels by tasks.registering(GenerateLanguageModelsTask::class) {
     linguaArtifact.set(lingua.singleFile)
     modelOutputDir.set(modelOutputDir_)
 
     finalizedBy(checkLanguageModelsChecksum)
 }
-sourceSets.main.get().output.dir(mutableMapOf<String, Any>("builtBy" to createLanguageModels), modelOutputDir_)
+sourceSets.main {
+    output.dir(mutableMapOf<String, Any>("builtBy" to createLanguageModels), modelOutputDir_)
+}
 
 // Check whether generated models match expected checksum; this is done mainly to verify that model
 // generation is deterministic
-val expectedModelsChecksum = "40b984db2677430e3a341796eaecab1cfee605dafd99d6fc5d56c731803e23fb"
 // Note: This is a separate task to not cause model generation task to fail, which would require regenerating
 // models a second time when checksum becomes outdated
 val checkLanguageModelsChecksum by tasks.registering {
     doLast {
         val messageDigest = MessageDigest.getInstance("SHA-256")
-        val startDir = modelOutputDir_.toPath()
+        val startDir = modelOutputDir_.get().asFile.toPath()
         Files.walk(startDir).use { files ->
             // Sort files because the iteration order is important for checksum creation
             files.filter(Files::isRegularFile).sorted(
@@ -400,6 +396,7 @@ val checkLanguageModelsChecksum by tasks.registering {
             it.toInt().and(0xFF).toString(16).padStart(2, '0')
         }
 
+        val expectedModelsChecksum: String by project
         if (actualChecksum != expectedModelsChecksum) {
             throw Exception(
                 """
@@ -417,9 +414,8 @@ dependencies {
 
     implementation(libs.fastutil)
 
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testImplementation("org.assertj:assertj-core:3.25.3")
-    testImplementation("io.mockk:mockk:1.13.10")
+    testImplementation(libs.junit)
+    testImplementation(libs.assertj)
 
     accuracyReportImplementation("com.optimaize.languagedetector:language-detector:0.6")
     accuracyReportImplementation("org.apache.opennlp:opennlp-tools:1.9.4")
@@ -444,10 +440,10 @@ publishing {
 
             from(components["kotlin"])
 
-            artifact(tasks["sourcesJar"])
-            artifact(tasks["jarWithDependencies"])
-            artifact(tasks["dokkaJavadocJar"])
-            artifact(tasks["dokkaHtmlJar"])
+            artifact(sourcesJar)
+            artifact(tasks.shadowJar)
+            artifact(dokkaJavadocJar)
+            artifact(dokkaHtmlJar)
 
             pom {
                 name.set(linguaName)

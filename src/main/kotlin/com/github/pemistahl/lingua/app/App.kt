@@ -34,7 +34,7 @@ private fun runApp() {
 
     println(
         """
-        This is Tiny Lingua, a fork of Lingua.
+        This is Tiny Lingua, a language detection library.
         Select the action you want to perform:
 
         1: detect language with chosen languages
@@ -43,6 +43,8 @@ private fun runApp() {
 
         Type a number and press <Enter>.
         Type :quit to exit.
+
+        Visit https://github.com/Marcono1234/tiny-lingua for more information.
 
         """.trimIndent()
     )
