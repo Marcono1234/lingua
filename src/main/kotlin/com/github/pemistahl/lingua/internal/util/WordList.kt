@@ -94,7 +94,10 @@ internal class WordList private constructor(
             return text[i]
         }
 
-        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
+        override fun subSequence(
+            startIndex: Int,
+            endIndex: Int,
+        ): CharSequence {
             // Currently not needed by this project
             throw UnsupportedOperationException()
         }
@@ -116,20 +119,22 @@ internal class WordList private constructor(
 
         while (positionsIndex < maxPositionsIndex) {
             var byte0 = positions[positionsIndex++]
-            val offset = if (byte0 < 0) {
-                val byte1 = positions[positionsIndex++]
-                byte0.toInt().and(0b0111_1111).or(byte1.toInt().and(0b1111_1111).shl(7))
-            } else {
-                byte0.toInt()
-            }
+            val offset =
+                if (byte0 < 0) {
+                    val byte1 = positions[positionsIndex++]
+                    byte0.toInt().and(0b0111_1111).or(byte1.toInt().and(0b1111_1111).shl(7))
+                } else {
+                    byte0.toInt()
+                }
 
             byte0 = positions[positionsIndex++]
-            val length = if (byte0 < 0) {
-                val byte1 = positions[positionsIndex++]
-                byte0.toInt().and(0b0111_1111).or(byte1.toInt().and(0b1111_1111).shl(7))
-            } else {
-                byte0.toInt()
-            }
+            val length =
+                if (byte0 < 0) {
+                    val byte1 = positions[positionsIndex++]
+                    byte0.toInt().and(0b0111_1111).or(byte1.toInt().and(0b1111_1111).shl(7))
+                } else {
+                    byte0.toInt()
+                }
 
             val start = lastEnd + offset
             val end = start + length

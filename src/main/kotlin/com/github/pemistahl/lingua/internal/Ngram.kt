@@ -33,8 +33,11 @@ internal value class PrimitiveNgram(val value: Long) {
     }
 
     operator fun component1() = getLength()
+
     operator fun component2() = (value shr 8).toInt().toChar()
+
     operator fun component3() = (value shr 24).toInt().toChar()
+
     operator fun component4() = (value shr 40).toInt().toChar()
 
     /**
@@ -56,35 +59,46 @@ internal value class PrimitiveNgram(val value: Long) {
         const val MAX_NGRAM_LENGTH = 3
         const val NONE = 0L
 
-        fun of(string: CharSequence, startIndex: Int, length: Int): PrimitiveNgram {
+        fun of(
+            string: CharSequence,
+            startIndex: Int,
+            length: Int,
+        ): PrimitiveNgram {
             return when (length) {
-                1 -> PrimitiveNgram(
-                    1L
-                        or (string[startIndex + 0].code.toLong() shl 8)
-                )
-                2 -> PrimitiveNgram(
-                    2L
-                        or (string[startIndex + 0].code.toLong() shl 8)
-                        or (string[startIndex + 1].code.toLong() shl 24)
-                )
-                3 -> PrimitiveNgram(
-                    3L
-                        or (string[startIndex + 0].code.toLong() shl 8)
-                        or (string[startIndex + 1].code.toLong() shl 24)
-                        or (string[startIndex + 2].code.toLong() shl 40)
-                )
+                1 ->
+                    PrimitiveNgram(
+                        1L
+                            or (string[startIndex + 0].code.toLong() shl 8),
+                    )
+                2 ->
+                    PrimitiveNgram(
+                        2L
+                            or (string[startIndex + 0].code.toLong() shl 8)
+                            or (string[startIndex + 1].code.toLong() shl 24),
+                    )
+                3 ->
+                    PrimitiveNgram(
+                        3L
+                            or (string[startIndex + 0].code.toLong() shl 8)
+                            or (string[startIndex + 1].code.toLong() shl 24)
+                            or (string[startIndex + 2].code.toLong() shl 40),
+                    )
                 // For now don't support larger ngrams, otherwise would complicate
                 // encoding since there would not be 16bits per char
                 else -> PrimitiveNgram(NONE)
             }
         }
 
-        fun of(char0: Char, char1: Char, char2: Char): PrimitiveNgram {
+        fun of(
+            char0: Char,
+            char1: Char,
+            char2: Char,
+        ): PrimitiveNgram {
             return PrimitiveNgram(
                 3L
                     or (char0.code.toLong() shl 8)
                     or (char1.code.toLong() shl 24)
-                    or (char2.code.toLong() shl 40)
+                    or (char2.code.toLong() shl 40),
             )
         }
     }
@@ -93,7 +107,7 @@ internal value class PrimitiveNgram(val value: Long) {
 @JvmInline
 internal value class ReusableObjectNgram(
     /** First element is the length encoded as Char, other elements are the chars */
-    val value: CharArray = CharArray(1 + 5)
+    val value: CharArray = CharArray(1 + 5),
 ) {
     fun setNgram(ngram: CharSequence) {
         val length = ngram.length
@@ -107,10 +121,15 @@ internal value class ReusableObjectNgram(
     fun length() = value[0].code
 
     operator fun component1() = length()
+
     operator fun component2() = value[1]
+
     operator fun component3() = value[2]
+
     operator fun component4() = value[3]
+
     operator fun component5() = value[4]
+
     operator fun component6() = value[5]
 
     /**

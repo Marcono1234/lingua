@@ -18,29 +18,35 @@ package com.github.pemistahl.lingua.internal.model.floatmap
 import it.unimi.dsi.fastutil.floats.FloatCollection
 import it.unimi.dsi.fastutil.floats.FloatLinkedOpenHashSet
 
-private inline fun FloatArray.forEachIndexedStartingAt(start: Int, action: (index: Int, f: Float) -> Unit) {
+private inline fun FloatArray.forEachIndexedStartingAt(
+    start: Int,
+    action: (index: Int, f: Float) -> Unit,
+) {
     for (i in start until size) {
         action(i - start, get(i))
     }
 }
 
-private inline fun FloatArray.forEachIndexedUntil(endExclusive: Int, action: (index: Int, f: Float) -> Unit) {
+private inline fun FloatArray.forEachIndexedUntil(
+    endExclusive: Int,
+    action: (index: Int, f: Float) -> Unit,
+) {
     repeat(endExclusive) {
         action(it, get(it))
     }
 }
 
-internal const val maxIndirectionIndices = 65536 // number of values representable by a short
+internal const val MAX_INDIRECTION_INDICES = 65536 // number of values representable by a short
 
 internal inline fun <T> createValueArrays(
     floatValues: FloatCollection,
-    resultHandler: (indValuesIndices: ShortArray, values: FloatArray) -> T
+    resultHandler: (indValuesIndices: ShortArray, values: FloatArray) -> T,
 ) = createValueArrays(floatValues.toFloatArray(), resultHandler)
 
 // Uses FloatArray to avoid boxing and for faster lookup
 internal inline fun <T> createValueArrays(
     floatValues: FloatArray,
-    resultHandler: (indValuesIndices: ShortArray, values: FloatArray) -> T
+    resultHandler: (indValuesIndices: ShortArray, values: FloatArray) -> T,
 ): T {
     val indirectValues = FloatLinkedOpenHashSet()
     var indirectLookupEndIndex = 0
@@ -49,7 +55,7 @@ internal inline fun <T> createValueArrays(
         floatValues.forEach {
             // Only have to break the loop if value is not contained and max size is reached
             if (!indirectValues.contains(it)) {
-                if (indirectValues.size >= maxIndirectionIndices) {
+                if (indirectValues.size >= MAX_INDIRECTION_INDICES) {
                     return@indirectlyAccessibleValues
                 }
 

@@ -55,6 +55,7 @@ import java.util.concurrent.Executor
 import kotlin.math.ln
 
 private const val FULL_WORD_VALUE = 1.0
+
 /**
  * Word value for a logogram.
  *
@@ -77,23 +78,28 @@ class LanguageDetector internal constructor(
     internal val numberOfLoadedLanguages: Int = languages.size,
 ) {
     // Stored as Array to reduce object creation during iteration
-    private val languagesWithUniqueCharacters = languages.filterNot { it.uniqueCharacters.isNullOrBlank() }
-        .toTypedArray()
-    private val alphabetsSupportingExactlyOneLanguage = enumMapOf(
-        Language.scriptsSupportingExactlyOneLanguage.filterValues {
-            it in languages
-        }
-    )
+    private val languagesWithUniqueCharacters =
+        languages.filterNot { it.uniqueCharacters.isNullOrBlank() }
+            .toTypedArray()
+    private val alphabetsSupportingExactlyOneLanguage =
+        enumMapOf(
+            Language.scriptsSupportingExactlyOneLanguage.filterValues {
+                it in languages
+            },
+        )
+
     /** Indexer for maps containing only the constants of [languages] as key */
     private val languagesSubsetIndexer = KeyIndexer.fromEnumConstants(languages)
+
     /** Indexer for maps used as part of rule based word detection */
-    private val wordLanguagesSubsetIndexer = KeyIndexer.fromEnumConstants(
-        languagesWithUniqueCharacters
-            .plus(alphabetsSupportingExactlyOneLanguage.values)
-            // Japanese and Chinese have custom detection
-            .plus(listOf(UNKNOWN, JAPANESE, CHINESE))
-            .toSet()
-    )
+    private val wordLanguagesSubsetIndexer =
+        KeyIndexer.fromEnumConstants(
+            languagesWithUniqueCharacters
+                .plus(alphabetsSupportingExactlyOneLanguage.values)
+                // Japanese and Chinese have custom detection
+                .plus(listOf(UNKNOWN, JAPANESE, CHINESE))
+                .toSet(),
+        )
 
     init {
         if (isEveryLanguageModelPreloaded) {
@@ -214,9 +220,9 @@ class LanguageDetector internal constructor(
         return Object2DoubleSortedMaps.singleton(language, 1.0)
     }
 
-    internal fun computeLanguageConfidenceValuesFuture(text: String):
-        CompletableFuture<Object2DoubleSortedMap<Language>> {
-
+    internal fun computeLanguageConfidenceValuesFuture(
+        text: String,
+    ): CompletableFuture<Object2DoubleSortedMap<Language>> {
         val cleanedUpText = cleanUpInputText(text)
 
         if (cleanedUpText.isEmpty() || !cleanedUpText.codePoints().anyMatch(Character::isLetter)) {
@@ -242,28 +248,33 @@ class LanguageDetector internal constructor(
         }
 
         val isLongText = cleanedUpText.length >= HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH
-        val ngramSizeRange = if (isLongText || isLowAccuracyModeEnabled) {
-            (3..3)
-        } else {
-            (1..5)
-        }
+        val ngramSizeRange =
+            if (isLongText || isLowAccuracyModeEnabled) {
+                (3..3)
+            } else {
+                (1..5)
+            }
         return ngramSizeRange.filter { i -> cleanedUpText.length >= i }
             .map { ngramLength ->
                 val testDataModel = TestDataLanguageModel.fromText(cleanedUpText, ngramLength)
                 computeLanguageProbabilities(testDataModel, filteredLanguages)
                     .thenApply { probabilities ->
-                        val unigramCounts = if (ngramLength == 1) {
-                            val languages = probabilities.getNonZeroKeys()
+                        val unigramCounts =
+                            if (ngramLength == 1) {
+                                val languages = probabilities.getNonZeroKeys()
 
-                            val unigramFilteredLanguages =
-                                if (languages.isNotEmpty()) filteredLanguages.asSequence()
-                                    .filter { languages.contains(it) }
-                                    .toSet()
-                                else filteredLanguages
-                            countUnigramsOfInputText(testDataModel, unigramFilteredLanguages)
-                        } else {
-                            null
-                        }
+                                val unigramFilteredLanguages =
+                                    if (languages.isNotEmpty()) {
+                                        filteredLanguages.asSequence()
+                                            .filter { languages.contains(it) }
+                                            .toSet()
+                                    } else {
+                                        filteredLanguages
+                                    }
+                                countUnigramsOfInputText(testDataModel, unigramFilteredLanguages)
+                            } else {
+                                null
+                            }
 
                         return@thenApply Pair(probabilities, unigramCounts)
                     }
@@ -271,11 +282,13 @@ class LanguageDetector internal constructor(
             .allOfToList()
             .thenApply { allProbabilitiesAndUnigramCounts ->
                 val allProbabilities = allProbabilitiesAndUnigramCounts.map { (probabilities, _) -> probabilities }
-                val unigramCounts = allProbabilitiesAndUnigramCounts[0].second
-                    ?: EnumIntMap.newMap(languagesSubsetIndexer)
+                val unigramCounts =
+                    allProbabilitiesAndUnigramCounts[0].second
+                        ?: EnumIntMap.newMap(languagesSubsetIndexer)
                 val summedUpProbabilities = sumUpProbabilities(allProbabilities, unigramCounts, filteredLanguages)
-                val highestProbability = summedUpProbabilities.maxValueOrNull()
-                    ?: return@thenApply Object2DoubleSortedMaps.emptyMap()
+                val highestProbability =
+                    summedUpProbabilities.maxValueOrNull()
+                        ?: return@thenApply Object2DoubleSortedMaps.emptyMap()
                 val confidenceValues = summedUpProbabilities.mapNonZeroValues { highestProbability / it }
                 return@thenApply confidenceValues.sortedByNonZeroDescendingValue()
             }
@@ -308,8 +321,8 @@ class LanguageDetector internal constructor(
             .replaceAll(
                 listOf(
                     NUMBERS_AND_PUNCTUATION to "",
-                    MULTIPLE_WHITESPACE to " "
-                )
+                    MULTIPLE_WHITESPACE to " ",
+                ),
             )
     }
 
@@ -320,7 +333,7 @@ class LanguageDetector internal constructor(
 
     private fun countUnigramsOfInputText(
         unigramLanguageModel: TestDataLanguageModel,
-        filteredLanguages: Set<Language>
+        filteredLanguages: Set<Language>,
     ): EnumIntMap<Language> {
         val unigramCounts = EnumIntMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
@@ -340,7 +353,7 @@ class LanguageDetector internal constructor(
     private fun sumUpProbabilities(
         probabilities: List<EnumDoubleMap<Language>>,
         unigramCountsOfInputText: EnumIntMap<Language>,
-        filteredLanguages: Set<Language>
+        filteredLanguages: Set<Language>,
     ): EnumDoubleMap<Language> {
         val summedUpProbabilities = EnumDoubleMap.newMap(languagesSubsetIndexer)
         for (language in filteredLanguages) {
@@ -497,9 +510,10 @@ class LanguageDetector internal constructor(
             }
         }
 
-        val filteredLanguages = languages.filter {
-            it.unicodeScriptsArray.any { script -> mostFrequentAlphabets.contains(script) }
-        }
+        val filteredLanguages =
+            languages.filter {
+                it.unicodeScriptsArray.any { script -> mostFrequentAlphabets.contains(script) }
+            }
         val languageCounts = EnumIntMap.newMap(languagesWithCharsIndexer)
 
         // Reuse same EnumSet to avoid creating new instances per word
@@ -538,19 +552,21 @@ class LanguageDetector internal constructor(
                     {
                         val modelHolder = languageModels[language]!!.value(increasedDetectionSpeed)
                         val uniBiTrigramsLookup = modelHolder.uniBiTrigramsLookup
-                        val quadriFivegramLookup = when {
-                            // When model only contains primitives don't have to load quadriFivegramLookup
-                            testDataModel.hasOnlyPrimitives() -> QuadriFivegramLookup.empty
-                            else -> modelHolder.quadriFivegramLookup.value
-                        }
+                        val quadriFivegramLookup =
+                            when {
+                                // When model only contains primitives don't have to load quadriFivegramLookup
+                                testDataModel.hasOnlyPrimitives() -> QuadriFivegramLookup.empty
+                                else -> modelHolder.quadriFivegramLookup.value
+                            }
 
-                        return@supplyAsync language to computeSumOfNgramProbabilities(
-                            uniBiTrigramsLookup,
-                            quadriFivegramLookup,
-                            testDataModel
-                        )
+                        return@supplyAsync language to
+                            computeSumOfNgramProbabilities(
+                                uniBiTrigramsLookup,
+                                quadriFivegramLookup,
+                                testDataModel,
+                            )
                     },
-                    executor
+                    executor,
                 )
             }
             .allOfToList()
@@ -577,7 +593,7 @@ class LanguageDetector internal constructor(
     private fun computeSumOfNgramProbabilities(
         uniBiTrigramsLookup: UniBiTrigramLookup,
         quadriFivegramLookup: QuadriFivegramLookup,
-        testDataModel: TestDataLanguageModel
+        testDataModel: TestDataLanguageModel,
     ): Double {
         var probabilitySum = 0.0
         // Reuse same object to avoid creating new objects for sub-ngrams
@@ -590,14 +606,19 @@ class LanguageDetector internal constructor(
             var currentPrimitive: PrimitiveNgram
             while (true) {
                 val (length, char0, char1, char2, char3, char4) = objectNgram
-                val probability = quadriFivegramLookup.getFrequency(
-                    length,
-                    char0, char1, char2, char3, char4
-                ) {
-                    assert(ngram.length == 5)
-                    // Return the original ngram String (assuming it is a fivegram)
-                    ngram
-                }
+                val probability =
+                    quadriFivegramLookup.getFrequency(
+                        length,
+                        char0,
+                        char1,
+                        char2,
+                        char3,
+                        char4,
+                    ) {
+                        assert(ngram.length == 5)
+                        // Return the original ngram String (assuming it is a fivegram)
+                        ngram
+                    }
 
                 if (probability > 0) {
                     probabilitySum += ln(probability)
@@ -638,32 +659,34 @@ class LanguageDetector internal constructor(
     }
 
     private fun preloadLanguageModels() {
-        val futures = languages.map {
-            CompletableFuture.runAsync(
-                {
-                    // Initialize values of Lazy objects
-                    val modelHolder = languageModels[it]!!.value(increasedDetectionSpeed)
-                    if (!isLowAccuracyModeEnabled) {
-                        modelHolder.quadriFivegramLookup.value
-                    }
-                },
-                executor
-            )
-        }.toTypedArray()
+        val futures =
+            languages.map {
+                CompletableFuture.runAsync(
+                    {
+                        // Initialize values of Lazy objects
+                        val modelHolder = languageModels[it]!!.value(increasedDetectionSpeed)
+                        if (!isLowAccuracyModeEnabled) {
+                            modelHolder.quadriFivegramLookup.value
+                        }
+                    },
+                    executor,
+                )
+            }.toTypedArray()
         // Wait for futures to finish, to let caller know in case loading fails
         CompletableFuture.allOf(*futures).join()
     }
 
-    override fun equals(other: Any?) = when {
-        this === other -> true
-        other !is LanguageDetector -> false
-        languages != other.languages -> false
-        minimumRelativeDistance != other.minimumRelativeDistance -> false
-        isLowAccuracyModeEnabled != other.isLowAccuracyModeEnabled -> false
-        executor != other.executor -> false
-        increasedDetectionSpeed != other.increasedDetectionSpeed -> false
-        else -> true
-    }
+    override fun equals(other: Any?) =
+        when {
+            this === other -> true
+            other !is LanguageDetector -> false
+            languages != other.languages -> false
+            minimumRelativeDistance != other.minimumRelativeDistance -> false
+            isLowAccuracyModeEnabled != other.isLowAccuracyModeEnabled -> false
+            executor != other.executor -> false
+            increasedDetectionSpeed != other.increasedDetectionSpeed -> false
+            else -> true
+        }
 
     override fun hashCode() =
         31 * languages.hashCode() + minimumRelativeDistance.hashCode() + isLowAccuracyModeEnabled.hashCode() +
@@ -680,7 +703,7 @@ class LanguageDetector internal constructor(
         val uniBiTrigramsLookup: UniBiTrigramLookup,
         // Lookup for quadrigrams and fivegrams is lazy since it won't be used when
         // large texts are analyzed
-        val quadriFivegramLookup: Lazy<QuadriFivegramLookup>
+        val quadriFivegramLookup: Lazy<QuadriFivegramLookup>,
     )
 
     internal class LazyModelEntry(
@@ -688,6 +711,7 @@ class LanguageDetector internal constructor(
     ) {
         @Volatile
         var increasedDetectionSpeed: Boolean = false
+
         @Volatile
         private var model: LanguageModelHolder? = null
 
@@ -730,23 +754,24 @@ class LanguageDetector internal constructor(
     internal companion object {
         private const val HIGH_ACCURACY_MODE_MAX_TEXT_LENGTH = 120
 
-        internal val languageModels: Map<Language, LazyModelEntry> = EnumMap(
-            Language.all().asSequence()
-                .associateWith {
-                    val languageCode = it.isoCode639_1.toString()
-                    LazyModelEntry { increasedDetectionSpeed ->
-                        LanguageModelHolder(
-                            UniBiTrigramBinarySearchLookup.fromBinary(languageCode).let { lookup ->
-                                if (increasedDetectionSpeed) lookup.asHashMapLookup() else lookup
-                            },
-                            lazy {
-                                QuadriFivegramBinarySearchLookup.fromBinary(languageCode).let { lookup ->
+        internal val languageModels: Map<Language, LazyModelEntry> =
+            EnumMap(
+                Language.all().asSequence()
+                    .associateWith {
+                        val languageCode = it.isoCode639_1.toString()
+                        LazyModelEntry { increasedDetectionSpeed ->
+                            LanguageModelHolder(
+                                UniBiTrigramBinarySearchLookup.fromBinary(languageCode).let { lookup ->
                                     if (increasedDetectionSpeed) lookup.asHashMapLookup() else lookup
-                                }
-                            }
-                        )
-                    }
-                }
-        )
+                                },
+                                lazy {
+                                    QuadriFivegramBinarySearchLookup.fromBinary(languageCode).let { lookup ->
+                                        if (increasedDetectionSpeed) lookup.asHashMapLookup() else lookup
+                                    }
+                                },
+                            )
+                        }
+                    },
+            )
     }
 }

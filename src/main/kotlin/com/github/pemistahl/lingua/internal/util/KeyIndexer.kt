@@ -22,6 +22,7 @@ internal interface KeyIndexer<K> {
 
     companion object {
         const val NO_INDEX = -1
+
         private fun <E> Collection<E>.asSet() = (this as? Set) ?: this.toSet()
 
         inline fun <reified E : Enum<E>> fromEnumConstants(constants: Collection<E>) =

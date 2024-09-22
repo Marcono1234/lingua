@@ -17,7 +17,7 @@ import java.util.TreeSet
 private const val NO_VALUE = (-1).toShort()
 
 internal class CharOffsetsData(
-    private val offsetMap: Char2ShortMap
+    private val offsetMap: Char2ShortMap,
 ) {
     companion object {
         fun createCharOffsetsData(ngrams: Sequence<String>): CharOffsetsData {
@@ -26,10 +26,11 @@ internal class CharOffsetsData(
             ngrams.forEach { ngram -> ngram.forEach { charCounts.addTo(it, 1) } }
 
             // Sort by occurrence count; most frequent chars first
-            val charRanks = TreeSet(
-                Comparator.comparingInt(Char2IntMap.Entry::getIntValue).reversed()
-                    .thenComparingInt { e -> e.charKey.code }
-            )
+            val charRanks =
+                TreeSet(
+                    Comparator.comparingInt(Char2IntMap.Entry::getIntValue).reversed()
+                        .thenComparingInt { e -> e.charKey.code },
+                )
             charCounts.char2IntEntrySet().forEach(charRanks::add)
 
             // Use linked map here to make sure `writeBinary` uses consistent order
@@ -132,14 +133,14 @@ internal class CharOffsetsData(
                 charOffset0
                     or (charOffset1 shl 11)
                     or (charOffset2 shl 11 * 2)
-                )
+            )
             asInt(encoded)
         } else {
             val encoded = (
                 char0.code.toLong()
                     or (char1.code.toLong() shl 16)
                     or (char2.code.toLong() shl 32)
-                )
+            )
             asLong(encoded)
         }
     }
@@ -176,7 +177,7 @@ internal class CharOffsetsData(
                     or (charOffset1 shl 8)
                     or (charOffset2 shl 16)
                     or (charOffset3 shl 24)
-                )
+            )
             asInt(encoded)
         } else {
             val encoded = (
@@ -184,7 +185,7 @@ internal class CharOffsetsData(
                     or (char1.code.toLong() shl 16)
                     or (char2.code.toLong() shl 32)
                     or (char3.code.toLong() shl 48)
-                )
+            )
             asLong(encoded)
         }
     }
@@ -196,10 +197,13 @@ internal class CharOffsetsData(
         notEncodable: () -> R,
     ): R {
         return useEncodedQuadrigram(
-            quadrigram[0], quadrigram[1], quadrigram[2], quadrigram[3],
+            quadrigram[0],
+            quadrigram[1],
+            quadrigram[2],
+            quadrigram[3],
             asInt,
             asLong,
-            notEncodable
+            notEncodable,
         )
     }
 
@@ -221,6 +225,7 @@ internal class CharOffsetsData(
         val charOffset3 = getCharOffset(char3).also { if (it == -1) return notEncodable() }
         val charOffset4 = getCharOffset(char4).also { if (it == -1) return notEncodable() }
 
+        @Suppress("ktlint:standard:discouraged-comment-location")
         /*
          * Int encoding: First two get 7 bits each, last three get 6 bits (2*7 + 3*6 = 32)
          */
@@ -237,7 +242,7 @@ internal class CharOffsetsData(
                     or (charOffset2 shl (7 * 2))
                     or (charOffset3 shl (7 * 2 + 6))
                     or (charOffset4 shl (7 * 2 + 6 * 2))
-                )
+            )
             asInt(encoded)
         }
         /*
@@ -256,7 +261,7 @@ internal class CharOffsetsData(
                     or (charOffset2.toLong() shl (13 * 2))
                     or (charOffset3.toLong() shl (13 * 3))
                     or (charOffset4.toLong() shl (13 * 4))
-                )
+            )
             asLong(encoded)
         } else {
             // Fall back to using ngram object
@@ -277,7 +282,7 @@ internal class CharOffsetsData(
             asInt,
             asLong,
             asObject,
-            notEncodable
+            notEncodable,
         )
     }
 

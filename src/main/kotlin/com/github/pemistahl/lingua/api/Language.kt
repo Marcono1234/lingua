@@ -191,7 +191,7 @@ enum class Language(
     internal val unicodeScripts: Set<UnicodeScript>,
     /** Same as [unicodeScripts], except stored as Array */
     internal val unicodeScriptsArray: Array<UnicodeScript>,
-    internal val uniqueCharacters: String?
+    internal val uniqueCharacters: String?,
 ) {
     AFRIKAANS(AF, AFR, enumSetOf(UnicodeScript.LATIN)),
     ALBANIAN(SQ, SQI, enumSetOf(UnicodeScript.LATIN)),
@@ -285,7 +285,7 @@ enum class Language(
      *
      * This value is returned if no language can be detected reliably.
      */
-    UNKNOWN(IsoCode639_1.NONE, IsoCode639_3.NONE, emptySet());
+    UNKNOWN(IsoCode639_1.NONE, IsoCode639_3.NONE, emptySet()),
     ;
 
     constructor (
@@ -294,7 +294,7 @@ enum class Language(
         @Suppress("LocalVariableName")
         isoCode639_3: IsoCode639_3,
         unicodeScripts: Set<UnicodeScript>,
-        uniqueCharacters: String
+        uniqueCharacters: String,
     ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), uniqueCharacters)
 
     constructor (
@@ -302,22 +302,25 @@ enum class Language(
         isoCode639_1: IsoCode639_1,
         @Suppress("LocalVariableName")
         isoCode639_3: IsoCode639_3,
-        unicodeScripts: Set<UnicodeScript>
+        unicodeScripts: Set<UnicodeScript>,
     ) : this(isoCode639_1, isoCode639_3, unicodeScripts, unicodeScripts.toTypedArray(), null)
 
     companion object {
         private val allScriptsSet: Set<UnicodeScript> =
             EnumSet.copyOf(entries.asSequence().flatMap(Language::unicodeScripts).toSet())
+
         // Is stored as Array to reduce object creation during iteration
         internal val allScripts = allScriptsSet.toTypedArray()
         internal val allScriptsIndexer = KeyIndexer.fromEnumConstants(allScriptsSet)
 
         internal val scriptsSupportingExactlyOneLanguage: Map<UnicodeScript, Language>
+
         init {
             val encounteredScripts = EnumSet.noneOf(UnicodeScript::class.java)
             val scriptsMap = EnumMap<UnicodeScript, Language>(UnicodeScript::class.java)
             for (language in entries) {
                 language.unicodeScripts.forEach {
+                    @Suppress("ktlint:standard:discouraged-comment-location")
                     // If not encountered yet, add mapping
                     if (encounteredScripts.add(it)) {
                         scriptsMap[it] = language
@@ -353,19 +356,34 @@ enum class Language(
          * Returns a list of all built-in languages supporting the Cyrillic script.
          */
         @JvmStatic
-        fun allWithCyrillicScript(): List<Language> = entries.filter { it.unicodeScripts.contains(UnicodeScript.CYRILLIC) }
+        fun allWithCyrillicScript(): List<Language> =
+            entries.filter {
+                it.unicodeScripts.contains(
+                    UnicodeScript.CYRILLIC,
+                )
+            }
 
         /**
          * Returns a list of all built-in languages supporting the Devanagari script.
          */
         @JvmStatic
-        fun allWithDevanagariScript(): List<Language> = entries.filter { it.unicodeScripts.contains(UnicodeScript.DEVANAGARI) }
+        fun allWithDevanagariScript(): List<Language> =
+            entries.filter {
+                it.unicodeScripts.contains(
+                    UnicodeScript.DEVANAGARI,
+                )
+            }
 
         /**
          * Returns a list of all built-in languages supporting the Ethiopic script.
          */
         @JvmStatic
-        fun allWithEthiopicScript(): List<Language> = entries.filter { it.unicodeScripts.contains(UnicodeScript.ETHIOPIC) }
+        fun allWithEthiopicScript(): List<Language> =
+            entries.filter {
+                it.unicodeScripts.contains(
+                    UnicodeScript.ETHIOPIC,
+                )
+            }
 
         /**
          * Returns a list of all built-in languages supporting the Latin script.

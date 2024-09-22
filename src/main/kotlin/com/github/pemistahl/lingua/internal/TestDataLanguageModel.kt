@@ -19,19 +19,23 @@ package com.github.pemistahl.lingua.internal
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet
 
+@Suppress("ktlint:standard:no-consecutive-comments")
 internal class TestDataLanguageModel(
     // Note: These are Arrays to make iteration of them later more efficient
     /** Ngrams which could not be encoded as [PrimitiveNgram] */
     val objectNgrams: Array<String>,
     /** [PrimitiveNgram] values */
-    val primitiveNgrams: LongArray
+    val primitiveNgrams: LongArray,
 ) {
     fun hasOnlyPrimitives(): Boolean {
         return objectNgrams.isEmpty()
     }
 
     companion object {
-        fun fromText(text: CharSequence, ngramLength: Int): TestDataLanguageModel {
+        fun fromText(
+            text: CharSequence,
+            ngramLength: Int,
+        ): TestDataLanguageModel {
             require(ngramLength in 1..5) {
                 "ngram length $ngramLength is not in range 1..5"
             }

@@ -13,7 +13,7 @@ import javax.swing.SwingWorker
  * last detected languages.
  */
 internal class MultiLanguageModel(
-    initialLanguages: List<Language>
+    initialLanguages: List<Language>,
 ) {
     data class DetectionEntry(
         /** 0-based inclusive start index within the complete text */
@@ -34,6 +34,7 @@ internal class MultiLanguageModel(
     private val listeners: MutableList<(MultiLanguageModel) -> Unit> = mutableListOf()
 
     private var currentWorker: SwingWorker<*, *>? = null
+
     // Use separate AtomicBoolean because `SwingWorker.cancel` call has no effect if it already finished
     private var currentWorkerCancelled: AtomicBoolean? = null
 
@@ -85,29 +86,31 @@ internal class MultiLanguageModel(
             this.currentWorkerCancelled = currentWorkerCancelled
             // Store property value in local variable to safely access it from worker thread
             val text = text
-            currentWorker = object : SwingWorker<List<LanguageDetector.LanguageSection>, Unit>() {
-                override fun doInBackground(): List<LanguageDetector.LanguageSection> {
-                    return languageDetector.detectMultiLanguageOf(text)
-                }
-
-                override fun done() {
-                    if (!isCancelled && !currentWorkerCancelled.get()) {
-                        val sections = get()
-                        sections.forEach {
-                            this@MultiLanguageModel.sectionsMap[it.start] = DetectionEntry(
-                                it.start,
-                                it.end,
-                                it.language,
-                                it.confidenceValues
-                            )
-                        }
-                        maxSectionLength = sections.maxOfOrNull { it.end - it.start } ?: 0
-                        this@MultiLanguageModel.sections = sections
-
-                        listeners.forEach { it(this@MultiLanguageModel) }
+            currentWorker =
+                object : SwingWorker<List<LanguageDetector.LanguageSection>, Unit>() {
+                    override fun doInBackground(): List<LanguageDetector.LanguageSection> {
+                        return languageDetector.detectMultiLanguageOf(text)
                     }
-                }
-            }.also { it.execute() }
+
+                    override fun done() {
+                        if (!isCancelled && !currentWorkerCancelled.get()) {
+                            val sections = get()
+                            sections.forEach {
+                                this@MultiLanguageModel.sectionsMap[it.start] =
+                                    DetectionEntry(
+                                        it.start,
+                                        it.end,
+                                        it.language,
+                                        it.confidenceValues,
+                                    )
+                            }
+                            maxSectionLength = sections.maxOfOrNull { it.end - it.start } ?: 0
+                            this@MultiLanguageModel.sections = sections
+
+                            listeners.forEach { it(this@MultiLanguageModel) }
+                        }
+                    }
+                }.also { it.execute() }
         } else {
             sections = emptyList()
             listeners.forEach { it(this) }
@@ -127,8 +130,9 @@ internal class MultiLanguageModel(
             detectLanguages()
             return false
         } else {
-            languageDetector = LanguageDetectorBuilder.fromLanguages(*languages.toTypedArray())
-                .build()
+            languageDetector =
+                LanguageDetectorBuilder.fromLanguages(*languages.toTypedArray())
+                    .build()
             detectLanguages()
             return true
         }

@@ -8,22 +8,32 @@ import javax.swing.text.JTextComponent
 import kotlin.math.max
 import kotlin.math.min
 
-private fun Graphics.drawPixel(x: Int, y: Int) {
+private fun Graphics.drawPixel(
+    x: Int,
+    y: Int,
+) {
     drawLine(x, y, x, y)
 }
+
+// Note: If this code becomes too difficult to maintain, could switch back to
+// javax.swing.text.DefaultHighlighter.DefaultHighlightPainter
 
 /**
  * Highlight painter which draws a border around highlights and also improves indication for wrapped
  * highlighted sections.
  */
-// Note: If this code becomes too difficult to maintain, could switch back to
-// javax.swing.text.DefaultHighlighter.DefaultHighlightPainter
 internal class BorderedHighlightPainter(private val color: Color) : Highlighter.HighlightPainter {
     private val borderColor = color.multiplyHSBBrightness(0.5f).withAlpha(min(255, color.alpha * 2))
 
     // Note: Seems to cause issues for multiline highlights; apparently draws outside of area expected by default
     // highlighter; currently MultiLanguageTextArea works around this by calling `repaint()`
-    override fun paint(g: Graphics, p0: Int, p1: Int, bounds: Shape, c: JTextComponent) {
+    override fun paint(
+        g: Graphics,
+        p0: Int,
+        p1: Int,
+        bounds: Shape,
+        c: JTextComponent,
+    ) {
         // Don't draw highlights for empty sections
         if (p0 >= p1) {
             return
@@ -57,6 +67,7 @@ internal class BorderedHighlightPainter(private val color: Color) : Highlighter.
             // Position behind the last char
             val nextCharRect = c.modelToView2D(p1)
 
+            @Suppress("ktlint:standard:discouraged-comment-location")
             if (lastCharRect.minY == nextCharRect.minY) {
                 lastLineEndX = nextCharRect.minX.toInt()
                 lastLineStartY = nextCharRect.minY.toInt()
@@ -74,6 +85,7 @@ internal class BorderedHighlightPainter(private val color: Color) : Highlighter.
 
         g.color = color
 
+        @Suppress("ktlint:standard:discouraged-comment-location")
         if (firstLineStartY == lastLineStartY) {
             val width = lastLineEndX - firstLineStartX
             g.fillRect(firstLineStartX, firstLineStartY, width, lineHeight)
@@ -94,10 +106,11 @@ internal class BorderedHighlightPainter(private val color: Color) : Highlighter.
              * Whether to omit the border at the end of the first and the start of the last line to indicate
              * that the section is wrapped.
              */
-            val showHorizontalContinuation = blockHeight == 0 && lastLineEndX - firstLineStartX < 30 &&
-                // With the pixel offset for `lastLineEndX - firstLineStartX`, ignore if continuation would be
-                // directly below first line / above second line
-                !(firstLineStartX == minX || lastLineEndX == maxX)
+            val showHorizontalContinuation =
+                blockHeight == 0 && lastLineEndX - firstLineStartX < 30 &&
+                    // With the pixel offset for `lastLineEndX - firstLineStartX`, ignore if continuation would be
+                    // directly below first line / above second line
+                    !(firstLineStartX == minX || lastLineEndX == maxX)
             val continuationFillOffset = 1
 
             var firstLineWidth = maxX - firstLineStartX + 1 // + 1 because both position values are inclusive

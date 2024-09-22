@@ -22,11 +22,12 @@ import java.util.EnumSet
 
 // Cache set of scripts here to avoid evaluating it every time
 // for isLogogram()
-private val scriptsWithLogograms = EnumSet.copyOf(
-    LANGUAGES_SUPPORTING_LOGOGRAMS.asSequence()
-        .flatMap(Language::unicodeScripts)
-        .toSet()
-)
+private val scriptsWithLogograms =
+    EnumSet.copyOf(
+        LANGUAGES_SUPPORTING_LOGOGRAMS.asSequence()
+            .flatMap(Language::unicodeScripts)
+            .toSet(),
+    )
 
 internal fun Char.isLogogram(): Boolean {
     return if (this.isWhitespace()) {

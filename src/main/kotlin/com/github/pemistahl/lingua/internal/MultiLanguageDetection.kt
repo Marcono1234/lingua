@@ -37,7 +37,10 @@ import kotlin.math.min
  *    section
  */
 
-private fun Char.isPotentialLanguageBoundary(previousChar: Char, nextChar: Char): Boolean {
+private fun Char.isPotentialLanguageBoundary(
+    previousChar: Char,
+    nextChar: Char,
+): Boolean {
     when (this) {
         ':' -> return true
         // Based on https://en.wikipedia.org/wiki/Newline#Unicode
@@ -61,7 +64,8 @@ private fun Char.isPotentialLanguageBoundary(previousChar: Char, nextChar: Char)
         '\uFE41', '\uFE42',
         '\uFE43', '\uFE44',
         '\uFF02', '\uFF07',
-        '\uFF62', '\uFF63' -> return true
+        '\uFF62', '\uFF63',
+        -> return true
         // Cannot cover these supplementary code points here because function is for Char: U+1F676, U+1F677, U+1F678
     }
 
@@ -76,7 +80,8 @@ private fun Char.isPotentialLanguageBoundary(previousChar: Char, nextChar: Char)
         CharCategory.INITIAL_QUOTE_PUNCTUATION,
         CharCategory.FINAL_QUOTE_PUNCTUATION,
         CharCategory.LINE_SEPARATOR,
-        CharCategory.PARAGRAPH_SEPARATOR -> return true
+        CharCategory.PARAGRAPH_SEPARATOR,
+        -> return true
         else -> {}
     }
 
@@ -104,7 +109,9 @@ private open class PotentialSection(
     }
 
     fun getStart() = start
+
     fun getEnd() = end
+
     fun getLettersCount() = lettersCount
 
     fun containsNonLetter(): Boolean {
@@ -145,13 +152,13 @@ private open class PotentialSection(
             end,
             lettersCount,
             fullText,
-            cachedText
+            cachedText,
         )
     }
 
     fun toConfidenceValuesSection(
         languageDetector: LanguageDetector,
-        confidenceValues: Object2DoubleSortedMap<Language>
+        confidenceValues: Object2DoubleSortedMap<Language>,
     ): ConfidenceValuesPotentialSection {
         return ConfidenceValuesPotentialSection(
             start,
@@ -160,7 +167,7 @@ private open class PotentialSection(
             fullText,
             cachedText,
             languageDetector,
-            confidenceValues
+            confidenceValues,
         )
     }
 
@@ -189,6 +196,7 @@ private fun splitPotentialSections(text: String): MutableList<PotentialSection> 
         if (char.isLetter()) {
             val script = UnicodeScript.of(char.code)
 
+            @Suppress("ktlint:standard:discouraged-comment-location")
             if (start == -1) {
                 // Start a new section
                 start = index
@@ -214,9 +222,9 @@ private fun splitPotentialSections(text: String): MutableList<PotentialSection> 
             hasLogograms = hasLogograms || char.isLogogram()
         } else if (lettersCount >= minSectionLength && start != -1 &&
             char.isPotentialLanguageBoundary(
-                    if (index == 0) '\u0000' else text[index - 1],
-                    if (index + 1 >= text.length) '\u0000' else text[index + 1]
-                )
+                if (index == 0) '\u0000' else text[index - 1],
+                if (index + 1 >= text.length) '\u0000' else text[index + 1],
+            )
         ) {
             sections.add(PotentialSection(start, end, lettersCount, text))
             start = -1
@@ -241,7 +249,6 @@ private class LanguagePotentialSection(
     cachedText: String?,
     val ruleBasedLanguages: EnumSet<Language> = EnumSet.noneOf(Language::class.java),
 ) : PotentialSection(start, end, lettersCount, fullText, cachedText) {
-
     fun canBeMergedWith(other: LanguagePotentialSection): Boolean {
         // Don't merge if exact language of subsequent section was determined
         return other.ruleBasedLanguages.size != 1 &&
@@ -262,7 +269,7 @@ private class LanguagePotentialSection(
 
 private fun createSectionsWithRuleBasedLanguage(
     text: String,
-    languageDetector: LanguageDetector
+    languageDetector: LanguageDetector,
 ): MutableList<LanguagePotentialSection> {
     // Note: Could try to run rule-based detection concurrently, but overhead due to number of created
     // CompletableFuture instances and increased complexity might not justify this
@@ -316,7 +323,6 @@ private class ConfidenceValuesPotentialSection(
     private val languageDetector: LanguageDetector,
     private var cachedConfidenceValues: Object2DoubleSortedMap<Language>?,
 ) : PotentialSection(start, end, lettersCount, fullText, cachedText) {
-
     fun mergeWith(other: ConfidenceValuesPotentialSection) {
         // Call parent method
         mergeWith(other as PotentialSection)
@@ -359,7 +365,7 @@ private class ConfidenceValuesPotentialSection(
             getLettersCount(),
             getText(),
             languageDetector.getLanguageFromConfidenceValues(confidenceValues),
-            confidenceValues
+            confidenceValues,
         )
     }
 
@@ -371,9 +377,8 @@ private class ConfidenceValuesPotentialSection(
 
 private fun createSectionsWithConfidenceValues(
     text: String,
-    languageDetector: LanguageDetector
+    languageDetector: LanguageDetector,
 ): MutableList<ConfidenceValuesPotentialSection> {
-
     val sections = createSectionsWithRuleBasedLanguage(text, languageDetector)
     val confidenceSections = mutableListOf<ConfidenceValuesPotentialSection>()
 
@@ -393,12 +398,13 @@ private fun createSectionsWithConfidenceValues(
             while (index < sections.size - 1) {
                 val nextSection = sections[index + 1]
 
-                val shouldMerge = shouldMergeShortRuleBasedSection(
-                    section,
-                    sections[index + 1],
-                    confidenceSections.lastOrNull(),
-                    languageDetector
-                )
+                val shouldMerge =
+                    shouldMergeShortRuleBasedSection(
+                        section,
+                        sections[index + 1],
+                        confidenceSections.lastOrNull(),
+                        languageDetector,
+                    )
 
                 if (shouldMerge) {
                     section.mergeWith(nextSection)
@@ -436,8 +442,9 @@ internal fun LanguageDetector.internalDetectMultiLanguageOf(text: String): List<
     iterator.next()
     while (iterator.hasNext()) {
         val section = iterator.next()
-        val nextSection = iterator.nextIndex()
-            .let { if (it < sections.size) sections[it] else null }
+        val nextSection =
+            iterator.nextIndex()
+                .let { if (it < sections.size) sections[it] else null }
 
         if (canMergeConfidenceSection(section, previousSection, nextSection)) {
             // Merge sections and confidence values
@@ -456,7 +463,7 @@ private fun shouldMergeShortRuleBasedSection(
     current: LanguagePotentialSection,
     next: LanguagePotentialSection,
     previousConfidenceSection: ConfidenceValuesPotentialSection?,
-    languageDetector: LanguageDetector
+    languageDetector: LanguageDetector,
 ): Boolean {
     /** Estimated minimum number of letters to get reliable language detection results */
     val minReliableLettersCount = 15
@@ -477,10 +484,11 @@ private fun shouldMergeShortRuleBasedSection(
         val nextConfidenceValues = languageDetector.computeLanguageConfidenceValuesFuture(next.getText()).join()
         val minNextConfidence = next.getMinConfidence()
 
-        val isConfidenceForMostCommonLanguagesTooLow = confidenceValues.object2DoubleEntrySet()
-            .filter { it.doubleValue > minConfidence }
-            .map { it.key }
-            .all { nextConfidenceValues.getDouble(it) < minNextConfidence }
+        val isConfidenceForMostCommonLanguagesTooLow =
+            confidenceValues.object2DoubleEntrySet()
+                .filter { it.doubleValue > minConfidence }
+                .map { it.key }
+                .all { nextConfidenceValues.getDouble(it) < minNextConfidence }
 
         if (isConfidenceForMostCommonLanguagesTooLow) {
             // Don't merge
@@ -508,7 +516,7 @@ private fun shouldMergeShortRuleBasedSection(
 private fun canMergeConfidenceSection(
     current: ConfidenceValuesPotentialSection,
     previous: ConfidenceValuesPotentialSection,
-    next: ConfidenceValuesPotentialSection?
+    next: ConfidenceValuesPotentialSection?,
 ): Boolean {
     val currentRelevantLanguages = current.getLanguagesWithMinConfidence()
     val previousRelevantLanguages = previous.getLanguagesWithMinConfidence()

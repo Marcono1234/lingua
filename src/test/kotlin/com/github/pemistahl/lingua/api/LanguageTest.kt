@@ -175,12 +175,12 @@ class LanguageTest {
     @MethodSource("filteredLanguagesProvider")
     internal fun `assert that languages support correct alphabets`(
         alphabet: UnicodeScript,
-        expectedLanguages: List<Language>
+        expectedLanguages: List<Language>,
     ) {
         assertThat(
-            Language.entries.filter { it.unicodeScripts.contains(alphabet) }
+            Language.entries.filter { it.unicodeScripts.contains(alphabet) },
         ).`as`(
-            "alphabet '$alphabet'"
+            "alphabet '$alphabet'",
         ).containsExactlyElementsOf(
             expectedLanguages,
         )

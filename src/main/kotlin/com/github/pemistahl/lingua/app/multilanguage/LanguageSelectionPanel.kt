@@ -140,11 +140,12 @@ internal class LanguageSelectionPanel(
 
     private fun onSelectedLanguagesChanged() {
         val languages = getSelectedLanguages()
-        selectAllCheckbox.selectionState = when (languages.size) {
-            0 -> TriStateCheckbox.SelectionState.NOT_SELECTED
-            checkboxes.size -> TriStateCheckbox.SelectionState.SELECTED
-            else -> TriStateCheckbox.SelectionState.SOME_SELECTED
-        }
+        selectAllCheckbox.selectionState =
+            when (languages.size) {
+                0 -> TriStateCheckbox.SelectionState.NOT_SELECTED
+                checkboxes.size -> TriStateCheckbox.SelectionState.SELECTED
+                else -> TriStateCheckbox.SelectionState.SOME_SELECTED
+            }
 
         val tooFewLanguages = !multiLanguageModel.setLanguages(languages)
         tooFewLanguagesLabel.isVisible = tooFewLanguages

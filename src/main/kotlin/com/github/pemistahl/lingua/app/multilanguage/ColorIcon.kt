@@ -17,7 +17,12 @@ internal class ColorIcon(
         check(size >= 3)
     }
 
-    override fun paintIcon(c: Component, g: Graphics, x: Int, y: Int) {
+    override fun paintIcon(
+        c: Component,
+        g: Graphics,
+        x: Int,
+        y: Int,
+    ) {
         g.color = borderColor
         // Create border
         g.fillRect(x, y, size, size)

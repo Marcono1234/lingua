@@ -26,7 +26,6 @@ import org.junit.jupiter.api.Test
 import java.util.EnumSet
 
 class LanguageDetectorBuilderTest {
-
     private val minimumLanguagesErrorMessage = "LanguageDetector needs at least 2 languages to choose from"
 
     private val expectedExecutor = LanguageDetectorBuilder.defaultExecutor
@@ -56,7 +55,7 @@ class LanguageDetectorBuilderTest {
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
                 increasedDetectionSpeed = false,
-            )
+            ),
         )
 
         assertThat(builder.withMinimumRelativeDistance(0.2).minimumRelativeDistance).isEqualTo(0.2)
@@ -68,7 +67,7 @@ class LanguageDetectorBuilderTest {
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
                 increasedDetectionSpeed = false,
-            )
+            ),
         )
     }
 
@@ -88,7 +87,7 @@ class LanguageDetectorBuilderTest {
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
                 increasedDetectionSpeed = false,
-            )
+            ),
         )
 
         assertThat(builder.withMinimumRelativeDistance(0.2).minimumRelativeDistance).isEqualTo(0.2)
@@ -100,7 +99,7 @@ class LanguageDetectorBuilderTest {
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
                 increasedDetectionSpeed = false,
-            )
+            ),
         )
     }
 
@@ -131,13 +130,15 @@ class LanguageDetectorBuilderTest {
     @Test
     fun `assert that LanguageDetector can be built from blacklist`() {
         run {
-            val builder = LanguageDetectorBuilder.fromAllLanguagesWithout(
-                Language.TURKISH,
-                Language.ROMANIAN
-            )
-            val expectedLanguages = Language.entries.toSet().minus(
-                arrayOf(Language.TURKISH, Language.ROMANIAN, Language.UNKNOWN)
-            ).toList()
+            val builder =
+                LanguageDetectorBuilder.fromAllLanguagesWithout(
+                    Language.TURKISH,
+                    Language.ROMANIAN,
+                )
+            val expectedLanguages =
+                Language.entries.toSet().minus(
+                    arrayOf(Language.TURKISH, Language.ROMANIAN, Language.UNKNOWN),
+                ).toList()
 
             assertThat(builder.languages).isEqualTo(expectedLanguages)
             assertThat(builder.minimumRelativeDistance).isEqualTo(0.0)
@@ -151,7 +152,7 @@ class LanguageDetectorBuilderTest {
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
                     increasedDetectionSpeed = false,
-                )
+                ),
             )
 
             assertThat(builder.withMinimumRelativeDistance(0.2).minimumRelativeDistance).isEqualTo(0.2)
@@ -163,7 +164,7 @@ class LanguageDetectorBuilderTest {
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
                     increasedDetectionSpeed = false,
-                )
+                ),
             )
         }
         run {
@@ -192,7 +193,7 @@ class LanguageDetectorBuilderTest {
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
                     increasedDetectionSpeed = false,
-                )
+                ),
             )
 
             assertThat(builder.withMinimumRelativeDistance(0.2).minimumRelativeDistance).isEqualTo(0.2)
@@ -204,7 +205,7 @@ class LanguageDetectorBuilderTest {
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
                     increasedDetectionSpeed = false,
-                )
+                ),
             )
         }
         run {
@@ -232,7 +233,7 @@ class LanguageDetectorBuilderTest {
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
                     increasedDetectionSpeed = false,
-                )
+                ),
             )
 
             assertThat(builder.withMinimumRelativeDistance(0.2).minimumRelativeDistance).isEqualTo(0.2)
@@ -244,7 +245,7 @@ class LanguageDetectorBuilderTest {
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
                     increasedDetectionSpeed = false,
-                )
+                ),
             )
 
             assertThat(builder.build()).isEqualTo(
@@ -255,7 +256,7 @@ class LanguageDetectorBuilderTest {
                     isLowAccuracyModeEnabled = false,
                     expectedExecutor,
                     increasedDetectionSpeed = false,
-                )
+                ),
             )
         }
         run {
@@ -297,7 +298,7 @@ class LanguageDetectorBuilderTest {
                 isLowAccuracyModeEnabled = false,
                 expectedExecutor,
                 increasedDetectionSpeed = false,
-            )
+            ),
         )
     }
 
@@ -318,7 +319,7 @@ class LanguageDetectorBuilderTest {
                 isLowAccuracyModeEnabled = true,
                 expectedExecutor,
                 increasedDetectionSpeed = false,
-            )
+            ),
         )
 
         builder.withPreloadedLanguageModels()
@@ -333,7 +334,7 @@ class LanguageDetectorBuilderTest {
                 isLowAccuracyModeEnabled = true,
                 expectedExecutor,
                 increasedDetectionSpeed = false,
-            )
+            ),
         )
     }
 }

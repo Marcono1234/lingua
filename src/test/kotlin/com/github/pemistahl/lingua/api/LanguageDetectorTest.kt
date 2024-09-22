@@ -117,7 +117,6 @@ class LanguageDetectorTest {
         )
     }
 
-
     // language detection with rules
 
     private fun singleWordWordList(word: String): WordList {

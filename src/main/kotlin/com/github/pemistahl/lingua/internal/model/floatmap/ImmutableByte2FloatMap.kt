@@ -14,7 +14,7 @@ import java.io.OutputStream
 
 internal class ImmutableByte2FloatMap private constructor(
     private val keys: ByteArray,
-    private val values: FloatArray
+    private val values: FloatArray,
 ) : Byte2FloatFunction {
     companion object {
         fun fromBinary(inputStream: InputStream): ImmutableByte2FloatMap {
@@ -30,7 +30,10 @@ internal class ImmutableByte2FloatMap private constructor(
         // Uses a red-black tree map because that should have faster insertion times than AVL map
         private val map: Byte2FloatSortedMap = Byte2FloatRBTreeMap()
 
-        fun add(key: Byte, value: Float) {
+        fun add(
+            key: Byte,
+            value: Float,
+        ) {
             val old = map.put(key, value)
             check(old == 0f)
         }

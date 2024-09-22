@@ -20,19 +20,21 @@ internal class MultiLanguageTextArea(
         font = Font(Font.SANS_SERIF, Font.PLAIN, 20)
         lineWrap = true
 
-        document.addDocumentListener(object : DocumentListener {
-            override fun removeUpdate(e: DocumentEvent) {
-                detectLanguages()
-            }
+        document.addDocumentListener(
+            object : DocumentListener {
+                override fun removeUpdate(e: DocumentEvent) {
+                    detectLanguages()
+                }
 
-            override fun insertUpdate(e: DocumentEvent) {
-                detectLanguages()
-            }
+                override fun insertUpdate(e: DocumentEvent) {
+                    detectLanguages()
+                }
 
-            override fun changedUpdate(e: DocumentEvent) {
-                // Not interested in attribute changes
-            }
-        })
+                override fun changedUpdate(e: DocumentEvent) {
+                    // Not interested in attribute changes
+                }
+            },
+        )
         ToolTipManager.sharedInstance().registerComponent(this)
 
         multiLanguageModel.addListener {

@@ -25,7 +25,7 @@ internal class ImmutableLong2FloatMap private constructor(
      * - else: Look up value from `values[i - indValuesIndices.length + maxIndirectionIndices]`
      */
     private val indValuesIndices: ShortArray,
-    private val values: FloatArray
+    private val values: FloatArray,
 ) : Long2FloatFunction {
     companion object {
         fun fromBinary(inputStream: InputStream): ImmutableLong2FloatMap {
@@ -41,7 +41,10 @@ internal class ImmutableLong2FloatMap private constructor(
         // Uses a red-black tree map because that should have faster insertion times than AVL map
         private val map: Long2FloatSortedMap = Long2FloatRBTreeMap()
 
-        fun add(key: Long, value: Float) {
+        fun add(
+            key: Long,
+            value: Float,
+        ) {
             val old = map.put(key, value)
             check(old == 0f)
         }
@@ -56,9 +59,14 @@ internal class ImmutableLong2FloatMap private constructor(
     }
 
     private fun getValue(index: Int): Float {
-        return if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
-        else if (indValuesIndices.isEmpty()) values[index]
-        else values[index - indValuesIndices.size + maxIndirectionIndices]
+        return if (index < indValuesIndices.size) {
+            @Suppress("ktlint:standard:comment-wrapping")
+            values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
+        } else if (indValuesIndices.isEmpty()) {
+            values[index]
+        } else {
+            values[index - indValuesIndices.size + MAX_INDIRECTION_INDICES]
+        }
     }
 
     override fun get(key: Long): Float {

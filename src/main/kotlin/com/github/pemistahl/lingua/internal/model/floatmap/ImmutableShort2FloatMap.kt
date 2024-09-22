@@ -26,7 +26,7 @@ internal class ImmutableShort2FloatMap private constructor(
      * so the question is only whether indirection reduces memory usage)
      */
     private val indValuesIndices: ShortArray,
-    private val values: FloatArray
+    private val values: FloatArray,
 ) : Short2FloatFunction {
     companion object {
         fun fromBinary(inputStream: InputStream): ImmutableShort2FloatMap {
@@ -49,7 +49,10 @@ internal class ImmutableShort2FloatMap private constructor(
         // Uses a red-black tree map because that should have faster insertion times than AVL map
         private val map: Short2FloatSortedMap = Short2FloatRBTreeMap()
 
-        fun add(key: Short, value: Float) {
+        fun add(
+            key: Short,
+            value: Float,
+        ) {
             val old = map.put(key, value)
             check(old == 0f)
         }
@@ -64,8 +67,12 @@ internal class ImmutableShort2FloatMap private constructor(
     }
 
     private fun getValue(index: Int): Float {
-        return if (indValuesIndices.isEmpty()) values[index]
-        else values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
+        return if (indValuesIndices.isEmpty()) {
+            values[index]
+        } else {
+            @Suppress("ktlint:standard:comment-wrapping")
+            values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
+        }
     }
 
     override fun get(key: Short): Float {

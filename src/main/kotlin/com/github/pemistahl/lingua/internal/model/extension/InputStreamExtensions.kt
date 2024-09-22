@@ -17,10 +17,11 @@ internal fun InputStream.readShort(): Int {
 }
 
 internal fun InputStream.readInt(): Int {
-    val v = read().shl(24)
-        .or(read().shl(16))
-        .or((read().shl(8)))
-        .or(read())
+    val v =
+        read().shl(24)
+            .or(read().shl(16))
+            .or((read().shl(8)))
+            .or(read())
     if (v < 0) throw EOFException()
     return v
 }

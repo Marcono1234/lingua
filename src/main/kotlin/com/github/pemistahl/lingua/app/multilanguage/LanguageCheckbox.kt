@@ -14,9 +14,8 @@ private val TEXT_COLOR_UNSELECTED = Color.LIGHT_GRAY
  */
 internal class LanguageCheckbox(
     val language: Language,
-    iconColor: Color
+    iconColor: Color,
 ) : JCheckBox(language.name) {
-
     private var colorIcon = ColorIcon(SIZE, iconColor)
 
     init {

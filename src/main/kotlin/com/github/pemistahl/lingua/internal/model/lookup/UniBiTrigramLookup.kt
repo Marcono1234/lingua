@@ -26,30 +26,42 @@ internal open class UniBiTrigramLookup(
 ) {
     // Note: Effectively this is a destructured PrimitiveNgram, but to keep number of classes for buildSrc
     // binary model task low, avoid dependency on other class (in other package)
-    fun getFrequency(length: Int, char0: Char, char1: Char, char2: Char): Double {
+    fun getFrequency(
+        length: Int,
+        char0: Char,
+        char1: Char,
+        char2: Char,
+    ): Double {
         // Note: Explicitly specify type Float here to avoid accidentally having implicit type Number
         // (and therefore boxing) when one of the results is not a Float
-        val frequency: Float = when (length) {
-            1 -> charOffsetsData.useEncodedUnigram(
-                char0,
-                { unigramsAsByte.get(it) },
-                { unigramsAsShort.get(it) },
-                { 0f }
-            )
-            2 -> charOffsetsData.useEncodedBigram(
-                char0, char1,
-                { bigramsAsShort.get(it) },
-                { bigramsAsInt.get(it) },
-                { 0f }
-            )
-            3 -> charOffsetsData.useEncodedTrigram(
-                char0, char1, char2,
-                { trigramsAsInt.get(it) },
-                { trigramsAsLong.get(it) },
-                { 0f }
-            )
-            else -> throw AssertionError("Invalid ngram length $length")
-        }
+        val frequency: Float =
+            when (length) {
+                1 ->
+                    charOffsetsData.useEncodedUnigram(
+                        char0,
+                        { unigramsAsByte.get(it) },
+                        { unigramsAsShort.get(it) },
+                        { 0f },
+                    )
+                2 ->
+                    charOffsetsData.useEncodedBigram(
+                        char0,
+                        char1,
+                        { bigramsAsShort.get(it) },
+                        { bigramsAsInt.get(it) },
+                        { 0f },
+                    )
+                3 ->
+                    charOffsetsData.useEncodedTrigram(
+                        char0,
+                        char1,
+                        char2,
+                        { trigramsAsInt.get(it) },
+                        { trigramsAsLong.get(it) },
+                        { 0f },
+                    )
+                else -> throw AssertionError("Invalid ngram length $length")
+            }
         return frequency.toDouble()
     }
 }
@@ -66,20 +78,20 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
     private val trigramsAsInt: ImmutableInt2FloatTrieMap,
     private val trigramsAsLong: ImmutableLong2FloatMap,
 ) : UniBiTrigramLookup(
-    charOffsetsData,
-    unigramsAsByte,
-    unigramsAsShort,
-    bigramsAsShort,
-    bigramsAsInt,
-    trigramsAsInt,
-    trigramsAsLong,
-) {
+        charOffsetsData,
+        unigramsAsByte,
+        unigramsAsShort,
+        bigramsAsShort,
+        bigramsAsInt,
+        trigramsAsInt,
+        trigramsAsLong,
+    ) {
     companion object {
         @Suppress("unused") // used by buildSrc for model generation
         fun fromJson(
             unigrams: Object2FloatLinkedOpenHashMap<String>,
             bigrams: Object2FloatLinkedOpenHashMap<String>,
-            trigrams: Object2FloatLinkedOpenHashMap<String>
+            trigrams: Object2FloatLinkedOpenHashMap<String>,
         ): UniBiTrigramBinarySearchLookup {
             val ngrams = unigrams.keys.asSequence().plus(bigrams.keys).plus(trigrams.keys)
             val charOffsetsData = CharOffsetsData.createCharOffsetsData(ngrams)
@@ -124,7 +136,7 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
                     bigramsAsShort,
                     bigramsAsInt,
                     trigramsAsInt,
-                    trigramsAsLong
+                    trigramsAsLong,
                 )
             }
         }
@@ -140,7 +152,10 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
         private val trigramsAsIntBuilder = ImmutableInt2FloatTrieMap.Builder()
         private val trigramsAsLongBuilder = ImmutableLong2FloatMap.Builder()
 
-        fun putUnigramFrequency(unigram: String, frequency: Float) {
+        fun putUnigramFrequency(
+            unigram: String,
+            frequency: Float,
+        ) {
             if (unigram.length != 1) {
                 throw IllegalArgumentException("Invalid ngram length ${unigram.length}")
             }
@@ -149,11 +164,14 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
                 unigram,
                 { unigramsAsByteBuilder.add(it, frequency) },
                 { unigramsAsShortBuilder.add(it, frequency) },
-                { throw AssertionError("Char offsets don't include chars of: $unigram") }
+                { throw AssertionError("Char offsets don't include chars of: $unigram") },
             )
         }
 
-        fun putBigramFrequency(bigram: String, frequency: Float) {
+        fun putBigramFrequency(
+            bigram: String,
+            frequency: Float,
+        ) {
             if (bigram.length != 2) {
                 throw IllegalArgumentException("Invalid ngram length ${bigram.length}")
             }
@@ -162,11 +180,14 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
                 bigram,
                 { bigramsAsShortBuilder.add(it, frequency) },
                 { bigramsAsIntBuilder.add(it, frequency) },
-                { throw AssertionError("Char offsets don't include chars of: $bigram") }
+                { throw AssertionError("Char offsets don't include chars of: $bigram") },
             )
         }
 
-        fun putTrigramFrequency(trigram: String, frequency: Float) {
+        fun putTrigramFrequency(
+            trigram: String,
+            frequency: Float,
+        ) {
             if (trigram.length != 3) {
                 throw IllegalArgumentException("Invalid ngram length ${trigram.length}")
             }
@@ -175,7 +196,7 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
                 trigram,
                 { trigramsAsIntBuilder.add(it, frequency) },
                 { trigramsAsLongBuilder.add(it, frequency) },
-                { throw AssertionError("Char offsets don't include chars of: $trigram") }
+                { throw AssertionError("Char offsets don't include chars of: $trigram") },
             )
         }
 
@@ -187,20 +208,21 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
                 bigramsAsShortBuilder.build(),
                 bigramsAsIntBuilder.build(),
                 trigramsAsIntBuilder.build(),
-                trigramsAsLongBuilder.build()
+                trigramsAsLongBuilder.build(),
             )
         }
     }
 
-    fun asHashMapLookup() = UniBiTrigramLookup(
-        charOffsetsData,
-        unigramsAsByte.asHashMap(),
-        unigramsAsShort.asHashMap(),
-        bigramsAsShort.asHashMap(),
-        bigramsAsInt.asHashMap(),
-        trigramsAsInt.asHashMap(),
-        trigramsAsLong.asHashMap(),
-    )
+    fun asHashMapLookup() =
+        UniBiTrigramLookup(
+            charOffsetsData,
+            unigramsAsByte.asHashMap(),
+            unigramsAsShort.asHashMap(),
+            bigramsAsShort.asHashMap(),
+            bigramsAsInt.asHashMap(),
+            trigramsAsInt.asHashMap(),
+            trigramsAsLong.asHashMap(),
+        )
 
     /**
      * Writes the binary representation of the model data to a sub directory for
@@ -212,7 +234,7 @@ internal class UniBiTrigramBinarySearchLookup private constructor(
     fun writeBinary(
         resourcesDirectory: Path,
         languageCode: String,
-        changeSummaryCallback: (oldSizeBytes: Long?, newSizeBytes: Long) -> Unit
+        changeSummaryCallback: (oldSizeBytes: Long?, newSizeBytes: Long) -> Unit,
     ): Path {
         val resourceName = getBinaryModelResourceName(languageCode)
 

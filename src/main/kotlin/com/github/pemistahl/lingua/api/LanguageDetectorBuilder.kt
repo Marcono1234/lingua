@@ -36,14 +36,15 @@ class LanguageDetectorBuilder private constructor(
     /**
      * Creates and returns the configured instance of [LanguageDetector].
      */
-    fun build() = LanguageDetector(
-        EnumSet.copyOf(languages),
-        minimumRelativeDistance,
-        isEveryLanguageModelPreloaded,
-        isLowAccuracyModeEnabled,
-        executor,
-        increasedDetectionSpeed,
-    )
+    fun build() =
+        LanguageDetector(
+            EnumSet.copyOf(languages),
+            minimumRelativeDistance,
+            isEveryLanguageModelPreloaded,
+            isLowAccuracyModeEnabled,
+            executor,
+            increasedDetectionSpeed,
+        )
 
     /**
      * Sets the desired value for the minimum relative distance measure.
@@ -147,6 +148,7 @@ class LanguageDetectorBuilder private constructor(
         // when user also calls LanguageDetector functions from commonPool(), preventing tasks
         // submitted by those functions from being executed
         internal val defaultExecutor: Executor
+
         init {
             // Similar to ForkJoinPool.commonPool() use one worker less than available cores
             // to leave one core for OS
@@ -156,12 +158,13 @@ class LanguageDetectorBuilder private constructor(
                 defaultExecutor = Executor { r -> r.run() }
             } else {
                 val threadNumber = AtomicInteger(1)
-                val threadFactory = ThreadFactory { runnable ->
-                    val thread = Thread(runnable, "tiny-lingua-worker-${threadNumber.getAndIncrement()}")
-                    // Don't prevent JVM exit
-                    thread.isDaemon = true
-                    return@ThreadFactory thread
-                }
+                val threadFactory =
+                    ThreadFactory { runnable ->
+                        val thread = Thread(runnable, "tiny-lingua-worker-${threadNumber.getAndIncrement()}")
+                        // Don't prevent JVM exit
+                        thread.isDaemon = true
+                        return@ThreadFactory thread
+                    }
                 defaultExecutor = Executors.newFixedThreadPool(cpuCoresToUse, threadFactory)
             }
         }

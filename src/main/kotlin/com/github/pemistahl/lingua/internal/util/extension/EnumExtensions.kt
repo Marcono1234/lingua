@@ -19,12 +19,16 @@ package com.github.pemistahl.lingua.internal.util.extension
 import java.util.EnumMap
 import java.util.EnumSet
 
-internal inline fun <reified K : Enum<K>, V> enumMapOf(map: Map<K, V>): EnumMap<K, V> = when (map.size) {
-    0 -> EnumMap(K::class.java)
-    else -> EnumMap(map)
-}
+internal inline fun <reified K : Enum<K>, V> enumMapOf(map: Map<K, V>): EnumMap<K, V> =
+    when (map.size) {
+        0 -> EnumMap(K::class.java)
+        else -> EnumMap(map)
+    }
 
-internal inline fun <reified E : Enum<E>> enumSetOf(first: E, vararg others: E): EnumSet<E> {
+internal inline fun <reified E : Enum<E>> enumSetOf(
+    first: E,
+    vararg others: E,
+): EnumSet<E> {
     return if (others.isNotEmpty()) EnumSet.of(first, *others) else EnumSet.of(first)
 }
 

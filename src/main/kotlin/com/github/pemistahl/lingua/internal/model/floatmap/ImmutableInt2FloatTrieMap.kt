@@ -64,7 +64,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
      * - else: Look up value from `values[i - indValuesIndices.length + maxIndirectionIndices]`
      */
     private val indValuesIndices: ShortArray,
-    private val values: FloatArray
+    private val values: FloatArray,
 ) : Int2FloatFunction {
     companion object {
         fun fromBinary(inputStream: InputStream): ImmutableInt2FloatTrieMap {
@@ -103,7 +103,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
                 keyRemainderLayerSearchData,
                 keyRemainderLayer,
                 indValuesIndices,
-                values
+                values,
             )
         }
 
@@ -119,7 +119,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
             firstLayerGlobalIndex: Int,
             firstLayerSize: Int,
             secondLayerIndex: Int,
-            secondLayerSize: Int
+            secondLayerSize: Int,
         ): Int {
             val averageSizePerFirstLayer = totalSize / firstLayerSize.toDouble()
             // Use maximum to account for small second layers with previous second layers which may be way larger
@@ -127,7 +127,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
             return (
                 firstLayerGlobalIndex + secondLayerIndex * averageSizePerSecondLayer +
                     (secondLayerSize / 2.0)
-                ).toInt()
+            ).toInt()
         }
 
         /**
@@ -143,15 +143,19 @@ internal class ImmutableInt2FloatTrieMap private constructor(
         private var size = 0
         private val map: Byte2ObjectSortedMap<Byte2ObjectSortedMap<Short2FloatSortedMap>> = Byte2ObjectAVLTreeMap()
 
-        fun add(key: Int, value: Float) {
+        fun add(
+            key: Int,
+            value: Float,
+        ) {
             val firstKey = key.toByte()
             val secondKey = key.shr(8).toByte()
             val keyRemainder = key.shr(16).toShort()
 
-            val old = map.computeIfAbsent(firstKey, Byte2ObjectFunction { Byte2ObjectAVLTreeMap() })
-                // Uses a red-black tree map because that should have faster insertion times than AVL map
-                .computeIfAbsent(secondKey, Byte2ObjectFunction { Short2FloatRBTreeMap() })
-                .put(keyRemainder, value)
+            val old =
+                map.computeIfAbsent(firstKey, Byte2ObjectFunction { Byte2ObjectAVLTreeMap() })
+                    // Uses a red-black tree map because that should have faster insertion times than AVL map
+                    .computeIfAbsent(secondKey, Byte2ObjectFunction { Short2FloatRBTreeMap() })
+                    .put(keyRemainder, value)
             check(old == 0f)
             size++
         }
@@ -165,7 +169,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
                     map.values.forEach(
                         FloatConsumer {
                             allValues[valueIndex++] = it
-                        }
+                        },
                     )
                 }
 
@@ -195,13 +199,14 @@ internal class ImmutableInt2FloatTrieMap private constructor(
                     val keyRemainderMap = secondMapEntry.value
                     secondKeyLayer[secondKeyIndex] = secondKey
 
-                    val estimatedRemainderIndex = calculateEstimatedRemainderIndex(
-                        size,
-                        firstKeyGlobalIndex,
-                        firstKeyLayer.size,
-                        secondKeyIndex,
-                        secondKeyLayer.size
-                    )
+                    val estimatedRemainderIndex =
+                        calculateEstimatedRemainderIndex(
+                            size,
+                            firstKeyGlobalIndex,
+                            firstKeyLayer.size,
+                            secondKeyIndex,
+                            secondKeyLayer.size,
+                        )
                     val indexDiff = globalIndex - estimatedRemainderIndex
                     // Search data encoding is rather brittle and might fail if estimated remainder index is way off,
                     // or if combination of firstKey and secondKey is an extremely common prefix
@@ -209,19 +214,20 @@ internal class ImmutableInt2FloatTrieMap private constructor(
                     // Calculate bits count - 1 here because value is signed
                     check(
                         indexDiff in -(1.shl(indexDiffBitsCount - 1)) until
-                            1.shl(indexDiffBitsCount - 1)
+                            1.shl(indexDiffBitsCount - 1),
                     )
                     check(keyRemainderMap.size in 1..1.shl(SEARCH_DATA_SIZE_BITS_COUNT))
-                    val encodedSearchData = indexDiff.shl(SEARCH_DATA_SIZE_BITS_COUNT)
-                        // size - 1, because map will never have size 0
-                        .or(keyRemainderMap.size - 1)
+                    val encodedSearchData =
+                        indexDiff.shl(SEARCH_DATA_SIZE_BITS_COUNT)
+                            // size - 1, because map will never have size 0
+                            .or(keyRemainderMap.size - 1)
                     searchData[secondKeyIndex] = encodedSearchData
 
                     keyRemainderMap.keys.forEach(
                         ShortConsumer { keyRemainder ->
                             keyRemainderLayer[globalIndex] = keyRemainder
                             globalIndex++
-                        }
+                        },
                     )
                 }
             }
@@ -235,7 +241,7 @@ internal class ImmutableInt2FloatTrieMap private constructor(
                     keyRemainderLayerSearchData,
                     keyRemainderLayer,
                     indValuesIndices,
-                    values
+                    values,
                 )
             }
         }
@@ -245,33 +251,39 @@ internal class ImmutableInt2FloatTrieMap private constructor(
         firstKeyIndex: Int,
         secondKeyIndex: Int,
         secondKeyLayerSize: Int,
-        function: (startIndex: Int, endIndex: Int) -> T
+        function: (startIndex: Int, endIndex: Int) -> T,
     ): T {
         // Determine where to search within keyRemainderLayer
-        val estimatedRemainderIndex = calculateEstimatedRemainderIndex(
-            size,
-            firstKeyGlobalIndices[firstKeyIndex],
-            firstKeyLayer.size,
-            secondKeyIndex,
-            secondKeyLayerSize
-        )
+        val estimatedRemainderIndex =
+            calculateEstimatedRemainderIndex(
+                size,
+                firstKeyGlobalIndices[firstKeyIndex],
+                firstKeyLayer.size,
+                secondKeyIndex,
+                secondKeyLayerSize,
+            )
         val remainderLayerSearchData = keyRemainderLayerSearchData[firstKeyIndex][secondKeyIndex]
 
         // shr instead of ushr to preserve sign
-        val remainderSearchStartIndex = estimatedRemainderIndex + remainderLayerSearchData.shr(
-            SEARCH_DATA_SIZE_BITS_COUNT
-        )
+        val remainderSearchStartIndex =
+            estimatedRemainderIndex + remainderLayerSearchData.shr(SEARCH_DATA_SIZE_BITS_COUNT)
 
-        val remainderSearchSize = remainderLayerSearchData
-            .and(1.shl(SEARCH_DATA_SIZE_BITS_COUNT) - 1) + 1 // + 1 because size cannot be 0
+        val remainderSearchSize =
+            remainderLayerSearchData
+                .and(1.shl(SEARCH_DATA_SIZE_BITS_COUNT) - 1) + 1 // + 1 because size cannot be 0
 
         return function(remainderSearchStartIndex, remainderSearchStartIndex + remainderSearchSize)
     }
 
     private fun getValue(index: Int): Float {
-        return if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
-        else if (indValuesIndices.isEmpty()) values[index]
-        else values[index - indValuesIndices.size + maxIndirectionIndices]
+        return if (index < indValuesIndices.size) {
+            @Suppress("ktlint:standard:comment-wrapping")
+            values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
+        } else if (indValuesIndices.isEmpty()) {
+            values[index]
+        } else {
+            values[index - indValuesIndices.size + MAX_INDIRECTION_INDICES]
+        }
     }
 
     override fun get(key: Int): Float {
@@ -284,15 +296,16 @@ internal class ImmutableInt2FloatTrieMap private constructor(
         val secondKeyIndex = secondKeyLayer.binarySearch(secondKey)
         if (secondKeyIndex < 0) return 0f
 
-        val index = useRemainderLayerRange(firstKeyIndex, secondKeyIndex, secondKeyLayer.size) { startIndex, endIndex ->
-            val keyRemainder = key.shr(16).toShort()
+        val index =
+            useRemainderLayerRange(firstKeyIndex, secondKeyIndex, secondKeyLayer.size) { startIndex, endIndex ->
+                val keyRemainder = key.shr(16).toShort()
 
-            keyRemainderLayer.binarySearch(
-                keyRemainder,
-                startIndex,
-                endIndex
-            )
-        }
+                keyRemainderLayer.binarySearch(
+                    keyRemainder,
+                    startIndex,
+                    endIndex,
+                )
+            }
 
         return if (index < 0) 0f else getValue(index)
     }
@@ -308,12 +321,13 @@ internal class ImmutableInt2FloatTrieMap private constructor(
                 useRemainderLayerRange(
                     firstKeyIndex,
                     secondKeyIndex,
-                    secondKeyLayer.size
+                    secondKeyLayer.size,
                 ) { startIndex, endIndex ->
                     for (index in startIndex until endIndex) {
-                        val key = firstKey.toInt().and(0xFF)
-                            .or(secondKey.toInt().and(0xFF).shl(8))
-                            .or(keyRemainderLayer[index].toInt().shl(16))
+                        val key =
+                            firstKey.toInt().and(0xFF)
+                                .or(secondKey.toInt().and(0xFF).shl(8))
+                                .or(keyRemainderLayer[index].toInt().shl(16))
                         map.put(key, getValue(index))
                     }
                 }

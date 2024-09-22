@@ -8,7 +8,7 @@ private const val ALPHA = 50
 
 internal class LanguageColorMap(
     /** All languages except [Language.UNKNOWN] */
-    allLanguages: List<Language>
+    allLanguages: List<Language>,
 ) {
     private val colorsMap = EnumMap<Language, Color>(Language::class.java)
     private val listeners = mutableListOf<(Map<Language, Color>) -> Unit>()

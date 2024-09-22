@@ -20,7 +20,7 @@ private const val NO_INDEX = -1
  */
 internal class EnumDoubleMap<E : Enum<E>>(
     private val enumClass: Class<E>,
-    private val keyIndexer: KeyIndexer<E>
+    private val keyIndexer: KeyIndexer<E>,
 ) {
     companion object {
         inline fun <reified E : Enum<E>> newMap(keyIndexer: KeyIndexer<E>): EnumDoubleMap<E> {
@@ -30,11 +30,17 @@ internal class EnumDoubleMap<E : Enum<E>>(
 
     private val values = DoubleArray(keyIndexer.indicesCount())
 
-    fun set(enumConstant: E, value: Double) {
+    fun set(
+        enumConstant: E,
+        value: Double,
+    ) {
         values[keyIndexer.keyToIndex(enumConstant)] = value
     }
 
-    fun increment(enumConstant: E, value: Double) {
+    fun increment(
+        enumConstant: E,
+        value: Double,
+    ) {
         values[keyIndexer.keyToIndex(enumConstant)] += value
     }
 
@@ -90,15 +96,16 @@ internal class EnumDoubleMap<E : Enum<E>>(
 
     fun sortedByNonZeroDescendingValue(): Object2DoubleSortedMap<E> {
         // Uses a red-black tree map because that should have faster insertion times than AVL map
-        var map: Object2DoubleSortedMap<E> = Object2DoubleRBTreeMap { a, b ->
-            // Highest first
-            val diff = getOrZero(b).compareTo(getOrZero(a))
-            when {
-                diff != 0 -> diff
-                // Else sort Language constants by declaration order
-                else -> a.compareTo(b)
+        var map: Object2DoubleSortedMap<E> =
+            Object2DoubleRBTreeMap { a, b ->
+                // Highest first
+                val diff = getOrZero(b).compareTo(getOrZero(a))
+                when {
+                    diff != 0 -> diff
+                    // Else sort Language constants by declaration order
+                    else -> a.compareTo(b)
+                }
             }
-        }
         values.forEachIndexed { index, value ->
             if (value != 0.0) {
                 map.put(keyIndexer.indexToKey(index), value)
@@ -133,70 +140,71 @@ internal class EnumDoubleMap<E : Enum<E>>(
 
     data class Entry<E : Enum<E>>(val key: E, val value: Double)
 
-    fun descendingIterator() = object : Iterator<Entry<E>> {
-        var lastMax = Double.MAX_VALUE
-        var nextIndex = Int.MAX_VALUE // Move to end to skip `lastMax` check for first `hasNext()` call
+    fun descendingIterator() =
+        object : Iterator<Entry<E>> {
+            var lastMax = Double.MAX_VALUE
+            var nextIndex = Int.MAX_VALUE // Move to end to skip `lastMax` check for first `hasNext()` call
 
-        var next: E? = null
-        var nextValue = 0.0
+            var next: E? = null
+            var nextValue = 0.0
 
-        override fun hasNext(): Boolean {
-            if (next != null) return true
-            if (nextIndex == NO_INDEX) return false
+            override fun hasNext(): Boolean {
+                if (next != null) return true
+                if (nextIndex == NO_INDEX) return false
 
-            var maxIndex = NO_INDEX
-            var maxValue = 0.0
+                var maxIndex = NO_INDEX
+                var maxValue = 0.0
 
-            // First try finding constant with same value behind last result
-            for (index in nextIndex until values.size) {
-                val value = values[index]
-                if (value == lastMax && value > 0.0) {
-                    maxIndex = index
-                    maxValue = value
-                    break
+                // First try finding constant with same value behind last result
+                for (index in nextIndex until values.size) {
+                    val value = values[index]
+                    if (value == lastMax && value > 0.0) {
+                        maxIndex = index
+                        maxValue = value
+                        break
+                    }
+                }
+
+                if (maxIndex != NO_INDEX) {
+                    next = keyIndexer.indexToKey(maxIndex)
+                    nextValue = maxValue
+                    // Next iteration search one constant further for max
+                    nextIndex = maxIndex + 1
+                    return true
+                }
+
+                // No other constant found with `value == lastMax`, now check all constants
+                values.forEachIndexed { index, value ->
+                    @Suppress("ConvertTwoComparisonsToRangeCheck")
+                    if (value < lastMax && value > maxValue) {
+                        maxIndex = index
+                        maxValue = value
+                    }
+                }
+
+                @Suppress("LiftReturnOrAssignment")
+                if (maxIndex != NO_INDEX) {
+                    next = keyIndexer.indexToKey(maxIndex)
+                    nextValue = maxValue
+                    // Next iteration search one constant further for max
+                    nextIndex = maxIndex + 1
+                    lastMax = maxValue
+                    return true
+                } else {
+                    // Reached end
+                    nextIndex = NO_INDEX
+                    return false
                 }
             }
 
-            if (maxIndex != NO_INDEX) {
-                next = keyIndexer.indexToKey(maxIndex)
-                nextValue = maxValue
-                // Next iteration search one constant further for max
-                nextIndex = maxIndex + 1
-                return true
-            }
-
-            // No other constant found with `value == lastMax`, now check all constants
-            values.forEachIndexed { index, value ->
-                @Suppress("ConvertTwoComparisonsToRangeCheck")
-                if (value < lastMax && value > maxValue) {
-                    maxIndex = index
-                    maxValue = value
+            override fun next(): Entry<E> {
+                if (hasNext()) {
+                    val result = next
+                    next = null
+                    return Entry(result!!, nextValue)
+                } else {
+                    throw NoSuchElementException()
                 }
             }
-
-            @Suppress("LiftReturnOrAssignment")
-            if (maxIndex != NO_INDEX) {
-                next = keyIndexer.indexToKey(maxIndex)
-                nextValue = maxValue
-                // Next iteration search one constant further for max
-                nextIndex = maxIndex + 1
-                lastMax = maxValue
-                return true
-            } else {
-                // Reached end
-                nextIndex = NO_INDEX
-                return false
-            }
         }
-
-        override fun next(): Entry<E> {
-            if (hasNext()) {
-                val result = next
-                next = null
-                return Entry(result!!, nextValue)
-            } else {
-                throw NoSuchElementException()
-            }
-        }
-    }
 }

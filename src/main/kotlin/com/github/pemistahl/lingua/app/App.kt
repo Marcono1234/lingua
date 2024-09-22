@@ -31,7 +31,6 @@ fun main() {
 }
 
 private fun runApp() {
-
     println(
         """
         This is Tiny Lingua, a language detection library.
@@ -46,7 +45,7 @@ private fun runApp() {
 
         Visit https://github.com/Marcono1234/tiny-lingua for more information.
 
-        """.trimIndent()
+        """.trimIndent(),
     )
 
     val console: Console? = System.console()
@@ -59,12 +58,13 @@ private fun runApp() {
         if (input == ":quit") break
         if (input.isEmpty()) continue
 
-        number = try {
-            input.toInt()
-        } catch (e: NumberFormatException) {
-            println("This is not a valid number. Try again.\n")
-            continue
-        }
+        number =
+            try {
+                input.toInt()
+            } catch (e: NumberFormatException) {
+                println("This is not a valid number. Try again.\n")
+                continue
+            }
 
         if (number !in 1..3) {
             println("This selection is out of range.\nEnter number 1, 2 or 3.\n")
@@ -91,7 +91,7 @@ private fun runApp() {
                 List some language ISO 639-1 codes separated by spaces and press <Enter>.
                 Type :quit to exit.
 
-                """.trimIndent()
+                """.trimIndent(),
             )
 
             while (true) {
@@ -154,7 +154,7 @@ private fun runApp() {
             Type some text and press <Enter> to detect its language.
             Type :quit to exit.
 
-            """.trimIndent()
+            """.trimIndent(),
         )
 
         while (true) {

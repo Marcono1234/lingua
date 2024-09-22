@@ -15,12 +15,13 @@ import javax.swing.UIManager
  *
  * The selection state is represented by the [selectionState] property.
  */
-// Based on https://stackoverflow.com/a/26749506
 internal class TriStateCheckbox(text: String) : JCheckBox(text) {
+    // Based on https://stackoverflow.com/a/26749506
+
     enum class SelectionState {
         NOT_SELECTED,
         SOME_SELECTED,
-        SELECTED
+        SELECTED,
     }
 
     var selectionState: SelectionState = SelectionState.NOT_SELECTED
@@ -39,34 +40,41 @@ internal class TriStateCheckbox(text: String) : JCheckBox(text) {
     init {
         val delegateIcon = UIManager.getIcon("CheckBox.icon")
 
-        icon = object : Icon {
-            override fun paintIcon(c: Component, g: Graphics, x: Int, y: Int) {
-                delegateIcon.paintIcon(c, g, x, y)
-                if (this@TriStateCheckbox.selectionState != SelectionState.SOME_SELECTED) {
-                    return
+        icon =
+            object : Icon {
+                override fun paintIcon(
+                    c: Component,
+                    g: Graphics,
+                    x: Int,
+                    y: Int,
+                ) {
+                    delegateIcon.paintIcon(c, g, x, y)
+                    if (this@TriStateCheckbox.selectionState != SelectionState.SOME_SELECTED) {
+                        return
+                    }
+
+                    g.color = if (c.isEnabled) Color(51, 51, 51) else Color(122, 138, 153)
+
+                    val w = iconWidth
+                    val xInset = w / 3
+                    val h = iconHeight
+                    val yInset = h / 3
+                    g.fillRect(x + xInset, y + yInset, w - 2 * xInset, h - 2 * yInset)
                 }
 
-                g.color = if (c.isEnabled) Color(51, 51, 51) else Color(122, 138, 153)
+                override fun getIconWidth() = delegateIcon.iconWidth
 
-                val w = iconWidth
-                val xInset = w / 3
-                val h = iconHeight
-                val yInset = h / 3
-                g.fillRect(x + xInset, y + yInset, w - 2 * xInset, h - 2 * yInset)
+                override fun getIconHeight() = delegateIcon.iconHeight
             }
-
-            override fun getIconWidth() = delegateIcon.iconWidth
-
-            override fun getIconHeight() = delegateIcon.iconHeight
-        }
 
         addActionListener {
-            selectionState = when (selectionState) {
-                // Toggle between selected / not-selected; cannot reach 'some selected' here
-                SelectionState.SELECTED -> SelectionState.NOT_SELECTED
-                SelectionState.NOT_SELECTED -> SelectionState.SELECTED
-                SelectionState.SOME_SELECTED -> SelectionState.SELECTED
-            }
+            selectionState =
+                when (selectionState) {
+                    // Toggle between selected / not-selected; cannot reach 'some selected' here
+                    SelectionState.SELECTED -> SelectionState.NOT_SELECTED
+                    SelectionState.NOT_SELECTED -> SelectionState.SELECTED
+                    SelectionState.SOME_SELECTED -> SelectionState.SELECTED
+                }
             listeners.forEach { it(selectionState == SelectionState.SELECTED) }
         }
 

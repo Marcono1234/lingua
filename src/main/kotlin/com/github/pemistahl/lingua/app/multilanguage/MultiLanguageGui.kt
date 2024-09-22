@@ -60,18 +60,19 @@ internal fun openMultiLanguageDetectionGui() {
                 if (sections.isEmpty()) {
                     summaryLabel.text = noSectionsText
                 } else {
-                    val detectedLanguages = sections.map { s -> s.language }
-                        .groupingBy { l -> l }
-                        .eachCount()
-                        .entries
-                        .sortedWith { a, b ->
-                            // Sort highest count first
-                            val diff = b.value - a.value
-                            if (diff != 0) return@sortedWith diff
+                    val detectedLanguages =
+                        sections.map { s -> s.language }
+                            .groupingBy { l -> l }
+                            .eachCount()
+                            .entries
+                            .sortedWith { a, b ->
+                                // Sort highest count first
+                                val diff = b.value - a.value
+                                if (diff != 0) return@sortedWith diff
 
-                            return@sortedWith a.key.compareTo(b.key)
-                        }
-                        .map { e -> "${e.key} (${e.value})" }
+                                return@sortedWith a.key.compareTo(b.key)
+                            }
+                            .map { e -> "${e.key} (${e.value})" }
                     summaryLabel.text = "Sections: ${sections.size}; Languages: ${detectedLanguages.joinToString(", ")}"
                 }
             }

@@ -151,7 +151,7 @@ tasks.jacocoTestReport {
                     exclude("**/app/**")
                 }
             },
-        )
+        ),
     )
 }
 
@@ -162,21 +162,23 @@ tasks.register<Test>("accuracyReport") {
     classpath = sourceSets["accuracyReport"].runtimeClasspath
 
     val allowedDetectors = linguaSupportedDetectors.split(',')
-    val detectors = project.findProperty("detectors")?.toString()?.split(Regex("\\s*,\\s*"))
-        ?: allowedDetectors
+    val detectors =
+        project.findProperty("detectors")?.toString()?.split(Regex("\\s*,\\s*"))
+            ?: allowedDetectors
 
     detectors.filterNot { it in allowedDetectors }.forEach {
         throw GradleException(
             """
             detector '$it' does not exist
             supported detectors: ${allowedDetectors.joinToString(", ")}
-            """.trimIndent()
+            """.trimIndent(),
         )
     }
 
     val allowedLanguages = linguaSupportedLanguages.split(',')
-    val languages = project.findProperty("languages")?.toString()?.split(Regex("\\s*,\\s*"))
-        ?: allowedLanguages
+    val languages =
+        project.findProperty("languages")?.toString()?.split(Regex("\\s*,\\s*"))
+            ?: allowedLanguages
 
     languages.filterNot { it in allowedLanguages }.forEach {
         throw GradleException("language '$it' is not supported")
@@ -185,11 +187,12 @@ tasks.register<Test>("accuracyReport") {
     val availableCpuCores = Runtime.getRuntime().availableProcessors()
     val cpuCoresRepr = project.findProperty("cpuCores")?.toString() ?: "1"
 
-    val cpuCores = try {
-        cpuCoresRepr.toInt()
-    } catch (e: NumberFormatException) {
-        throw GradleException("'$cpuCoresRepr' is not a valid value for argument -PcpuCores")
-    }
+    val cpuCores =
+        try {
+            cpuCoresRepr.toInt()
+        } catch (e: NumberFormatException) {
+            throw GradleException("'$cpuCoresRepr' is not a valid value for argument -PcpuCores")
+        }
 
     if (cpuCores !in 1..availableCpuCores) {
         throw GradleException(
@@ -197,7 +200,7 @@ tasks.register<Test>("accuracyReport") {
             $cpuCores cpu cores are not supported
             minimum: 1
             maximum: $availableCpuCores
-            """.trimIndent()
+            """.trimIndent(),
         )
     }
 
@@ -211,7 +214,7 @@ tasks.register<Test>("accuracyReport") {
             languages.forEach { language ->
                 includeTestsMatching(
                     "com.github.pemistahl.lingua.report" +
-                        ".${detector.lowercase()}.${language}DetectionAccuracyReport"
+                        ".${detector.lowercase()}.${language}DetectionAccuracyReport",
                 )
             }
         }
@@ -252,11 +255,12 @@ val writeAggregatedAccuracyReport by tasks.registering {
                 if (languageReportFile.exists()) {
                     for (line in languageReportFile.readLines()) {
                         if (line.startsWith(stringToSplitAt)) {
-                            val accuracyValues = line
-                                .split(stringToSplitAt)[1]
-                                .split(' ')
-                                .slice(sliceLength)
-                                .joinToString(",")
+                            val accuracyValues =
+                                line
+                                    .split(stringToSplitAt)[1]
+                                    .split(' ')
+                                    .slice(sliceLength)
+                                    .joinToString(",")
                             csvFile.appendText(",")
                             csvFile.appendText(accuracyValues)
                         }
@@ -320,7 +324,6 @@ tasks.shadowJar {
     manifest {
         attributes(
             "Main-Class" to linguaMainClass,
-
             // Note: Depending on the dependencies, might have to set `Multi-Release: true`, see https://github.com/johnrengelman/shadow/issues/449
         )
     }
@@ -335,7 +338,7 @@ val lingua by configurations.creating {
     isTransitive = false
 }
 
-@Suppress("PropertyName")
+@Suppress("ktlint:standard:property-naming", "PropertyName")
 val modelOutputDir_ = layout.buildDirectory.dir("generated/language-models")
 val createLanguageModels by tasks.registering(GenerateLanguageModelsTask::class) {
     linguaArtifact.set(lingua.singleFile)
@@ -367,15 +370,16 @@ val checkLanguageModelsChecksum by tasks.registering {
                     val pathA = a.createPathString()
                     val pathB = b.createPathString()
                     return@Comparator pathA.compareTo(pathB)
-                }
+                },
             ).forEach {
                 messageDigest.update(Files.readAllBytes(it))
             }
         }
 
-        val actualChecksum = messageDigest.digest().joinToString("") {
-            it.toInt().and(0xFF).toString(16).padStart(2, '0')
-        }
+        val actualChecksum =
+            messageDigest.digest().joinToString("") {
+                it.toInt().and(0xFF).toString(16).padStart(2, '0')
+            }
 
         val expectedModelsChecksum: String by project
         if (actualChecksum != expectedModelsChecksum) {
@@ -384,7 +388,7 @@ val checkLanguageModelsChecksum by tasks.registering {
                 Language model checksums differ:
                   Expected: $expectedModelsChecksum
                   Actual:   $actualChecksum
-                """.trimIndent()
+                """.trimIndent(),
             )
         }
     }

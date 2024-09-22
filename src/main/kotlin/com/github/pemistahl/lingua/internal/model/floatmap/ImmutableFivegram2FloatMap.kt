@@ -49,7 +49,10 @@ internal class ImmutableFivegram2FloatMap private constructor(
         // Uses a red-black tree map because that should have faster insertion times than AVL map
         private val map: Object2FloatSortedMap<String> = Object2FloatRBTreeMap()
 
-        fun add(key: String, value: Float) {
+        fun add(
+            key: String,
+            value: Float,
+        ) {
             check(key.length == 5)
             val old = map.put(key, value)
             check(old == 0f)
@@ -65,9 +68,14 @@ internal class ImmutableFivegram2FloatMap private constructor(
     }
 
     private fun getValue(index: Int): Float {
-        return if (index < indValuesIndices.size) values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
-        else if (indValuesIndices.isEmpty()) values[index]
-        else values[index - indValuesIndices.size + maxIndirectionIndices]
+        return if (index < indValuesIndices.size) {
+            @Suppress("ktlint:standard:comment-wrapping")
+            values[indValuesIndices[index].toInt().and(0xFFFF) /* UShort */]
+        } else if (indValuesIndices.isEmpty()) {
+            values[index]
+        } else {
+            values[index - indValuesIndices.size + MAX_INDIRECTION_INDICES]
+        }
     }
 
     override fun getFloat(key: Any): Float {

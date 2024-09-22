@@ -26,14 +26,15 @@ internal open class QuadriFivegramLookup(
     private val fivegramsAsString: Object2FloatFunction<String>,
 ) {
     companion object {
-        val empty = QuadriFivegramLookup(
-            CharOffsetsData(Char2ShortMaps.EMPTY_MAP),
-            Int2FloatMaps.EMPTY_MAP,
-            Long2FloatMaps.EMPTY_MAP,
-            Int2FloatMaps.EMPTY_MAP,
-            Long2FloatMaps.EMPTY_MAP,
-            Object2FloatMaps.emptyMap(),
-        )
+        val empty =
+            QuadriFivegramLookup(
+                CharOffsetsData(Char2ShortMaps.EMPTY_MAP),
+                Int2FloatMaps.EMPTY_MAP,
+                Long2FloatMaps.EMPTY_MAP,
+                Int2FloatMaps.EMPTY_MAP,
+                Long2FloatMaps.EMPTY_MAP,
+                Object2FloatMaps.emptyMap(),
+            )
     }
 
     // Note: Effectively this is a destructured ReusableObjectNgram, but to keep number of classes for buildSrc
@@ -49,23 +50,29 @@ internal open class QuadriFivegramLookup(
     ): Double {
         // Note: Explicitly specify type Float here to avoid accidentally having implicit type Number
         // (and therefore boxing) when one of the results is not a Float
-        val frequency: Float = when (length) {
-            4 -> charOffsetsData.useEncodedQuadrigram(
-                char0, char1, char2, char3,
-                { quadrigramsAsInt.get(it) },
-                { quadrigramsAsLong.get(it) },
-                { 0f }
-            )
-            5 -> charOffsetsData.useEncodedFivegram(
-                char0, char1, char2, char3, char4,
-                fivegramAsString,
-                { fivegramsAsInt.get(it) },
-                { fivegramsAsLong.get(it) },
-                { fivegramsAsString.getFloat(it) },
-                { 0f }
-            )
-            else -> throw IllegalArgumentException("Invalid Ngram length")
-        }
+        val frequency: Float =
+            when (length) {
+                4 ->
+                    charOffsetsData.useEncodedQuadrigram(
+                        char0,
+                        char1,
+                        char2,
+                        char3,
+                        { quadrigramsAsInt.get(it) },
+                        { quadrigramsAsLong.get(it) },
+                        { 0f },
+                    )
+                5 ->
+                    charOffsetsData.useEncodedFivegram(
+                        char0, char1, char2, char3, char4,
+                        fivegramAsString,
+                        { fivegramsAsInt.get(it) },
+                        { fivegramsAsLong.get(it) },
+                        { fivegramsAsString.getFloat(it) },
+                        { 0f },
+                    )
+                else -> throw IllegalArgumentException("Invalid Ngram length")
+            }
         return frequency.toDouble()
     }
 }
@@ -81,18 +88,18 @@ internal class QuadriFivegramBinarySearchLookup private constructor(
     private val fivegramsAsLong: ImmutableLong2FloatMap,
     private val fivegramsAsString: ImmutableFivegram2FloatMap,
 ) : QuadriFivegramLookup(
-    charOffsetsData,
-    quadrigramsAsInt,
-    quadrigramsAsLong,
-    fivegramsAsInt,
-    fivegramsAsLong,
-    fivegramsAsString,
-) {
+        charOffsetsData,
+        quadrigramsAsInt,
+        quadrigramsAsLong,
+        fivegramsAsInt,
+        fivegramsAsLong,
+        fivegramsAsString,
+    ) {
     companion object {
         @Suppress("unused") // used by buildSrc for model generation
         fun fromJson(
             quadrigrams: Object2FloatLinkedOpenHashMap<String>,
-            fivegrams: Object2FloatLinkedOpenHashMap<String>
+            fivegrams: Object2FloatLinkedOpenHashMap<String>,
         ): QuadriFivegramBinarySearchLookup {
             val ngrams = quadrigrams.keys.asSequence().plus(fivegrams.keys)
             val charOffsetsData = CharOffsetsData.createCharOffsetsData(ngrams)
@@ -131,7 +138,7 @@ internal class QuadriFivegramBinarySearchLookup private constructor(
                     quadrigramsAsLong,
                     fivegramsAsInt,
                     fivegramsAsLong,
-                    fivegramsAsObject
+                    fivegramsAsObject,
                 )
             }
         }
@@ -146,7 +153,10 @@ internal class QuadriFivegramBinarySearchLookup private constructor(
         private val fivegramsAsLongBuilder = ImmutableLong2FloatMap.Builder()
         private val fivegramsAsStringBuilder = ImmutableFivegram2FloatMap.Builder()
 
-        fun putQuadrigramFrequency(quadrigram: String, frequency: Float) {
+        fun putQuadrigramFrequency(
+            quadrigram: String,
+            frequency: Float,
+        ) {
             if (quadrigram.length != 4) {
                 throw IllegalArgumentException("Invalid ngram length ${quadrigram.length}")
             }
@@ -155,11 +165,14 @@ internal class QuadriFivegramBinarySearchLookup private constructor(
                 quadrigram,
                 { quadrigramsAsIntBuilder.add(it, frequency) },
                 { quadrigramsAsLongBuilder.add(it, frequency) },
-                { throw AssertionError("Char offsets don't include chars of: $quadrigram") }
+                { throw AssertionError("Char offsets don't include chars of: $quadrigram") },
             )
         }
 
-        fun putFivegramFrequency(fivegram: String, frequency: Float) {
+        fun putFivegramFrequency(
+            fivegram: String,
+            frequency: Float,
+        ) {
             if (fivegram.length != 5) {
                 throw IllegalArgumentException("Invalid ngram length ${fivegram.length}")
             }
@@ -169,7 +182,7 @@ internal class QuadriFivegramBinarySearchLookup private constructor(
                 { fivegramsAsIntBuilder.add(it, frequency) },
                 { fivegramsAsLongBuilder.add(it, frequency) },
                 { fivegramsAsStringBuilder.add(it, frequency) },
-                { throw AssertionError("Char offsets don't include chars of: $fivegram") }
+                { throw AssertionError("Char offsets don't include chars of: $fivegram") },
             )
         }
 
@@ -180,19 +193,20 @@ internal class QuadriFivegramBinarySearchLookup private constructor(
                 quadrigramsAsLongBuilder.build(),
                 fivegramsAsIntBuilder.build(),
                 fivegramsAsLongBuilder.build(),
-                fivegramsAsStringBuilder.build()
+                fivegramsAsStringBuilder.build(),
             )
         }
     }
 
-    fun asHashMapLookup() = QuadriFivegramLookup(
-        charOffsetsData,
-        quadrigramsAsInt.asHashMap(),
-        quadrigramsAsLong.asHashMap(),
-        fivegramsAsInt.asHashMap(),
-        fivegramsAsLong.asHashMap(),
-        fivegramsAsString.asHashMap(),
-    )
+    fun asHashMapLookup() =
+        QuadriFivegramLookup(
+            charOffsetsData,
+            quadrigramsAsInt.asHashMap(),
+            quadrigramsAsLong.asHashMap(),
+            fivegramsAsInt.asHashMap(),
+            fivegramsAsLong.asHashMap(),
+            fivegramsAsString.asHashMap(),
+        )
 
     /**
      * Writes the binary representation of the model data to a sub directory for
@@ -204,7 +218,7 @@ internal class QuadriFivegramBinarySearchLookup private constructor(
     fun writeBinary(
         resourcesDirectory: Path,
         languageCode: String,
-        changeSummaryCallback: (oldSizeBytes: Long?, newSizeBytes: Long) -> Unit
+        changeSummaryCallback: (oldSizeBytes: Long?, newSizeBytes: Long) -> Unit,
     ): Path {
         val resourceName = getBinaryModelResourceName(languageCode)
 

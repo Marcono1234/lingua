@@ -88,7 +88,6 @@ internal object Constant {
             "ÐðÞþ" to enumSetOf(ICELANDIC, TURKISH),
             "Ûû" to enumSetOf(FRENCH, HUNGARIAN),
             "Ōō" to enumSetOf(MAORI, YORUBA),
-
             "ĀāĒēĪī" to enumSetOf(LATVIAN, MAORI, YORUBA),
             "Şş" to enumSetOf(AZERBAIJANI, ROMANIAN, TURKISH),
             "Ďď" to enumSetOf(CZECH, ROMANIAN, SLOVAK),
@@ -97,45 +96,41 @@ internal object Constant {
             "Іі" to enumSetOf(BELARUSIAN, KAZAKH, UKRAINIAN),
             "Ìì" to enumSetOf(ITALIAN, VIETNAMESE, YORUBA),
             "Øø" to enumSetOf(BOKMAL, DANISH, NYNORSK),
-
             "Ūū" to enumSetOf(LATVIAN, LITHUANIAN, MAORI, YORUBA),
             "Ëë" to enumSetOf(AFRIKAANS, ALBANIAN, DUTCH, FRENCH),
             "ÈèÙù" to enumSetOf(FRENCH, ITALIAN, VIETNAMESE, YORUBA),
             "Êê" to enumSetOf(AFRIKAANS, FRENCH, PORTUGUESE, VIETNAMESE),
             "Õõ" to enumSetOf(ESTONIAN, HUNGARIAN, PORTUGUESE, VIETNAMESE),
             "Ôô" to enumSetOf(FRENCH, PORTUGUESE, SLOVAK, VIETNAMESE),
-
             "ЁёЫыЭэ" to enumSetOf(BELARUSIAN, KAZAKH, MONGOLIAN, RUSSIAN),
             "Щщ" to enumSetOf(BULGARIAN, KAZAKH, MONGOLIAN, RUSSIAN, UKRAINIAN),
             "Ъъ" to enumSetOf(BULGARIAN, KAZAKH, MONGOLIAN, RUSSIAN),
             "Òò" to enumSetOf(CATALAN, ITALIAN, VIETNAMESE, YORUBA),
             "Ææ" to enumSetOf(BOKMAL, DANISH, ICELANDIC, NYNORSK),
             "Åå" to enumSetOf(BOKMAL, DANISH, NYNORSK, SWEDISH),
-
             "Ýý" to enumSetOf(CZECH, ICELANDIC, SLOVAK, TURKISH, VIETNAMESE),
             "Ää" to enumSetOf(ESTONIAN, FINNISH, GERMAN, SLOVAK, SWEDISH),
             "Àà" to enumSetOf(CATALAN, FRENCH, ITALIAN, PORTUGUESE, VIETNAMESE),
             "Ââ" to enumSetOf(FRENCH, PORTUGUESE, ROMANIAN, TURKISH, VIETNAMESE),
-
             "Üü" to enumSetOf(AZERBAIJANI, CATALAN, ESTONIAN, GERMAN, HUNGARIAN, SPANISH, TURKISH),
             "ČčŠšŽž" to enumSetOf(BOSNIAN, CZECH, CROATIAN, LATVIAN, LITHUANIAN, SLOVAK, SLOVENE),
             "Çç" to enumSetOf(ALBANIAN, AZERBAIJANI, BASQUE, CATALAN, FRENCH, PORTUGUESE, TURKISH),
-
             "Öö" to enumSetOf(AZERBAIJANI, ESTONIAN, FINNISH, GERMAN, HUNGARIAN, ICELANDIC, SWEDISH, TURKISH),
-
-            "Óó" to enumSetOf(
-                CATALAN, HUNGARIAN, ICELANDIC, IRISH, POLISH,
-                PORTUGUESE, SLOVAK, SPANISH, VIETNAMESE, YORUBA
-            ),
-            "ÁáÍíÚú" to enumSetOf(
-                CATALAN, CZECH, ICELANDIC, IRISH, HUNGARIAN,
-                PORTUGUESE, SLOVAK, SPANISH, VIETNAMESE, YORUBA
-            ),
-
-            "Éé" to enumSetOf(
-                CATALAN, CZECH, FRENCH, HUNGARIAN, ICELANDIC, IRISH,
-                ITALIAN, PORTUGUESE, SLOVAK, SPANISH, VIETNAMESE, YORUBA
-            )
+            "Óó" to
+                enumSetOf(
+                    CATALAN, HUNGARIAN, ICELANDIC, IRISH, POLISH,
+                    PORTUGUESE, SLOVAK, SPANISH, VIETNAMESE, YORUBA,
+                ),
+            "ÁáÍíÚú" to
+                enumSetOf(
+                    CATALAN, CZECH, ICELANDIC, IRISH, HUNGARIAN,
+                    PORTUGUESE, SLOVAK, SPANISH, VIETNAMESE, YORUBA,
+                ),
+            "Éé" to
+                enumSetOf(
+                    CATALAN, CZECH, FRENCH, HUNGARIAN, ICELANDIC, IRISH,
+                    ITALIAN, PORTUGUESE, SLOVAK, SPANISH, VIETNAMESE, YORUBA,
+                ),
         ).forEach {
             val valueArray = it.value.toTypedArray()
             it.key.forEach { char ->
@@ -146,9 +141,10 @@ internal object Constant {
 
     /** Indexer for all Languages which are the values of [CHARS_TO_LANGUAGES_MAPPING] */
     @JvmField
-    val languagesWithCharsIndexer = KeyIndexer.fromEnumConstants(
-        CHARS_TO_LANGUAGES_MAPPING.values.flatMap { it.toList() }
-    )
+    val languagesWithCharsIndexer =
+        KeyIndexer.fromEnumConstants(
+            CHARS_TO_LANGUAGES_MAPPING.values.flatMap { it.toList() },
+        )
 
     // Note: Interestingly @JvmStatic turns the function into a static one instead of adding an additional
     // static function (https://youtrack.jetbrains.com/issue/KT-54370), so using it here is probably an improvement
@@ -161,8 +157,10 @@ internal object Constant {
 
     @JvmField
     val LANGUAGES_SUPPORTING_LOGOGRAMS = enumSetOf(CHINESE, JAPANESE, KOREAN)
+
     @JvmField
     val MULTIPLE_WHITESPACE = Regex("\\s+")
+
     @JvmField
     val NUMBERS_AND_PUNCTUATION = Regex("\\p{N}|\\p{P}")
 }
