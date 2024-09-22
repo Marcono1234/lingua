@@ -6,8 +6,12 @@ import okio.buffer
 import okio.source
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.tasks.*
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
 import java.nio.file.FileVisitResult
@@ -15,16 +19,21 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
+import java.time.Duration
 import java.util.*
-import java.util.jar.JarEntry
-import java.util.jar.JarFile
+import kotlin.io.path.inputStream
 import kotlin.math.abs
 
+/**
+ * Clones the upstream Lingua Git repository, processes the language models in the JSON format and
+ * converts them to the binary format used by Tiny Lingua.
+ */
 @CacheableTask
 abstract class GenerateLanguageModelsTask : DefaultTask() {
-    @get:InputFile
-    @get:PathSensitive(PathSensitivity.NONE) // only content matters, file name does not matter
-    abstract val linguaArtifact: RegularFileProperty
+    @get:Input
+    abstract val linguaRepoUrl: Property<String>
+    @get:Input
+    abstract val linguaCommit: Property<String>
     /*
      * TODO: Does not seem to detect when unused files exist, might have to adjust task, see also
      *      https://github.com/gradle/gradle/blob/19a20e98d7697333674c88f2db6dae1d0e3d206b/subprojects/core/src/main/java/org/gradle/api/internal/tasks/execution/CleanupStaleOutputsExecuter.java
@@ -65,65 +74,41 @@ abstract class GenerateLanguageModelsTask : DefaultTask() {
 
         val modelFileCreator = ModelFileCreator()
 
-        JarFile(linguaArtifact.get().asFile).use { jarFile ->
-            jarFile.entries().asSequence()
-                .filter { it.name.startsWith("language-models/") && !it.isDirectory }
-                // Group by language code
-                .groupBy { it.name.substringAfter('/').substringBefore('/') }
-                .mapValues {
-                    val map = mutableMapOf<String, JarEntry>()
-                    it.value.forEach { entry ->
-                        val fileName = entry.name.split('/', limit = 3)[2]
-                        map[fileName] = entry
-                    }
-                    map
-                }
-                .forEach { (languageCode, entries) ->
-                    fun readModel(fileName: String, estimatedNgramsCount: Int): Object2FloatLinkedOpenHashMap<String> {
-                        // If model file does not exist return empty map; some languages such as Chinese don't
-                        // have model files for all ngram lengths, see
-                        // https://github.com/pemistahl/lingua/commit/444aaa0848840e542d5c8bdc54ea1aff092f209b
-                        return entries[fileName]?.let {
-                            jarFile.getInputStream(it).use { stream ->
-                                readJsonLanguageModel(stream, estimatedNgramsCount)
-                            }
-                        } ?: Object2FloatLinkedOpenHashMap<String>()
-                    }
+        processLanguageDirs { languageModelDir ->
+            val languageCode = languageModelDir.getLanguageCode()
 
-                    // Read JAR contents single-threaded because JarFile does not seem to be thread-safe
-                    val unigrams = readModel("unigrams.json", 64)
-                    val bigrams = readModel("bigrams.json", 1024)
-                    val trigrams = readModel("trigrams.json", 8192)
-                    modelFileCreator.submitCreationTask(
-                        {
-                            UniBiTrigramBinarySearchLookup.fromJson(unigrams, bigrams, trigrams)
-                        },
-                        {
-                            val file = it.writeBinary(
-                                modelOutputDir,
-                                languageCode,
-                                printingSizeChange(languageCode, "uni-bi-trigram")
-                            )
-                            filesToDelete.remove(file.toAbsolutePath())
-                        }
+            val unigrams = languageModelDir.readModel("unigrams.json", 64)
+            val bigrams = languageModelDir.readModel("bigrams.json", 1024)
+            val trigrams = languageModelDir.readModel("trigrams.json", 8192)
+            modelFileCreator.submitCreationTask(
+                {
+                    UniBiTrigramBinarySearchLookup.fromJson(unigrams, bigrams, trigrams)
+                },
+                {
+                    val file = it.writeBinary(
+                        modelOutputDir,
+                        languageCode,
+                        printingSizeChange(languageCode, "uni-bi-trigram")
                     )
-
-                    val quadrigrams = readModel("quadrigrams.json", 32768)
-                    val fivegrams = readModel("fivegrams.json", 65536)
-                    modelFileCreator.submitCreationTask(
-                        {
-                            QuadriFivegramBinarySearchLookup.fromJson(quadrigrams, fivegrams)
-                        },
-                        {
-                            val file = it.writeBinary(
-                                modelOutputDir,
-                                languageCode,
-                                printingSizeChange(languageCode, "quadri-fivegram")
-                            )
-                            filesToDelete.remove(file.toAbsolutePath())
-                        }
-                    )
+                    filesToDelete.remove(file.toAbsolutePath())
                 }
+            )
+
+            val quadrigrams = languageModelDir.readModel("quadrigrams.json", 32768)
+            val fivegrams = languageModelDir.readModel("fivegrams.json", 65536)
+            modelFileCreator.submitCreationTask(
+                {
+                    QuadriFivegramBinarySearchLookup.fromJson(quadrigrams, fivegrams)
+                },
+                {
+                    val file = it.writeBinary(
+                        modelOutputDir,
+                        languageCode,
+                        printingSizeChange(languageCode, "quadri-fivegram")
+                    )
+                    filesToDelete.remove(file.toAbsolutePath())
+                }
+            )
         }
 
         modelFileCreator.awaitCompletion()
@@ -154,46 +139,109 @@ abstract class GenerateLanguageModelsTask : DefaultTask() {
         })
     }
 
-    private fun readJsonLanguageModel(
-        jsonStream: InputStream,
-        estimatedNgramsCount: Int
-    ): Object2FloatLinkedOpenHashMap<String> {
-        val jsonReader = JsonReader.of(jsonStream.source().buffer())
-        jsonReader.beginObject()
+    private class LanguageModelDir(private val dir: Path) {
+        fun getLanguageCode(): String = dir.fileName.toString()
 
-        var ngramsMap: Object2FloatLinkedOpenHashMap<String>? = null
+        fun readModel(fileName: String, estimatedNgramsCount: Int): Object2FloatLinkedOpenHashMap<String> {
+            val file = dir.resolve(fileName)
+            if (!Files.isRegularFile(file)) {
+                // If model file does not exist return empty map; some languages such as Chinese don't
+                // have model files for all ngram lengths, see
+                // https://github.com/pemistahl/lingua/commit/444aaa0848840e542d5c8bdc54ea1aff092f209b
+                return Object2FloatLinkedOpenHashMap<String>()
+            }
 
-        while (jsonReader.hasNext()) {
-            when (val name = jsonReader.nextName()) {
-                "language" -> { jsonReader.skipValue() }
-                "ngrams" -> {
-                    if (ngramsMap == null) {
-                        ngramsMap = Object2FloatLinkedOpenHashMap(estimatedNgramsCount)
-                        jsonReader.beginObject()
-                        while (jsonReader.hasNext()) {
-                            val frequencyString = jsonReader.nextName()
-                            val separatorIndex = frequencyString.indexOf('/')
-                            val numerator = Integer.parseInt(frequencyString, 0, separatorIndex, 10)
-                            val denominator = Integer.parseInt(frequencyString, separatorIndex + 1, frequencyString.length, 10)
-
-                            val frequency = numerator.toFloat() / denominator
-                            // Note: Specifies delimiter as String `" "` instead of Char `' '` because currently
-                            // implementation of `split` function would convert that to String anyway
-                            val ngrams = jsonReader.nextString().split(" ")
-                            ngrams.forEach { ngram ->
-                                ngramsMap.put(ngram, frequency)
-                            }
-                        }
-                        jsonReader.endObject()
-                    } else throw IllegalArgumentException("Duplicate ngrams at ${jsonReader.path}")
-                }
-                else -> throw IllegalArgumentException("Unknown name '$name' at ${jsonReader.path}")
+            return file.inputStream().use { stream ->
+                readJsonLanguageModel(stream, estimatedNgramsCount)
             }
         }
-        jsonReader.endObject()
 
-        if (ngramsMap == null) throw IllegalArgumentException("Model data is missing ngrams")
-        return ngramsMap
+        private fun readJsonLanguageModel(
+            jsonStream: InputStream,
+            estimatedNgramsCount: Int
+        ): Object2FloatLinkedOpenHashMap<String> {
+            val jsonReader = JsonReader.of(jsonStream.source().buffer())
+            jsonReader.beginObject()
+
+            var ngramsMap: Object2FloatLinkedOpenHashMap<String>? = null
+
+            while (jsonReader.hasNext()) {
+                when (val name = jsonReader.nextName()) {
+                    "language" -> { jsonReader.skipValue() }
+                    "ngrams" -> {
+                        if (ngramsMap == null) {
+                            ngramsMap = Object2FloatLinkedOpenHashMap(estimatedNgramsCount)
+                            jsonReader.beginObject()
+                            while (jsonReader.hasNext()) {
+                                val frequencyString = jsonReader.nextName()
+                                val separatorIndex = frequencyString.indexOf('/')
+                                val numerator = Integer.parseInt(frequencyString, 0, separatorIndex, 10)
+                                val denominator = Integer.parseInt(frequencyString, separatorIndex + 1, frequencyString.length, 10)
+
+                                val frequency = numerator.toFloat() / denominator
+                                // Note: Specifies delimiter as String `" "` instead of Char `' '` because currently
+                                // implementation of `split` function would convert that to String anyway
+                                val ngrams = jsonReader.nextString().split(" ")
+                                ngrams.forEach { ngram ->
+                                    ngramsMap.put(ngram, frequency)
+                                }
+                            }
+                            jsonReader.endObject()
+                        } else throw IllegalArgumentException("Duplicate ngrams at ${jsonReader.path}")
+                    }
+                    else -> throw IllegalArgumentException("Unknown name '$name' at ${jsonReader.path}")
+                }
+            }
+            jsonReader.endObject()
+
+            if (ngramsMap == null) throw IllegalArgumentException("Model data is missing ngrams")
+            return ngramsMap
+        }
+    }
+
+    private class CloseableTempDir private constructor(val path: Path) : Closeable {
+        companion object {
+            fun create(namePrefix: String): CloseableTempDir {
+                return CloseableTempDir(Files.createTempDirectory(namePrefix))
+            }
+        }
+
+        override fun close() {
+            path.toFile().deleteRecursively()
+        }
+    }
+
+    private fun processLanguageDirs(consumer: (LanguageModelDir) -> Unit) {
+        val linguaRepoUrl = linguaRepoUrl.get()
+        val linguaCommit = linguaCommit.get()
+
+        CloseableTempDir.create("lingua-${linguaCommit.take(8)}-").use { it ->
+            val gitDir = it.path
+            logger.info("Cloning Lingua into directory $gitDir")
+
+            val languageModelsDir = Path.of("src/main/resources/language-models")
+
+            data class Command(val command: List<String>, val timeout: Duration)
+            // Perform shallow clone of specific commit, see https://stackoverflow.com/a/43136160
+            val commands = listOf(
+                Command(listOf("git", "init"), Duration.ofSeconds(5)),
+                Command(listOf("git", "remote", "add", "origin", linguaRepoUrl), Duration.ofSeconds(5)),
+                Command(listOf("git", "fetch", "--depth", "1", "origin", linguaCommit), Duration.ofSeconds(60)),
+                // Check out only the needed files
+                Command(listOf("git", "checkout", "FETCH_HEAD", "--", languageModelsDir.toString()), Duration.ofSeconds(30)),
+            )
+
+            commands.forEach {
+                // For now don't treat std-err output as error because Git writes some non-error information there
+                val treatStdErrAsError = false
+                ProcessExecutor(it.command, gitDir).execute(treatStdErrAsError, it.timeout)
+            }
+
+            logger.info("Starting to process language models")
+            Files.list(gitDir.resolve(languageModelsDir)).use {
+                it.map{ dir -> LanguageModelDir(dir)}.forEach(consumer)
+            }
+        }
     }
 
 

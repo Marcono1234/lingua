@@ -36,11 +36,11 @@ However, there are some differences:
 The detection confidence values returned by this library won't be exactly the same as the ones
 returned by the original Lingua library. However, the differences should be negligible.
 
-The versioning scheme is `<version>-L<upstream-lingua-version>`. For example `1.0.0-L1.2.2` means:
+The versioning scheme is `<version>-L<upstream-lingua-commit>`. For example `1.0.0-L44ee38c1` means:
 - Tiny Lingua version 1.0.0
-- based on upstream Lingua version 1.2.2
+- based on upstream Lingua commit `44ee38c1`, see [GitHub commit search](https://github.com/search?q=repo%3Apemistahl%2Flingua+44ee38c1ba79698e704f217162f625bd87632d6a&type=commits)
 
-Note that the upstream Lingua version number does not guarantee that all of the APIs and functionality
+Note that the upstream Lingua commit does not guarantee that all of the APIs and functionality of that version
 are supported. Some features might be omitted (or replaced) in this library.
 
 > [!WARNING]\

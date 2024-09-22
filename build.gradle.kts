@@ -23,12 +23,16 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 
+val upstreamRepoUrl: String by project
+// Commit of the upstream Lingua project on which this project is based
+// Uses commit instead of version to allow merging in not yet released changes,
+// and using the corresponding language models
+val upstreamRepoCommit: String by project
+
 val linguaTaskGroup: String by project
 val linguaGroupId: String by project
 val linguaArtifactId: String by project
 val projectVersion: String by project
-// Version of the upstream Lingua project on which this project is based
-val upstreamProjectVersion: String by project
 val linguaName: String by project
 val linguaDescription: String by project
 val linguaLicenseName: String by project
@@ -45,7 +49,7 @@ val linguaCsvHeader: String by project
 val compileTestKotlin: KotlinCompile by tasks
 
 group = linguaGroupId
-version = "$projectVersion-L$upstreamProjectVersion"
+version = "$projectVersion-L${upstreamRepoCommit.take(8)}"
 description = linguaDescription
 
 plugins {
@@ -331,17 +335,11 @@ tasks.shadowJar {
     exclude("**/module-info.class")
 }
 
-val lingua by configurations.creating {
-    // Prevent projects depending on lingua from seeing and using this configuration
-    isCanBeConsumed = false
-    isVisible = false
-    isTransitive = false
-}
-
 @Suppress("ktlint:standard:property-naming", "PropertyName")
 val modelOutputDir_ = layout.buildDirectory.dir("generated/language-models")
 val createLanguageModels by tasks.registering(GenerateLanguageModelsTask::class) {
-    linguaArtifact.set(lingua.singleFile)
+    linguaRepoUrl.set(upstreamRepoUrl)
+    linguaCommit.set(upstreamRepoCommit)
     modelOutputDir.set(modelOutputDir_)
 
     finalizedBy(checkLanguageModelsChecksum)
@@ -395,8 +393,6 @@ val checkLanguageModelsChecksum by tasks.registering {
 }
 
 dependencies {
-    lingua("com.github.pemistahl:lingua:$upstreamProjectVersion")
-
     implementation(libs.fastutil)
 
     testImplementation(libs.junit)
