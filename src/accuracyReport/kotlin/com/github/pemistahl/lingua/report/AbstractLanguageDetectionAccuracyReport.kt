@@ -17,6 +17,7 @@
 package com.github.pemistahl.lingua.report
 
 import com.github.pemistahl.lingua.api.IsoCode639_1
+import com.github.pemistahl.lingua.api.IsoCode639_1.AM
 import com.github.pemistahl.lingua.api.IsoCode639_1.AZ
 import com.github.pemistahl.lingua.api.IsoCode639_1.BS
 import com.github.pemistahl.lingua.api.IsoCode639_1.EO
@@ -29,8 +30,11 @@ import com.github.pemistahl.lingua.api.IsoCode639_1.MI
 import com.github.pemistahl.lingua.api.IsoCode639_1.MN
 import com.github.pemistahl.lingua.api.IsoCode639_1.NB
 import com.github.pemistahl.lingua.api.IsoCode639_1.NN
+import com.github.pemistahl.lingua.api.IsoCode639_1.OM
+import com.github.pemistahl.lingua.api.IsoCode639_1.SI
 import com.github.pemistahl.lingua.api.IsoCode639_1.SN
 import com.github.pemistahl.lingua.api.IsoCode639_1.ST
+import com.github.pemistahl.lingua.api.IsoCode639_1.TI
 import com.github.pemistahl.lingua.api.IsoCode639_1.TN
 import com.github.pemistahl.lingua.api.IsoCode639_1.TS
 import com.github.pemistahl.lingua.api.IsoCode639_1.XH
@@ -62,7 +66,7 @@ import kotlin.math.roundToInt
 
 abstract class AbstractLanguageDetectionAccuracyReport(
     private val language: Language,
-    private val implementationToUse: LanguageDetectorImplementation
+    private val implementationToUse: LanguageDetectorImplementation,
 ) {
     private val singleWordsStatistics = mutableMapOf<Language, Pair<Int, Int>>()
     private val wordPairsStatistics = mutableMapOf<Language, Pair<Int, Int>>()
@@ -88,17 +92,19 @@ abstract class AbstractLanguageDetectionAccuracyReport(
         val accuracyReportsDirectoryName = "accuracy-reports"
         val detectorDirectoryName = implementationToUse.name.lowercase()
         val languageReportFileName = "${language.name.lowercase().replaceFirstChar { it.titlecase() }}.txt"
-        val accuracyReportsDirectoryPath = Paths.get(
-            projectRootPath,
-            accuracyReportsDirectoryName,
-            detectorDirectoryName
-        )
-        val accuracyReportFilePath = Paths.get(
-            projectRootPath,
-            accuracyReportsDirectoryName,
-            detectorDirectoryName,
-            languageReportFileName
-        )
+        val accuracyReportsDirectoryPath =
+            Paths.get(
+                projectRootPath,
+                accuracyReportsDirectoryName,
+                detectorDirectoryName,
+            )
+        val accuracyReportFilePath =
+            Paths.get(
+                projectRootPath,
+                accuracyReportsDirectoryName,
+                detectorDirectoryName,
+                languageReportFileName,
+            )
 
         println(statisticsReport())
 
@@ -113,43 +119,48 @@ abstract class AbstractLanguageDetectionAccuracyReport(
         val wordPairsAccuracyValues = mapCountsToAccuracies(wordPairsStatistics)
         val sentencesAccuracyValues = mapCountsToAccuracies(sentencesStatistics)
 
-        val (singleWordAccuracies, singleWordAccuracyReport) = getReportData(
-            singleWordsAccuracyValues,
-            wordCount,
-            wordLengthCount,
-            "single words"
-        )
-        val (wordPairAccuracies, wordPairAccuracyReport) = getReportData(
-            wordPairsAccuracyValues,
-            wordPairCount,
-            wordPairLengthCount,
-            "word pairs"
-        )
-        val (sentenceAccuracies, sentenceAccuracyReport) = getReportData(
-            sentencesAccuracyValues,
-            sentenceCount,
-            sentenceLengthCount,
-            "sentences"
-        )
+        val (singleWordAccuracies, singleWordAccuracyReport) =
+            getReportData(
+                singleWordsAccuracyValues,
+                wordCount,
+                wordLengthCount,
+                "single words",
+            )
+        val (wordPairAccuracies, wordPairAccuracyReport) =
+            getReportData(
+                wordPairsAccuracyValues,
+                wordPairCount,
+                wordPairLengthCount,
+                "word pairs",
+            )
+        val (sentenceAccuracies, sentenceAccuracyReport) =
+            getReportData(
+                sentencesAccuracyValues,
+                sentenceCount,
+                sentenceLengthCount,
+                "sentences",
+            )
 
         val averageAccuracyInLowAccuracyMode =
             (singleWordAccuracies.first + wordPairAccuracies.first + sentenceAccuracies.first) / 3
         val averageAccuracyInHighAccuracyMode =
             (singleWordAccuracies.second + wordPairAccuracies.second + sentenceAccuracies.second) / 3
 
-        val averageAccuracyReport = if (implementationToUse == LINGUA) {
-            ">>> Accuracy on average: ${formatAccuracy(averageAccuracyInLowAccuracyMode)} | " +
-                formatAccuracy(averageAccuracyInHighAccuracyMode)
-        } else {
-            ">>> Accuracy on average: ${formatAccuracy(averageAccuracyInHighAccuracyMode)}"
-        }
+        val averageAccuracyReport =
+            if (implementationToUse == LINGUA) {
+                ">>> Accuracy on average: ${formatAccuracy(averageAccuracyInLowAccuracyMode)} | " +
+                    formatAccuracy(averageAccuracyInHighAccuracyMode)
+            } else {
+                ">>> Accuracy on average: ${formatAccuracy(averageAccuracyInHighAccuracyMode)}"
+            }
 
-        val reportParts = arrayOf(
-            averageAccuracyReport,
-            singleWordAccuracyReport,
-            wordPairAccuracyReport,
-            sentenceAccuracyReport
-        )
+        val reportParts =
+            arrayOf(
+                averageAccuracyReport,
+                singleWordAccuracyReport,
+                wordPairAccuracyReport,
+                sentenceAccuracyReport,
+            )
         val newlines = "\n".repeat(2)
         var report = "##### $language #####"
 
@@ -159,8 +170,9 @@ abstract class AbstractLanguageDetectionAccuracyReport(
         }
 
         for (reportPart in reportParts)
-            if (reportPart.isNotEmpty())
+            if (reportPart.isNotEmpty()) {
                 report += "$newlines$reportPart"
+            }
 
         report += "$newlines>> Exact values:"
 
@@ -195,31 +207,36 @@ abstract class AbstractLanguageDetectionAccuracyReport(
         sentenceLengthCount += sentence.length
     }
 
-    private fun computeStatistics(statistics: MutableMap<Language, Pair<Int, Int>>, element: String) {
-        val detectedLanguages = when (implementationToUse) {
-            LINGUA -> {
-                val languageInLowAccuracyMode = linguaDetectorWithLowAccuracy.detectLanguageOf(element)
-                val languageInHighAccuracyMode = linguaDetectorWithHighAccuracy.detectLanguageOf(element)
-                languageInLowAccuracyMode to languageInHighAccuracyMode
-            }
-            OPTIMAIZE -> null to mapLocaleToLanguage(optimaizeDetector.detect(textObjectFactory.forText(element)))
-            TIKA -> {
-                tikaDetector.addText(element)
-                val detectedLanguage = mapLanguageResultToLanguage(tikaDetector.detect())
-                tikaDetector.reset()
-                null to detectedLanguage
-            }
-            OPENNLP -> {
-                val detectedLanguage = opennlpDetector.predictLanguage(element)
-                val isoCode = try {
-                    val isoCode = detectedLanguage.lang.uppercase()
-                    IsoCode639_3.valueOf(mapOpenNlpIsoCodeToLinguaIsoCode(isoCode))
-                } catch (e: IllegalArgumentException) {
-                    IsoCode639_3.NONE
+    private fun computeStatistics(
+        statistics: MutableMap<Language, Pair<Int, Int>>,
+        element: String,
+    ) {
+        val detectedLanguages =
+            when (implementationToUse) {
+                LINGUA -> {
+                    val languageInLowAccuracyMode = linguaDetectorWithLowAccuracy.detectLanguageOf(element)
+                    val languageInHighAccuracyMode = linguaDetectorWithHighAccuracy.detectLanguageOf(element)
+                    languageInLowAccuracyMode to languageInHighAccuracyMode
                 }
-                null to Language.getByIsoCode639_3(isoCode)
+                OPTIMAIZE -> null to mapLocaleToLanguage(optimaizeDetector.detect(textObjectFactory.forText(element)))
+                TIKA -> {
+                    tikaDetector.addText(element)
+                    val detectedLanguage = mapLanguageResultToLanguage(tikaDetector.detect())
+                    tikaDetector.reset()
+                    null to detectedLanguage
+                }
+                OPENNLP -> {
+                    val detectedLanguage = opennlpDetector.predictLanguage(element)
+                    val isoCode =
+                        try {
+                            val isoCode = detectedLanguage.lang.uppercase()
+                            IsoCode639_3.valueOf(mapOpenNlpIsoCodeToLinguaIsoCode(isoCode))
+                        } catch (e: IllegalArgumentException) {
+                            IsoCode639_3.NONE
+                        }
+                    null to Language.getByIsoCode639_3(isoCode)
+                }
             }
-        }
         val languageInLowAccuracyMode = detectedLanguages.first
         val languageInHighAccuracyMode = detectedLanguages.second
 
@@ -234,16 +251,22 @@ abstract class AbstractLanguageDetectionAccuracyReport(
         statistics[languageInHighAccuracyMode] = languageCounts
     }
 
-    private fun computeAccuracy(languageCount: Int, totalLanguagesCount: Int) =
-        languageCount.toDouble() / totalLanguagesCount * 100
+    private fun computeAccuracy(
+        languageCount: Int,
+        totalLanguagesCount: Int,
+    ) = languageCount.toDouble() / totalLanguagesCount * 100
 
     private fun formatAccuracy(accuracy: Double) = "%.2f".format(Locale.US, accuracy) + "%"
 
-    private fun formatStatistics(statistics: Map<Language, Pair<Double, Double>>, language: Language): String {
-        val sortedEntries = statistics
-            .filterNot { it.key == language }
-            .toList()
-            .sortedByDescending { it.second.second }
+    private fun formatStatistics(
+        statistics: Map<Language, Pair<Double, Double>>,
+        language: Language,
+    ): String {
+        val sortedEntries =
+            statistics
+                .filterNot { it.key == language }
+                .toList()
+                .sortedByDescending { it.second.second }
 
         return if (implementationToUse == LINGUA) {
             sortedEntries.joinToString {
@@ -271,17 +294,19 @@ abstract class AbstractLanguageDetectionAccuracyReport(
         statistics: Map<Language, Pair<Double, Double>>,
         count: Int,
         length: Int,
-        description: String
+        description: String,
     ): Pair<Pair<Double, Double>, String> {
         val accuracies = statistics[language] ?: (0.0 to 0.0)
-        var report = ">> Detection of $count $description (average length: " +
-            "${(length.toDouble() / count).roundToInt()} chars)\n"
+        var report =
+            ">> Detection of $count $description (average length: " +
+                "${(length.toDouble() / count).roundToInt()} chars)\n"
 
-        report += if (implementationToUse == LINGUA) {
-            "Accuracy: ${formatAccuracy(accuracies.first)} | ${formatAccuracy(accuracies.second)}\n"
-        } else {
-            "Accuracy: ${formatAccuracy(accuracies.second)}\n"
-        }
+        report +=
+            if (implementationToUse == LINGUA) {
+                "Accuracy: ${formatAccuracy(accuracies.first)} | ${formatAccuracy(accuracies.second)}\n"
+            } else {
+                "Accuracy: ${formatAccuracy(accuracies.second)}\n"
+            }
 
         report += "Erroneously classified as ${formatStatistics(statistics, language)}"
 
@@ -316,13 +341,15 @@ abstract class AbstractLanguageDetectionAccuracyReport(
     }
 
     companion object {
-        private val languageIsoCodesToTest = Language.entries.toSet().minus(arrayOf(UNKNOWN)).map {
-            it.isoCode639_1
-        }.toTypedArray()
+        private val languageIsoCodesToTest =
+            Language.entries.toSet().minus(arrayOf(UNKNOWN)).map {
+                it.isoCode639_1
+            }.toTypedArray()
 
-        private val filteredIsoCodesForTikaAndOptimaize = languageIsoCodesToTest.filterNot {
-            it in setOf(AZ, BS, EO, HY, KA, KK, LA, LG, MI, MN, NB, NN, SN, ST, TN, TS, XH, YO, ZU)
-        }.map { it.toString() }
+        private val filteredIsoCodesForTikaAndOptimaize =
+            languageIsoCodesToTest.filterNot {
+                it in setOf(AM, AZ, BS, EO, HY, KA, KK, LA, LG, MI, MN, NB, NN, OM, SI, SN, ST, TI, TN, TS, XH, YO, ZU)
+            }.map { it.toString() }
 
         internal val linguaDetectorWithLowAccuracy by lazy {
             LanguageDetectorBuilder
@@ -344,12 +371,13 @@ abstract class AbstractLanguageDetectionAccuracyReport(
         }
 
         private val optimaizeDetector by lazy {
-            val languageLocales = filteredIsoCodesForTikaAndOptimaize.map {
-                when (it) {
-                    "zh" -> LdLocale.fromString("$it-CN")
-                    else -> LdLocale.fromString(it)
+            val languageLocales =
+                filteredIsoCodesForTikaAndOptimaize.map {
+                    when (it) {
+                        "zh" -> LdLocale.fromString("$it-CN")
+                        else -> LdLocale.fromString(it)
+                    }
                 }
-            }
             val languageProfiles = LanguageProfileReader().readBuiltIn(languageLocales.toSet())
             com.optimaize.langdetect.LanguageDetectorBuilder
                 .create(NgramExtractors.standard())
@@ -364,14 +392,15 @@ abstract class AbstractLanguageDetectionAccuracyReport(
                         "zh" -> "$it-CN"
                         else -> it
                     }
-                }.toSet()
+                }.toSet(),
             )
         }
 
         private val opennlpDetector by lazy {
-            val languageModel = LanguageDetectorModel(
-                this::class.java.getResourceAsStream("/opennlp-training-data/langdetect-183.bin")
-            )
+            val languageModel =
+                LanguageDetectorModel(
+                    this::class.java.getResourceAsStream("/opennlp-training-data/langdetect-183.bin"),
+                )
             LanguageDetectorME(languageModel)
         }
 

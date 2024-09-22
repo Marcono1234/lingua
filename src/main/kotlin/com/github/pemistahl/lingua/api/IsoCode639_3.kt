@@ -21,13 +21,17 @@ package com.github.pemistahl.lingua.api
  *
  * ISO 639 is a standardized nomenclature used to classify languages.
  */
-@Suppress("ClassName")
+@Suppress("ktlint:standard:class-naming", "ClassName")
 enum class IsoCode639_3 {
-
     /**
      * The ISO 639-3 code for [Afrikaans][Language.AFRIKAANS].
      */
     AFR,
+
+    /**
+     * The ISO 639-3 code for [Amharic][Language.AMHARIC].
+     */
+    AMH,
 
     /**
      * The ISO 639-3 code for [Arabic][Language.ARABIC].
@@ -255,6 +259,11 @@ enum class IsoCode639_3 {
     NOB,
 
     /**
+     * The ISO 639-3 code for [Oromo][Language.OROMO].
+     */
+    ORM,
+
+    /**
      * The ISO 639-3 code for [Punjabi][Language.PUNJABI].
      */
     PAN,
@@ -278,6 +287,11 @@ enum class IsoCode639_3 {
      * The ISO 639-3 code for [Russian][Language.RUSSIAN].
      */
     RUS,
+
+    /**
+     * The ISO 639-3 code for [Sinhala][Language.SINHALA].
+     */
+    SIN,
 
     /**
      * The ISO 639-3 code for [Slovak][Language.SLOVAK].
@@ -350,6 +364,11 @@ enum class IsoCode639_3 {
     THA,
 
     /**
+     * The ISO 639-3 code for [Tigrinya][Language.TIGRINYA].
+     */
+    TIR,
+
+    /**
      * The ISO 639-3 code for [Tswana][Language.TSWANA].
      */
     TSN,
@@ -402,7 +421,9 @@ enum class IsoCode639_3 {
     /**
      * The ISO 639-3 code for [the imaginary unknown language][Language.UNKNOWN].
      */
-    NONE;
+    NONE,
+
+    ;
 
     override fun toString() = this.name.lowercase()
 }

@@ -303,7 +303,7 @@ class LanguageDetector internal constructor(
         }
     }
 
-    private fun cleanUpInputText(text: String): CharSequence {
+    internal fun cleanUpInputText(text: String): CharSequence {
         return text.trim().lowercase()
             .replaceAll(
                 listOf(
@@ -709,6 +709,18 @@ class LanguageDetector internal constructor(
             }
             return model!!
         }
+
+        /*
+         * Only for unit tests; could lead to time-of-check vs. time-of-use concurrency issues
+         * when used by main code.
+         */
+        internal fun isLoaded(): Boolean = model != null
+
+        /*
+         * Only for unit tests; could lead to time-of-check vs. time-of-use concurrency issues
+         * when used by main code.
+         */
+        internal fun hasLoadedQuadriFivegram(): Boolean = model?.quadriFivegramLookup?.isInitialized() ?: false
 
         fun reset() {
             model = null

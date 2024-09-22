@@ -17,6 +17,7 @@
 package com.github.pemistahl.lingua.api
 
 import com.github.pemistahl.lingua.api.IsoCode639_1.AF
+import com.github.pemistahl.lingua.api.IsoCode639_1.AM
 import com.github.pemistahl.lingua.api.IsoCode639_1.AR
 import com.github.pemistahl.lingua.api.IsoCode639_1.AZ
 import com.github.pemistahl.lingua.api.IsoCode639_1.BE
@@ -63,11 +64,13 @@ import com.github.pemistahl.lingua.api.IsoCode639_1.MS
 import com.github.pemistahl.lingua.api.IsoCode639_1.NB
 import com.github.pemistahl.lingua.api.IsoCode639_1.NL
 import com.github.pemistahl.lingua.api.IsoCode639_1.NN
+import com.github.pemistahl.lingua.api.IsoCode639_1.OM
 import com.github.pemistahl.lingua.api.IsoCode639_1.PA
 import com.github.pemistahl.lingua.api.IsoCode639_1.PL
 import com.github.pemistahl.lingua.api.IsoCode639_1.PT
 import com.github.pemistahl.lingua.api.IsoCode639_1.RO
 import com.github.pemistahl.lingua.api.IsoCode639_1.RU
+import com.github.pemistahl.lingua.api.IsoCode639_1.SI
 import com.github.pemistahl.lingua.api.IsoCode639_1.SK
 import com.github.pemistahl.lingua.api.IsoCode639_1.SL
 import com.github.pemistahl.lingua.api.IsoCode639_1.SN
@@ -80,6 +83,7 @@ import com.github.pemistahl.lingua.api.IsoCode639_1.SW
 import com.github.pemistahl.lingua.api.IsoCode639_1.TA
 import com.github.pemistahl.lingua.api.IsoCode639_1.TE
 import com.github.pemistahl.lingua.api.IsoCode639_1.TH
+import com.github.pemistahl.lingua.api.IsoCode639_1.TI
 import com.github.pemistahl.lingua.api.IsoCode639_1.TL
 import com.github.pemistahl.lingua.api.IsoCode639_1.TN
 import com.github.pemistahl.lingua.api.IsoCode639_1.TR
@@ -92,6 +96,7 @@ import com.github.pemistahl.lingua.api.IsoCode639_1.YO
 import com.github.pemistahl.lingua.api.IsoCode639_1.ZH
 import com.github.pemistahl.lingua.api.IsoCode639_1.ZU
 import com.github.pemistahl.lingua.api.IsoCode639_3.AFR
+import com.github.pemistahl.lingua.api.IsoCode639_3.AMH
 import com.github.pemistahl.lingua.api.IsoCode639_3.ARA
 import com.github.pemistahl.lingua.api.IsoCode639_3.AZE
 import com.github.pemistahl.lingua.api.IsoCode639_3.BEL
@@ -137,11 +142,13 @@ import com.github.pemistahl.lingua.api.IsoCode639_3.MSA
 import com.github.pemistahl.lingua.api.IsoCode639_3.NLD
 import com.github.pemistahl.lingua.api.IsoCode639_3.NNO
 import com.github.pemistahl.lingua.api.IsoCode639_3.NOB
+import com.github.pemistahl.lingua.api.IsoCode639_3.ORM
 import com.github.pemistahl.lingua.api.IsoCode639_3.PAN
 import com.github.pemistahl.lingua.api.IsoCode639_3.POL
 import com.github.pemistahl.lingua.api.IsoCode639_3.POR
 import com.github.pemistahl.lingua.api.IsoCode639_3.RON
 import com.github.pemistahl.lingua.api.IsoCode639_3.RUS
+import com.github.pemistahl.lingua.api.IsoCode639_3.SIN
 import com.github.pemistahl.lingua.api.IsoCode639_3.SLK
 import com.github.pemistahl.lingua.api.IsoCode639_3.SLV
 import com.github.pemistahl.lingua.api.IsoCode639_3.SNA
@@ -156,6 +163,7 @@ import com.github.pemistahl.lingua.api.IsoCode639_3.TAM
 import com.github.pemistahl.lingua.api.IsoCode639_3.TEL
 import com.github.pemistahl.lingua.api.IsoCode639_3.TGL
 import com.github.pemistahl.lingua.api.IsoCode639_3.THA
+import com.github.pemistahl.lingua.api.IsoCode639_3.TIR
 import com.github.pemistahl.lingua.api.IsoCode639_3.TSN
 import com.github.pemistahl.lingua.api.IsoCode639_3.TSO
 import com.github.pemistahl.lingua.api.IsoCode639_3.TUR
@@ -187,6 +195,7 @@ enum class Language(
 ) {
     AFRIKAANS(AF, AFR, enumSetOf(UnicodeScript.LATIN)),
     ALBANIAN(SQ, SQI, enumSetOf(UnicodeScript.LATIN)),
+    AMHARIC(AM, AMH, enumSetOf(UnicodeScript.ETHIOPIC)),
     ARABIC(AR, ARA, enumSetOf(UnicodeScript.ARABIC)),
     ARMENIAN(HY, HYE, enumSetOf(UnicodeScript.ARMENIAN)),
     AZERBAIJANI(AZ, AZE, enumSetOf(UnicodeScript.LATIN), "Əə"),
@@ -231,6 +240,7 @@ enum class Language(
     MARATHI(MR, MAR, enumSetOf(UnicodeScript.DEVANAGARI), "ळ"),
     MONGOLIAN(MN, MON, enumSetOf(UnicodeScript.CYRILLIC), "ӨөҮү"),
     NYNORSK(NN, NNO, enumSetOf(UnicodeScript.LATIN)),
+    OROMO(OM, ORM, enumSetOf(UnicodeScript.LATIN)),
     PERSIAN(FA, FAS, enumSetOf(UnicodeScript.ARABIC)),
     POLISH(PL, POL, enumSetOf(UnicodeScript.LATIN), "ŁłŃńŚśŹź"),
     PORTUGUESE(PT, POR, enumSetOf(UnicodeScript.LATIN)),
@@ -239,6 +249,7 @@ enum class Language(
     RUSSIAN(RU, RUS, enumSetOf(UnicodeScript.CYRILLIC)),
     SERBIAN(SR, SRP, enumSetOf(UnicodeScript.CYRILLIC), "ЂђЋћ"),
     SHONA(SN, SNA, enumSetOf(UnicodeScript.LATIN)),
+    SINHALA(SI, SIN, enumSetOf(UnicodeScript.SINHALA)),
     SLOVAK(SK, SLK, enumSetOf(UnicodeScript.LATIN), "ĹĺĽľŔŕ"),
     SLOVENE(SL, SLV, enumSetOf(UnicodeScript.LATIN)),
     SOMALI(SO, SOM, enumSetOf(UnicodeScript.LATIN)),
@@ -250,6 +261,7 @@ enum class Language(
     TAMIL(TA, TAM, enumSetOf(UnicodeScript.TAMIL)),
     TELUGU(TE, TEL, enumSetOf(UnicodeScript.TELUGU)),
     THAI(TH, THA, enumSetOf(UnicodeScript.THAI)),
+    TIGRINYA(TI, TIR, enumSetOf(UnicodeScript.ETHIOPIC)),
     TSONGA(TS, TSO, enumSetOf(UnicodeScript.LATIN)),
     TSWANA(TN, TSN, enumSetOf(UnicodeScript.LATIN)),
     TURKISH(TR, TUR, enumSetOf(UnicodeScript.LATIN)),
@@ -259,10 +271,11 @@ enum class Language(
         VI,
         VIE,
         enumSetOf(UnicodeScript.LATIN),
-        "ẰằẦầẲẳẨẩẴẵẪẫẮắẤấẠạẶặẬậỀềẺẻỂểẼẽỄễẾếỆệỈỉĨĩỊịƠơỒồỜờỎỏỔổỞởỖỗỠỡỐốỚớỘộỢợƯưỪừỦủỬửŨũỮữỨứỤụỰựỲỳỶỷỸỹỴỵ"
+        "ẰằẦầẲẳẨẩẴẵẪẫẮắẤấẠạẶặẬậỀềẺẻỂểẼẽỄễẾếỆệỈỉĨĩỊịƠơỒồỜờỎỏỔổỞởỖỗỠỡỐốỚớỘộỢợƯưỪừỦủỬửŨũỮữỨứỤụỰựỲỳỶỷỸỹỴỵ",
     ),
     WELSH(CY, CYM, enumSetOf(UnicodeScript.LATIN)),
     XHOSA(XH, XHO, enumSetOf(UnicodeScript.LATIN)),
+
     // TODO for YORUBA: "E̩e̩Ẹ́ẹ́É̩é̩Ẹ̀ẹ̀È̩è̩Ẹ̄ẹ̄Ē̩ē̩ŌōO̩o̩Ọ́ọ́Ó̩ó̩Ọ̀ọ̀Ò̩ò̩Ọ̄ọ̄Ō̩ō̩ṢṣS̩s̩"
     YORUBA(YO, YOR, enumSetOf(UnicodeScript.LATIN), "Ṣṣ"),
     ZULU(ZU, ZUL, enumSetOf(UnicodeScript.LATIN)),
@@ -273,6 +286,7 @@ enum class Language(
      * This value is returned if no language can be detected reliably.
      */
     UNKNOWN(IsoCode639_1.NONE, IsoCode639_3.NONE, emptySet());
+    ;
 
     constructor (
         @Suppress("LocalVariableName")
@@ -321,51 +335,57 @@ enum class Language(
          * Returns a list of all built-in languages.
          */
         @JvmStatic
-        fun all() = filterOutLanguages(UNKNOWN)
+        fun all(): List<Language> = filterOutLanguages(UNKNOWN)
 
         /**
          * Returns a list of all built-in languages that are still spoken today.
          */
         @JvmStatic
-        fun allSpokenOnes() = filterOutLanguages(UNKNOWN, LATIN)
+        fun allSpokenOnes(): List<Language> = filterOutLanguages(UNKNOWN, LATIN)
 
         /**
          * Returns a list of all built-in languages supporting the Arabic script.
          */
         @JvmStatic
-        fun allWithArabicScript() = entries.filter { it.unicodeScripts.contains(UnicodeScript.ARABIC) }
+        fun allWithArabicScript(): List<Language> = entries.filter { it.unicodeScripts.contains(UnicodeScript.ARABIC) }
 
         /**
          * Returns a list of all built-in languages supporting the Cyrillic script.
          */
         @JvmStatic
-        fun allWithCyrillicScript() = entries.filter { it.unicodeScripts.contains(UnicodeScript.CYRILLIC) }
+        fun allWithCyrillicScript(): List<Language> = entries.filter { it.unicodeScripts.contains(UnicodeScript.CYRILLIC) }
 
         /**
          * Returns a list of all built-in languages supporting the Devanagari script.
          */
         @JvmStatic
-        fun allWithDevanagariScript() = entries.filter { it.unicodeScripts.contains(UnicodeScript.DEVANAGARI) }
+        fun allWithDevanagariScript(): List<Language> = entries.filter { it.unicodeScripts.contains(UnicodeScript.DEVANAGARI) }
+
+        /**
+         * Returns a list of all built-in languages supporting the Ethiopic script.
+         */
+        @JvmStatic
+        fun allWithEthiopicScript(): List<Language> = entries.filter { it.unicodeScripts.contains(UnicodeScript.ETHIOPIC) }
 
         /**
          * Returns a list of all built-in languages supporting the Latin script.
          */
         @JvmStatic
-        fun allWithLatinScript() = entries.filter { it.unicodeScripts.contains(UnicodeScript.LATIN) }
+        fun allWithLatinScript(): List<Language> = entries.filter { it.unicodeScripts.contains(UnicodeScript.LATIN) }
 
         /**
          * Returns the language for the given ISO 639-1 code.
          */
-        @Suppress("FunctionName")
         @JvmStatic
-        fun getByIsoCode639_1(isoCode: IsoCode639_1) = entries.find { it.isoCode639_1 == isoCode }!!
+        @Suppress("ktlint:standard:function-naming", "FunctionName")
+        fun getByIsoCode639_1(isoCode: IsoCode639_1): Language = entries.first { it.isoCode639_1 == isoCode }
 
         /**
          * Returns the language for the given ISO 639-3 code.
          */
-        @Suppress("FunctionName")
         @JvmStatic
-        fun getByIsoCode639_3(isoCode: IsoCode639_3) = entries.find { it.isoCode639_3 == isoCode }!!
+        @Suppress("ktlint:standard:function-naming", "FunctionName")
+        fun getByIsoCode639_3(isoCode: IsoCode639_3): Language = entries.first { it.isoCode639_3 == isoCode }
 
         private fun filterOutLanguages(vararg languages: Language) = entries.filterNot { it in languages }
     }

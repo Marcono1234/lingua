@@ -19,5 +19,5 @@ assertj = { module = "org.assertj:assertj-core", version = "3.26.3" }
 
 [plugins]
 dokka = { id = "org.jetbrains.dokka", version = "1.9.20" }
-ktlint = { id = "org.jlleitschuh.gradle.ktlint", version = "10.3.0" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version = "12.1.0" }
 shadow = { id = "com.gradleup.shadow", version = "8.3.2" }

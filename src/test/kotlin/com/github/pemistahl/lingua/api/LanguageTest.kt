@@ -18,6 +18,7 @@ package com.github.pemistahl.lingua.api
 
 import com.github.pemistahl.lingua.api.Language.AFRIKAANS
 import com.github.pemistahl.lingua.api.Language.ALBANIAN
+import com.github.pemistahl.lingua.api.Language.AMHARIC
 import com.github.pemistahl.lingua.api.Language.ARABIC
 import com.github.pemistahl.lingua.api.Language.ARMENIAN
 import com.github.pemistahl.lingua.api.Language.AZERBAIJANI
@@ -62,6 +63,7 @@ import com.github.pemistahl.lingua.api.Language.MAORI
 import com.github.pemistahl.lingua.api.Language.MARATHI
 import com.github.pemistahl.lingua.api.Language.MONGOLIAN
 import com.github.pemistahl.lingua.api.Language.NYNORSK
+import com.github.pemistahl.lingua.api.Language.OROMO
 import com.github.pemistahl.lingua.api.Language.PERSIAN
 import com.github.pemistahl.lingua.api.Language.POLISH
 import com.github.pemistahl.lingua.api.Language.PORTUGUESE
@@ -70,6 +72,7 @@ import com.github.pemistahl.lingua.api.Language.ROMANIAN
 import com.github.pemistahl.lingua.api.Language.RUSSIAN
 import com.github.pemistahl.lingua.api.Language.SERBIAN
 import com.github.pemistahl.lingua.api.Language.SHONA
+import com.github.pemistahl.lingua.api.Language.SINHALA
 import com.github.pemistahl.lingua.api.Language.SLOVAK
 import com.github.pemistahl.lingua.api.Language.SLOVENE
 import com.github.pemistahl.lingua.api.Language.SOMALI
@@ -81,6 +84,7 @@ import com.github.pemistahl.lingua.api.Language.TAGALOG
 import com.github.pemistahl.lingua.api.Language.TAMIL
 import com.github.pemistahl.lingua.api.Language.TELUGU
 import com.github.pemistahl.lingua.api.Language.THAI
+import com.github.pemistahl.lingua.api.Language.TIGRINYA
 import com.github.pemistahl.lingua.api.Language.TSONGA
 import com.github.pemistahl.lingua.api.Language.TSWANA
 import com.github.pemistahl.lingua.api.Language.TURKISH
@@ -100,30 +104,29 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.lang.Character.UnicodeScript
 
 class LanguageTest {
-
     @Test
     fun `assert that all supported languages are available`() {
         assertThat(Language.all()).containsExactly(
-            AFRIKAANS, ALBANIAN, ARABIC, ARMENIAN, AZERBAIJANI, BASQUE, BELARUSIAN, BENGALI, BOKMAL, BOSNIAN, BULGARIAN,
-            CATALAN, CHINESE, CROATIAN, CZECH, DANISH, DUTCH, ENGLISH, ESPERANTO, ESTONIAN,
+            AFRIKAANS, ALBANIAN, AMHARIC, ARABIC, ARMENIAN, AZERBAIJANI, BASQUE, BELARUSIAN, BENGALI, BOKMAL, BOSNIAN,
+            BULGARIAN, CATALAN, CHINESE, CROATIAN, CZECH, DANISH, DUTCH, ENGLISH, ESPERANTO, ESTONIAN,
             FINNISH, FRENCH, GANDA, GEORGIAN, GERMAN, GREEK, GUJARATI, HEBREW, HINDI, HUNGARIAN, ICELANDIC, INDONESIAN,
             IRISH, ITALIAN, JAPANESE, KAZAKH, KOREAN, LATIN, LATVIAN, LITHUANIAN, MACEDONIAN, MALAY, MAORI,
-            MARATHI, MONGOLIAN, NYNORSK, PERSIAN, POLISH, PORTUGUESE, PUNJABI, ROMANIAN, RUSSIAN, SERBIAN, SHONA,
-            SLOVAK, SLOVENE, SOMALI, SOTHO, SPANISH, SWAHILI, SWEDISH, TAGALOG, TAMIL, TELUGU, THAI, TSONGA, TSWANA,
-            TURKISH, UKRAINIAN, URDU, VIETNAMESE, WELSH, XHOSA, YORUBA, ZULU
+            MARATHI, MONGOLIAN, NYNORSK, OROMO, PERSIAN, POLISH, PORTUGUESE, PUNJABI, ROMANIAN, RUSSIAN, SERBIAN, SHONA,
+            SINHALA, SLOVAK, SLOVENE, SOMALI, SOTHO, SPANISH, SWAHILI, SWEDISH, TAGALOG, TAMIL, TELUGU, THAI, TIGRINYA,
+            TSONGA, TSWANA, TURKISH, UKRAINIAN, URDU, VIETNAMESE, WELSH, XHOSA, YORUBA, ZULU,
         )
     }
 
     @Test
     fun `assert that all supported spoken languages are available`() {
         assertThat(Language.allSpokenOnes()).containsExactly(
-            AFRIKAANS, ALBANIAN, ARABIC, ARMENIAN, AZERBAIJANI, BASQUE, BELARUSIAN, BENGALI, BOKMAL, BOSNIAN, BULGARIAN,
-            CATALAN, CHINESE, CROATIAN, CZECH, DANISH, DUTCH, ENGLISH, ESPERANTO, ESTONIAN,
+            AFRIKAANS, ALBANIAN, AMHARIC, ARABIC, ARMENIAN, AZERBAIJANI, BASQUE, BELARUSIAN, BENGALI, BOKMAL, BOSNIAN,
+            BULGARIAN, CATALAN, CHINESE, CROATIAN, CZECH, DANISH, DUTCH, ENGLISH, ESPERANTO, ESTONIAN,
             FINNISH, FRENCH, GANDA, GEORGIAN, GERMAN, GREEK, GUJARATI, HEBREW, HINDI, HUNGARIAN, ICELANDIC, INDONESIAN,
             IRISH, ITALIAN, JAPANESE, KAZAKH, KOREAN, LATVIAN, LITHUANIAN, MACEDONIAN, MALAY, MAORI, MARATHI, MONGOLIAN,
-            NYNORSK, PERSIAN, POLISH, PORTUGUESE, PUNJABI, ROMANIAN, RUSSIAN, SERBIAN, SHONA, SLOVAK, SLOVENE,
-            SOMALI, SOTHO, SPANISH, SWAHILI, SWEDISH, TAGALOG, TAMIL, TELUGU, THAI, TSONGA, TSWANA,
-            TURKISH, UKRAINIAN, URDU, VIETNAMESE, WELSH, XHOSA, YORUBA, ZULU
+            NYNORSK, OROMO, PERSIAN, POLISH, PORTUGUESE, PUNJABI, ROMANIAN, RUSSIAN, SERBIAN, SHONA, SINHALA, SLOVAK,
+            SLOVENE, SOMALI, SOTHO, SPANISH, SWAHILI, SWEDISH, TAGALOG, TAMIL, TELUGU, THAI, TIGRINYA, TSONGA, TSWANA,
+            TURKISH, UKRAINIAN, URDU, VIETNAMESE, WELSH, XHOSA, YORUBA, ZULU,
         )
     }
 
@@ -142,7 +145,7 @@ class LanguageTest {
             MONGOLIAN,
             RUSSIAN,
             SERBIAN,
-            UKRAINIAN
+            UKRAINIAN,
         )
     }
 
@@ -152,14 +155,19 @@ class LanguageTest {
     }
 
     @Test
+    fun `assert that certain languages support Ethiopic script`() {
+        assertThat(Language.allWithEthiopicScript()).containsExactly(AMHARIC, TIGRINYA)
+    }
+
+    @Test
     fun `assert that certain languages support Latin script`() {
         assertThat(Language.allWithLatinScript()).containsExactly(
             AFRIKAANS, ALBANIAN, AZERBAIJANI, BASQUE, BOKMAL, BOSNIAN, CATALAN, CROATIAN, CZECH,
             DANISH, DUTCH, ENGLISH, ESPERANTO, ESTONIAN, FINNISH, FRENCH, GANDA, GERMAN,
             HUNGARIAN, ICELANDIC, INDONESIAN, IRISH, ITALIAN, LATIN, LATVIAN,
-            LITHUANIAN, MALAY, MAORI, NYNORSK, POLISH, PORTUGUESE,
+            LITHUANIAN, MALAY, MAORI, NYNORSK, OROMO, POLISH, PORTUGUESE,
             ROMANIAN, SHONA, SLOVAK, SLOVENE, SOMALI, SOTHO, SPANISH, SWAHILI, SWEDISH, TAGALOG, TSONGA, TSWANA,
-            TURKISH, VIETNAMESE, WELSH, XHOSA, YORUBA, ZULU
+            TURKISH, VIETNAMESE, WELSH, XHOSA, YORUBA, ZULU,
         )
     }
 
@@ -174,13 +182,14 @@ class LanguageTest {
         ).`as`(
             "alphabet '$alphabet'"
         ).containsExactlyElementsOf(
-            expectedLanguages
+            expectedLanguages,
         )
     }
 
     @ParameterizedTest
     @CsvSource(
         "AF, AFRIKAANS",
+        "AM, AMHARIC",
         "SQ, ALBANIAN",
         "AR, ARABIC",
         "HY, ARMENIAN",
@@ -225,6 +234,7 @@ class LanguageTest {
         "MR, MARATHI",
         "MN, MONGOLIAN",
         "NN, NYNORSK",
+        "OM, OROMO",
         "FA, PERSIAN",
         "PL, POLISH",
         "PT, PORTUGUESE",
@@ -233,6 +243,7 @@ class LanguageTest {
         "RU, RUSSIAN",
         "SR, SERBIAN",
         "SN, SHONA",
+        "SI, SINHALA",
         "SK, SLOVAK",
         "SL, SLOVENE",
         "SO, SOMALI",
@@ -244,6 +255,7 @@ class LanguageTest {
         "TA, TAMIL",
         "TE, TELUGU",
         "TH, THAI",
+        "TI, TIGRINYA",
         "TS, TSONGA",
         "TN, TSWANA",
         "TR, TURKISH",
@@ -253,53 +265,59 @@ class LanguageTest {
         "CY, WELSH",
         "XH, XHOSA",
         "YO, YORUBA",
-        "ZU, ZULU"
+        "ZU, ZULU",
     )
-    fun `assert that correct language is returned for iso code`(isoCode: IsoCode639_1, language: Language) {
+    fun `assert that correct language is returned for iso code`(
+        isoCode: IsoCode639_1,
+        language: Language,
+    ) {
         assertThat(Language.getByIsoCode639_1(isoCode)).isEqualTo(language)
     }
 
-    private fun filteredLanguagesProvider() = listOf(
-        arguments(UnicodeScript.ARABIC, listOf(ARABIC, PERSIAN, URDU)),
-        arguments(UnicodeScript.ARMENIAN, listOf(ARMENIAN)),
-        arguments(UnicodeScript.BENGALI, listOf(BENGALI)),
-        arguments(
-            UnicodeScript.CYRILLIC,
-            listOf(
-                BELARUSIAN,
-                BULGARIAN,
-                KAZAKH,
-                MACEDONIAN,
-                MONGOLIAN,
-                RUSSIAN,
-                SERBIAN,
-                UKRAINIAN
-            )
-        ),
-        arguments(UnicodeScript.DEVANAGARI, listOf(HINDI, MARATHI)),
-        arguments(UnicodeScript.GEORGIAN, listOf(GEORGIAN)),
-        arguments(UnicodeScript.GREEK, listOf(GREEK)),
-        arguments(UnicodeScript.GUJARATI, listOf(GUJARATI)),
-        arguments(UnicodeScript.GURMUKHI, listOf(PUNJABI)),
-        arguments(UnicodeScript.HAN, listOf(CHINESE, JAPANESE)),
-        arguments(UnicodeScript.HANGUL, listOf(KOREAN)),
-        arguments(UnicodeScript.HEBREW, listOf(HEBREW)),
-        arguments(UnicodeScript.HIRAGANA, listOf(JAPANESE)),
-        arguments(UnicodeScript.KATAKANA, listOf(JAPANESE)),
-        arguments(
-            UnicodeScript.LATIN,
-            listOf(
-                AFRIKAANS, ALBANIAN, AZERBAIJANI, BASQUE, BOKMAL, BOSNIAN, CATALAN, CROATIAN,
-                CZECH, DANISH, DUTCH, ENGLISH, ESPERANTO, ESTONIAN, FINNISH, FRENCH, GANDA,
-                GERMAN, HUNGARIAN, ICELANDIC, INDONESIAN, IRISH, ITALIAN,
-                LATIN, LATVIAN, LITHUANIAN, MALAY, MAORI, NYNORSK,
-                POLISH, PORTUGUESE, ROMANIAN, SHONA, SLOVAK, SLOVENE, SOMALI, SOTHO,
-                SPANISH, SWAHILI, SWEDISH, TAGALOG, TSONGA, TSWANA, TURKISH, VIETNAMESE,
-                WELSH, XHOSA, YORUBA, ZULU
-            )
-        ),
-        arguments(UnicodeScript.TAMIL, listOf(TAMIL)),
-        arguments(UnicodeScript.TELUGU, listOf(TELUGU)),
-        arguments(UnicodeScript.THAI, listOf(THAI)),
-    )
+    private fun filteredLanguagesProvider() =
+        listOf(
+            arguments(UnicodeScript.ARABIC, listOf(ARABIC, PERSIAN, URDU)),
+            arguments(UnicodeScript.ARMENIAN, listOf(ARMENIAN)),
+            arguments(UnicodeScript.BENGALI, listOf(BENGALI)),
+            arguments(
+                UnicodeScript.CYRILLIC,
+                listOf(
+                    BELARUSIAN,
+                    BULGARIAN,
+                    KAZAKH,
+                    MACEDONIAN,
+                    MONGOLIAN,
+                    RUSSIAN,
+                    SERBIAN,
+                    UKRAINIAN,
+                ),
+            ),
+            arguments(UnicodeScript.DEVANAGARI, listOf(HINDI, MARATHI)),
+            arguments(UnicodeScript.ETHIOPIC, listOf(AMHARIC, TIGRINYA)),
+            arguments(UnicodeScript.GEORGIAN, listOf(GEORGIAN)),
+            arguments(UnicodeScript.GREEK, listOf(GREEK)),
+            arguments(UnicodeScript.GUJARATI, listOf(GUJARATI)),
+            arguments(UnicodeScript.GURMUKHI, listOf(PUNJABI)),
+            arguments(UnicodeScript.HAN, listOf(CHINESE, JAPANESE)),
+            arguments(UnicodeScript.HANGUL, listOf(KOREAN)),
+            arguments(UnicodeScript.HEBREW, listOf(HEBREW)),
+            arguments(UnicodeScript.HIRAGANA, listOf(JAPANESE)),
+            arguments(UnicodeScript.KATAKANA, listOf(JAPANESE)),
+            arguments(
+                UnicodeScript.LATIN,
+                listOf(
+                    AFRIKAANS, ALBANIAN, AZERBAIJANI, BASQUE, BOKMAL, BOSNIAN, CATALAN, CROATIAN,
+                    CZECH, DANISH, DUTCH, ENGLISH, ESPERANTO, ESTONIAN, FINNISH, FRENCH, GANDA,
+                    GERMAN, HUNGARIAN, ICELANDIC, INDONESIAN, IRISH, ITALIAN,
+                    LATIN, LATVIAN, LITHUANIAN, MALAY, MAORI, NYNORSK, OROMO,
+                    POLISH, PORTUGUESE, ROMANIAN, SHONA, SLOVAK, SLOVENE, SOMALI, SOTHO,
+                    SPANISH, SWAHILI, SWEDISH, TAGALOG, TSONGA, TSWANA, TURKISH, VIETNAMESE,
+                    WELSH, XHOSA, YORUBA, ZULU,
+                ),
+            ),
+            arguments(UnicodeScript.SINHALA, listOf(SINHALA)),
+            arguments(UnicodeScript.TAMIL, listOf(TAMIL)),
+            arguments(UnicodeScript.TELUGU, listOf(TELUGU)),
+            arguments(UnicodeScript.THAI, listOf(THAI)),
+        )
 }

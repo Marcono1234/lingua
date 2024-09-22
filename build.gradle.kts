@@ -19,7 +19,6 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import ru.vyarus.gradle.plugin.python.task.PythonTask
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -53,9 +52,8 @@ plugins {
     kotlin("jvm") version libs.versions.kotlinPlugin
     alias(libs.plugins.ktlint)
     alias(libs.plugins.dokka)
-    id("ru.vyarus.use-python") version "2.3.0"
     alias(libs.plugins.shadow)
-    id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
+    id("io.github.gradle-nexus.publish-plugin") version "1.3.0"
     `maven-publish`
     signing
     jacoco
@@ -279,20 +277,6 @@ val writeAggregatedAccuracyReport by tasks.registering {
     }
 }
 
-tasks.register<PythonTask>("drawAccuracyPlots") {
-    dependsOn(writeAggregatedAccuracyReport)
-    group = linguaTaskGroup
-    description = "Draws plots showing the results of the accuracy detection reports."
-    command = "src/python-scripts/draw_accuracy_plots.py"
-}
-
-tasks.register<PythonTask>("writeAccuracyTable") {
-    dependsOn(writeAggregatedAccuracyReport)
-    group = linguaTaskGroup
-    description = "Creates HTML table from all accuracy detection results and writes it to a markdown file."
-    command = "src/python-scripts/write_accuracy_table.py"
-}
-
 tasks.withType<DokkaTask>().configureEach {
     dokkaSourceSets.configureEach {
         jdkVersion.set(17) // link against Java 17 documentation
@@ -421,19 +405,12 @@ dependencies {
     accuracyReportImplementation("org.slf4j:slf4j-nop:1.7.36")
 }
 
-python {
-    pip("matplotlib:3.5.2")
-    pip("seaborn:0.11.2")
-    pip("pandas:1.4.2")
-    pip("numpy:1.22.0")
-}
-
 publishing {
     publications {
         create<MavenPublication>("lingua") {
             groupId = linguaGroupId
             artifactId = linguaArtifactId
-            version = version
+            version = project.version.toString()
 
             from(components["kotlin"])
 
