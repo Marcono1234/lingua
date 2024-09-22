@@ -147,12 +147,12 @@ internal class WordList private constructor(
     }
 
     override fun toString(): String {
-        val builder = StringBuilder()
+        val builder = StringBuilder(text.length + 10)
         builder.append('[')
         var isNotEmpty = false
-        forEach {
+        forEach { word ->
             // Use loop because custom CharSequence intentionally does not support toString
-            it.forEach(builder::append)
+            word.forEach(builder::append)
             builder.append(',')
             isNotEmpty = true
         }

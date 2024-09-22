@@ -36,7 +36,7 @@ internal fun CharSequence.replaceAll(replacements: List<Pair<Regex, String>>): C
         if (matcher.find()) {
             val replacement = it.second
             var nextRangeStart = 0
-            val builder = StringBuilder()
+            val builder = StringBuilder(currentInput.length)
             do {
                 builder.append(currentInput, nextRangeStart, matcher.start())
                 builder.append(replacement)
