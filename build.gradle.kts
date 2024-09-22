@@ -352,7 +352,13 @@ sourceSets.main {
 // generation is deterministic
 // Note: This is a separate task to not cause model generation task to fail, which would require regenerating
 // models a second time when checksum becomes outdated
-val checkLanguageModelsChecksum by tasks.registering {
+val checkLanguageModelsChecksum: TaskProvider<Task> by tasks.registering {
+    onlyIf {
+        // Note that `didWork` might be deprecated in the future, see https://github.com/gradle/gradle/issues/23460
+        // have to check the 'up-to-date' status then?
+        createLanguageModels.get().didWork
+    }
+
     doLast {
         val messageDigest = MessageDigest.getInstance("SHA-256")
         val startDir = modelOutputDir_.get().asFile.toPath()
