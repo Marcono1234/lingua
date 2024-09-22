@@ -327,9 +327,10 @@ val sourcesJar by tasks.registering(Jar::class) {
 
 tasks.shadowJar {
     group = "Build"
-    description = "Assembles a jar archive containing the main classes and all external dependencies."
+    description =
+        "Assembles a jar archive containing the main classes and all external dependencies. Only intended for usage" +
+        " from command line, should not be used as dependency."
     archiveClassifier = "with-dependencies"
-    isEnableRelocation = true
     duplicatesStrategy = DuplicatesStrategy.FAIL
 
     manifest {
@@ -341,10 +342,6 @@ tasks.shadowJar {
     }
     // Exclude `module-info` from dependencies, see also https://github.com/johnrengelman/shadow/issues/729
     exclude("**/module-info.class")
-}
-// Build JAR with dependencies by default
-tasks.assemble {
-    dependsOn(tasks.shadowJar)
 }
 
 val lingua by configurations.creating {

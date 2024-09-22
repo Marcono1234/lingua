@@ -116,6 +116,8 @@ For demonstration purposes there is also a GUI you can try for multi-language de
 ```sh
 java -jar build/libs/tiny-lingua-*-with-dependencies.jar
 ```
+(this `...-with-dependencies.jar` is part of the release artifacts, or can be built manually using `./gradlew shadowJar`)
+
 ![multi-language detection GUI screenshot](./images/multi-language-detection-gui.png)
 
 ## Performance tips
