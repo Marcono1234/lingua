@@ -300,13 +300,13 @@ val dokkaJavadocJar by tasks.registering(Jar::class) {
     group = "Build"
     description = "Assembles a jar archive containing Javadoc documentation."
     archiveClassifier = "javadoc"
-    from(tasks.dokkaHtml.flatMap { it.outputDirectory })
+    from(tasks.dokkaJavadoc.flatMap { it.outputDirectory })
 }
 val dokkaHtmlJar by tasks.registering(Jar::class) {
     group = "Build"
     description = "Assembles a jar archive containing Dokka HTML documentation."
     archiveClassifier = "dokka-html"
-    from(tasks.dokkaJavadoc.flatMap { it.outputDirectory })
+    from(tasks.dokkaHtml.flatMap { it.outputDirectory })
 }
 
 val sourcesJar by tasks.registering(Jar::class) {
