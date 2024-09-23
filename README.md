@@ -60,7 +60,8 @@ Requirements:
 > [!NOTE]\
 > Tiny Lingua is not published to Maven Central yet, you either need to [build it yourself](#building) and
 > then for example run [`./gradlew publishToMavenLocal`](https://docs.gradle.org/8.10.1/userguide/publishing_maven.html#publishing_maven:install)
-> to install it to your local Maven repository, or use a service like [JitPack](https://jitpack.io/#Marcono1234/tiny-lingua)[^1].
+> to install it to your local Maven repository, or use a service like [JitPack](https://jitpack.io/#Marcono1234/tiny-lingua)[^1].\
+> If you would like the artifacts of this project to be published, please add a reaction or comment on [this GitHub issue](https://github.com/Marcono1234/tiny-lingua/issues/5).
 
 ### Detect single language
 
