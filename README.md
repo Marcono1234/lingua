@@ -133,7 +133,19 @@ java -jar build/libs/tiny-lingua-*-with-dependencies.jar
 
 ## Building
 
-This project uses Gradle to build:
+The Git history of this project, including the history of the upstream Lingua project, has become quite
+large. It is therefore recommended to perform a shallow Git clone:
+
+- Only recent changes:
+    ```sh
+    git clone --depth=5 https://github.com/Marcono1234/tiny-lingua.git
+    ```
+- Changes since the first performance optimizations:
+    ```sh
+    git clone --shallow-since="2022-06-09T00:00:00Z" https://github.com/Marcono1234/tiny-lingua.git
+    ```
+
+Gradle is used for building this project:
 ```sh
 ./gradlew build
 ```
