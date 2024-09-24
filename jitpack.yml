@@ -1,4 +1,4 @@
 jdk:
   - openjdk11
 install:
-  - ./gradlew clean build publishToMavenLocal
+  - ./gradlew clean publishToMavenLocal -Porg.gradle.java.installations.auto-download=false
