@@ -26,7 +26,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
-        run: ./gradlew build
+        # Don't automatically download JDK toolchain; existing JDK of this workflow should be compatible
+        run: ./gradlew build -Porg.gradle.java.installations.auto-download=false
 
       - name: Check accuracy reports regression
         id: check-accuracy-reports

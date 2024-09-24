@@ -35,7 +35,8 @@ jobs:
           echo "Version: ${version}"
 
       - name: Create release artifacts
-        run: ./gradlew jar shadowJar sourcesJar dokkaJavadocJar dokkaHtmlJar
+        # Don't automatically download JDK toolchain; existing JDK of this workflow should be compatible
+        run: ./gradlew jar shadowJar sourcesJar dokkaJavadocJar dokkaHtmlJar -Porg.gradle.java.installations.auto-download=false
 
       - name: Create release and upload artifacts
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844  # v0.1.15
