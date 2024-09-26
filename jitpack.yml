@@ -1,4 +1,6 @@
 jdk:
   - openjdk11
 install:
-  - ./gradlew clean publishToMavenLocal -Porg.gradle.java.installations.auto-download=false
+  # Disable build cache; JitPack containers are probably single-use
+  # Disable download of JDK toolchain, JDK version specified above should already match
+  - ./gradlew clean publishToMavenLocal --no-build-cache -Porg.gradle.java.installations.auto-download=false
