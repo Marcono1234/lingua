@@ -31,7 +31,7 @@ internal class MultiLanguageModel(
     private var sections = emptyList<LanguageDetector.LanguageSection>()
     private var maxSectionLength: Int = 0
 
-    private val listeners: MutableList<(MultiLanguageModel) -> Unit> = mutableListOf()
+    private val listeners: MutableList<DetectionProgressListener> = mutableListOf()
 
     private var currentWorker: SwingWorker<*, *>? = null
 
@@ -42,7 +42,7 @@ internal class MultiLanguageModel(
         setLanguages(initialLanguages)
     }
 
-    fun addListener(listener: (MultiLanguageModel) -> Unit) {
+    fun addListener(listener: DetectionProgressListener) {
         listeners.add(listener)
     }
 
@@ -81,40 +81,43 @@ internal class MultiLanguageModel(
         currentWorker?.cancel(true)
         currentWorkerCancelled?.set(true)
 
-        if (languageDetector != null) {
-            val currentWorkerCancelled = AtomicBoolean(false)
-            this.currentWorkerCancelled = currentWorkerCancelled
-            // Store property value in local variable to safely access it from worker thread
-            val text = text
-            currentWorker =
-                object : SwingWorker<List<LanguageDetector.LanguageSection>, Unit>() {
-                    override fun doInBackground(): List<LanguageDetector.LanguageSection> {
-                        return languageDetector.detectMultiLanguageOf(text)
-                    }
-
-                    override fun done() {
-                        if (!isCancelled && !currentWorkerCancelled.get()) {
-                            val sections = get()
-                            sections.forEach {
-                                this@MultiLanguageModel.sectionsMap[it.start] =
-                                    DetectionEntry(
-                                        it.start,
-                                        it.end,
-                                        it.language,
-                                        it.confidenceValues,
-                                    )
-                            }
-                            maxSectionLength = sections.maxOfOrNull { it.end - it.start } ?: 0
-                            this@MultiLanguageModel.sections = sections
-
-                            listeners.forEach { it(this@MultiLanguageModel) }
-                        }
-                    }
-                }.also { it.execute() }
-        } else {
+        // Store `text` property value in local variable to safely access it from worker thread
+        val text = text
+        if (text.isEmpty() || languageDetector == null) {
             sections = emptyList()
-            listeners.forEach { it(this) }
+            listeners.forEach { it.detectionFinished(sections) }
+            return
         }
+
+        listeners.forEach { it.detectionStarted() }
+
+        val currentWorkerCancelled = AtomicBoolean(false)
+        this.currentWorkerCancelled = currentWorkerCancelled
+        currentWorker =
+            object : SwingWorker<List<LanguageDetector.LanguageSection>, Unit>() {
+                override fun doInBackground(): List<LanguageDetector.LanguageSection> {
+                    return languageDetector.detectMultiLanguageOf(text)
+                }
+
+                override fun done() {
+                    if (!isCancelled && !currentWorkerCancelled.get()) {
+                        val sections = get()
+                        sections.forEach {
+                            this@MultiLanguageModel.sectionsMap[it.start] =
+                                DetectionEntry(
+                                    it.start,
+                                    it.end,
+                                    it.language,
+                                    it.confidenceValues,
+                                )
+                        }
+                        maxSectionLength = sections.maxOfOrNull { it.end - it.start } ?: 0
+                        this@MultiLanguageModel.sections = sections
+
+                        listeners.forEach { it.detectionFinished(sections) }
+                    }
+                }
+            }.also { it.execute() }
     }
 
     /**

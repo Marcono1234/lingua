@@ -1,5 +1,6 @@
 package com.github.pemistahl.lingua.app.multilanguage
 
+import com.github.pemistahl.lingua.api.LanguageDetector
 import java.awt.Font
 import java.awt.event.MouseEvent
 import java.util.Locale
@@ -37,13 +38,17 @@ internal class MultiLanguageTextArea(
         )
         ToolTipManager.sharedInstance().registerComponent(this)
 
-        multiLanguageModel.addListener {
-            updateHighlightedSections()
-        }
+        multiLanguageModel.addListener(
+            object : DetectionProgressListener {
+                override fun detectionFinished(sections: List<LanguageDetector.LanguageSection>) {
+                    updateHighlightedSections(sections)
+                }
+            },
+        )
         languageColorMap.addListener { changedColors ->
             if (changedColors.keys.any(multiLanguageModel::hasEntryForLanguage)) {
                 // Update highlighted sections because their color has changed
-                updateHighlightedSections()
+                updateHighlightedSections(multiLanguageModel.getSections())
             }
         }
     }
@@ -68,13 +73,13 @@ internal class MultiLanguageTextArea(
         return multiLanguageModel.getEntryForIndex(offset)?.getRenderedString()
     }
 
-    private fun detectLanguages() {
+    fun detectLanguages() {
         multiLanguageModel.updateText(text)
     }
 
-    private fun updateHighlightedSections() {
+    private fun updateHighlightedSections(sections: List<LanguageDetector.LanguageSection>) {
         highlighter.removeAllHighlights()
-        multiLanguageModel.getSections().forEach { section ->
+        sections.forEach { section ->
             val painter = BorderedHighlightPainter(languageColorMap.getColor(section.language))
             highlighter.addHighlight(section.start, section.end, painter)
         }
